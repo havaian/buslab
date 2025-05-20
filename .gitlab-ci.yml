@@ -7,38 +7,29 @@ deploy:
     - shell
   variables:
     PROJECT_DIR: "/home/root/projects/buslab"
-    GIT_STRATEGY: none  # Prevent automatic checkout completely
+    GIT_STRATEGY: none  # Prevent automatic checkout
   script:
     - echo "Starting deployment..."
     - |
-      if [ -d "$PROJECT_DIR" ]; then
-        echo "Directory exists, checking if it's a git repository..."
-        if [ -d "$PROJECT_DIR/.git" ]; then
-          echo "Git repository already exists, will update it"
-          cd $PROJECT_DIR
-        else
-          echo "Directory exists but is not a git repository, cloning fresh..."
-          rm -rf $PROJECT_DIR
-          git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git $PROJECT_DIR
-          cd $PROJECT_DIR
-        fi
-      else
-        echo "Directory does not exist, cloning repository..."
-        mkdir -p $(dirname "$PROJECT_DIR")
-        git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git $PROJECT_DIR
-        cd $PROJECT_DIR
+      if [ ! -d "$PROJECT_DIR" ]; then
+        echo "❌ Directory $PROJECT_DIR does not exist"
+        exit 1
       fi
+    - cd $PROJECT_DIR
     - echo "✅ Pulling latest changes..."
-    - git checkout main || { echo "❌ Git checkout failed"; exit 1; }
+    # Use CI_JOB_TOKEN for authentication
+    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@${GITLAB_REMOTE_URL}
+    # Force checkout and pull latest changes
+    - echo "📥 Force pulling latest changes from repository..."
+    - git fetch --all || { echo "❌ Git fetch failed"; exit 1; }
+    - git reset --hard origin/main || { echo "❌ Git reset failed"; exit 1; }
     - git pull origin main || { echo "❌ Git pull failed"; exit 1; }
     - echo "✅ Executing deployment script..."
     # Run the deploy script
     - chmod +x deploy.sh
     - ./deploy.sh
   after_script:
-    - |
-      if [ -d "$PROJECT_DIR/.git" ]; then
-        cd $PROJECT_DIR && git remote set-url origin https://${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
-      fi
+    # Reset remote URL to prevent token exposure
+    - cd $PROJECT_DIR && git remote set-url origin https://${GITLAB_REMOTE_URL}
   only:
     - main
