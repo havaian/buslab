@@ -12,8 +12,8 @@ deploy:
     - echo "Starting deployment..."
     - |
       if [ ! -d "$PROJECT_DIR" ]; then
-        echo "❌ Directory $PROJECT_DIR does not exist"
-        exit 1
+        echo "Directory $PROJECT_DIR does not exist, creating..."
+        mkdir -p "$PROJECT_DIR"
       fi
     - cd $PROJECT_DIR
     - echo "✅ Pulling latest changes..."
