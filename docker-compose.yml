@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # MongoDB service
+  mongodb:
+    image: mongo:latest
+    container_name: buslab_mongodb
+    restart: always
+    ports:
+      - "${MONGODB_EXPOSE}:${MONGODB_PORT}"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - polyclinic_net
+    command: mongod --port ${MONGODB_PORT}
+
+  # Backend API service
+  backend:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: buslab_backend
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - MONGO_URI=mongodb://mongodb:${MONGODB_PORT}/${MONGO_DATABASE}
+    env_file:
+      - ./.env
+    ports:
+      - "${BACKEND_EXPOSE}:${BACKEND_PORT}"
+    networks:
+      - polyclinic_net
+
+volumes:
+  mongodb_data:
