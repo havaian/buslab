@@ -11,7 +11,7 @@ services:
     volumes:
       - mongodb_data:/data/db
     networks:
-      - polyclinic_net
+      - buslab_net
     command: mongod --port ${MONGODB_PORT}
 
   # Backend API service
@@ -22,20 +22,17 @@ services:
     container_name: buslab_backend
     restart: always
     depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - mongodb
     environment:
       - MONGO_URI=mongodb://mongodb:${MONGODB_PORT}/${MONGO_DATABASE}
     env_file:
       - ./.env
-    ports:
-      - "${BACKEND_EXPOSE}:${BACKEND_PORT}"
     networks:
-      - polyclinic_net
+      - buslab_net
 
 volumes:
   mongodb_data:
+
+networks:
+  buslab_net:
+    driver: bridge
