@@ -426,6 +426,8 @@ ${request.text}
       }
     });
 
+    // Reset to main menu keyboard
+    const { getMainMenuKeyboard } = require('./common');
     if (ctx.callbackQuery) {
       await ctx.reply('Вы отказались от обращения. Оно возвращено в общую очередь.');
     } else {

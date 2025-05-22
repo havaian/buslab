@@ -85,7 +85,7 @@ ${request.text}
       }
     });
 
-    // Update callback message
+    // Update callback message - REMOVE INLINE KEYBOARD
     await ctx.editMessageText(
       ctx.callbackQuery.message.text + '\n\n✅ Одобрено',
       { reply_markup: { inline_keyboard: [] } }
@@ -120,6 +120,12 @@ const handleDeclineRequest = async (ctx) => {
       await ctx.answerCbQuery('Это обращение уже обработано.');
       return;
     }
+
+    // IMMEDIATELY UPDATE THE CALLBACK MESSAGE TO REMOVE INLINE KEYBOARD
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text + '\n\n⏳ Отклонение обращения...',
+      { reply_markup: { inline_keyboard: [] } }
+    );
 
     // Set admin state to entering decline reason
     const user = await getOrCreateUser(ctx);
@@ -182,15 +188,11 @@ const handleDeclineReason = async (ctx, bot) => {
       `❌ Ваше обращение по категории "${request.categoryId.name}" отклонено.\n\nПричина: ${declineReason}`
     );
 
-    // Update admin chat
-    try {
-      await bot.telegram.sendMessage(
-        process.env.ADMIN_CHAT_ID,
-        `❌ Обращение #${request._id} отклонено.\nПричина: ${declineReason}`
-      );
-    } catch (err) {
-      console.error('Error updating admin message:', err);
-    }
+    // Send status message to admin chat (separate message)
+    await bot.telegram.sendMessage(
+      process.env.ADMIN_CHAT_ID,
+      `❌ Обращение #${request._id} отклонено.\nПричина: ${declineReason}`
+    );
 
     await ctx.reply(`Обращение #${request._id} успешно отклонено.`);
     adminStates.delete(user.telegramId);
@@ -243,13 +245,15 @@ const handleApproveAnswer = async (ctx, bot) => {
       `✅ Ваш запрос по категории "${request.categoryId.name}" был обработан.\n\n📝 Ответ:\n${request.answerText}`
     );
 
-    // Notify student
+    // Notify student with main menu keyboard reset
+    const { getMainMenuKeyboard } = require('./common');
     await bot.telegram.sendMessage(
       student.telegramId,
-      `✅ Ваш ответ на обращение #${request._id} был одобрен и отправлен пользователю.`
+      `✅ Ваш ответ на обращение #${request._id} был одобрен и отправлен пользователю.`,
+      getMainMenuKeyboard()
     );
 
-    // Update callback message
+    // Update callback message to remove inline keyboard
     await ctx.editMessageText(
       ctx.callbackQuery.message.text + '\n\n✅ Одобрено и отправлено пользователю',
       { reply_markup: { inline_keyboard: [] } }
@@ -285,6 +289,12 @@ const handleDeclineAnswer = async (ctx) => {
       await ctx.answerCbQuery('Это обращение находится в неправильном статусе.');
       return;
     }
+
+    // IMMEDIATELY UPDATE THE CALLBACK MESSAGE TO REMOVE INLINE KEYBOARD
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text + '\n\n⏳ Отклонение ответа...',
+      { reply_markup: { inline_keyboard: [] } }
+    );
 
     // Set admin state to entering decline reason
     const user = await getOrCreateUser(ctx);
@@ -340,7 +350,7 @@ const handleAnswerDeclineReason = async (ctx, bot) => {
     request.adminComment = declineReason;
     await request.save();
 
-    // Notify student
+    // Notify student with options
     await bot.telegram.sendMessage(
       request.studentId.telegramId,
       `❌ Ваш ответ на обращение #${request._id} по категории "${request.categoryId.name}" был отклонен.\n\nКомментарий: ${declineReason}\n\nВыберите действие:`,
@@ -352,19 +362,11 @@ const handleAnswerDeclineReason = async (ctx, bot) => {
       ])
     );
 
-    // Update callback message
-    try {
-      await ctx.editMessageText(
-        ctx.callbackQuery.message.text + '\n\n❌ Отклонено\nПричина: ' + declineReason,
-        { reply_markup: { inline_keyboard: [] } }
-      );
-    } catch (err) {
-      console.error('Error updating admin message:', err);
-      await bot.telegram.sendMessage(
-        process.env.ADMIN_CHAT_ID,
-        `❌ Ответ на обращение #${request._id} отклонен.\nПричина: ${declineReason}`
-      );
-    }
+    // Send status message to admin chat (separate message)
+    await bot.telegram.sendMessage(
+      process.env.ADMIN_CHAT_ID,
+      `❌ Ответ на обращение #${request._id} отклонен.\nПричина: ${declineReason}`
+    );
 
     await ctx.reply(`Ответ на обращение #${request._id} успешно отклонен.`);
     adminStates.delete(user.telegramId);
