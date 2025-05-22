@@ -40,7 +40,8 @@ const getMainMenuKeyboard = () => {
   return Markup.keyboard([
     ['Задать вопрос'],
     ['FAQ'],
-    ['Мои обращения']
+    ['Мои обращения'],
+    ['❓ Помощь']
   ]).resize();
 };
 
@@ -51,7 +52,7 @@ const getMainMenuKeyboard = () => {
 const getStudentMenuKeyboard = () => {
   return Markup.keyboard([
     ['Текущее обращение'],
-    ['Назад']
+    ['Мои ответы']
   ]).resize();
 };
 

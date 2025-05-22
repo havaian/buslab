@@ -1,5 +1,5 @@
 const { Markup } = require('telegraf');
-const { getOrCreateUser, getMainMenuKeyboard, getBackKeyboard } = require('./common');
+const { getOrCreateUser, getMainMenuKeyboard, getStudentMenuKeyboard, getBackKeyboard } = require('./common');
 const Category = require('../models/category');
 const Request = require('../models/request');
 const FAQ = require('../models/faq');
@@ -256,7 +256,11 @@ const handleMyRequests = async (ctx) => {
       message += `   Дата: ${date}\n`;
       
       if (request.status === 'closed' && request.answerText) {
-        message += `   [Просмотреть ответ](tg://request?${request._id})\n`;
+        // Truncate long answers for better readability
+        const truncatedAnswer = request.answerText.length > 200 
+          ? request.answerText.substring(0, 197) + '...' 
+          : request.answerText;
+        message += `   📝 Ответ: ${truncatedAnswer}\n`;
       }
       
       if (request.status === 'declined' && request.adminComment) {
@@ -444,10 +448,14 @@ const handleBack = async (ctx) => {
         faqKeyboard.push(['Назад']);
         await ctx.reply('Выберите категорию FAQ:', Markup.keyboard(faqKeyboard).resize());
         break;
-        
+      
       default:
         userStates.delete(user.telegramId);
-        await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+        if (isStudent(user)) {
+          await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+        } else {
+          await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+        }
     }
     
     await logAction('user_pressed_back', { userId: user._id });

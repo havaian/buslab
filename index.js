@@ -100,10 +100,12 @@ bot.hears('Назад', userHandlers.handleBack);
 bot.hears('❓ Помощь', userHandlers.handleHelp); // Keep help button handler
 
 // Student-specific handlers
-bot.hears('Текущее обращение', studentHandlers.handleMyAssignment);
 bot.hears('Подтвердить отправку ответа', (ctx) => studentHandlers.handleConfirmAnswer(ctx, bot));
 bot.hears('Изменить ответ', studentHandlers.handleEditAnswer);
 bot.hears('Отказаться от обращения', (ctx) => studentHandlers.handleRejectAssignment(ctx, bot));
+bot.hears('Мои ответы', studentHandlers.handleMyAnswers);
+bot.hears('Текущее обращение', studentHandlers.handleCurrentAssignment);
+bot.hears('Статистика', studentHandlers.handleStudentStats);
 
 // Admin callback handlers
 bot.action(/approve_request:(.+)/, (ctx) => adminHandlers.handleApproveRequest(ctx, bot));

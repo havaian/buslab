@@ -1,7 +1,7 @@
 const { Markup } = require('telegraf');
 const User = require('../models/user');
 const Request = require('../models/request');
-const { getOrCreateUser, getMainMenuKeyboard, canTakeRequests, isInStudentChat } = require('./common');
+const { isStudent, getOrCreateUser, getStudentMenuKeyboard, canTakeRequests } = require('./common');
 const { logAction, logWarn } = require('../logger');
 
 // Student state management (in-memory for simplicity)
@@ -105,78 +105,195 @@ ${request.text}
 };
 
 /**
- * Handle "Текущее обращение" button for students
+ * Handle "Мои ответы" action for students
  */
-const handleMyAssignment = async (ctx) => {
+const handleMyAnswers = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
-    
+
     if (!isStudent(user)) {
-      await ctx.reply('У вас нет прав студента.');
+      await ctx.reply('Эта функция доступна только студентам.');
       return;
     }
-    
+
+    // Get all requests handled by this student
+    const requests = await Request.find({ studentId: user._id })
+      .sort({ updatedAt: -1 })
+      .populate('categoryId')
+      .populate('userId');
+
+    if (requests.length === 0) {
+      await ctx.reply('Вы пока не обработали ни одного обращения.');
+      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+      return;
+    }
+
+    let message = '📋 Ваши ответы на обращения:\n\n';
+
+    requests.forEach((request, index) => {
+      const statusMap = {
+        'assigned': '🔄 В обработке',
+        'answered': '✅ Ответ на проверке',
+        'closed': '✅ Принято'
+      };
+
+      const date = request.updatedAt.toLocaleDateString('ru-RU');
+      const userInfo = request.userId.username
+        ? `@${request.userId.username}`
+        : `ID:${request.userId.telegramId}`;
+
+      message += `${index + 1}. ${request.categoryId.name} - ${statusMap[request.status]}\n`;
+      message += `   Пользователь: ${userInfo}\n`;
+      message += `   Дата: ${date}\n`;
+
+      if (request.answerText) {
+        const truncatedAnswer = request.answerText.length > 150
+          ? request.answerText.substring(0, 147) + '...'
+          : request.answerText;
+        message += `   📝 Ваш ответ: ${truncatedAnswer}\n`;
+      }
+
+      if (request.adminComment) {
+        message += `   💬 Комментарий администратора: ${request.adminComment}\n`;
+      }
+
+      message += '\n';
+    });
+
+    await ctx.reply(message);
+    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+
+    await logAction('student_viewed_answers', { userId: user._id });
+  } catch (error) {
+    console.error('Error handling student answers:', error);
+    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+  }
+};
+
+/**
+ * Handle "Текущее обращение" action for students
+ */
+const handleCurrentAssignment = async (ctx) => {
+  try {
+    const user = await getOrCreateUser(ctx);
+
+    if (!isStudent(user)) {
+      await ctx.reply('Эта функция доступна только студентам.');
+      return;
+    }
+
     if (!user.currentAssignmentId) {
-      await ctx.reply('У вас нет активных заданий.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply('У вас нет активных обращений в работе.');
+      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
       return;
     }
-    
-    // Get current assignment details
+
     const request = await Request.findById(user.currentAssignmentId)
       .populate('categoryId')
       .populate('userId');
-    
+
     if (!request) {
+      await ctx.reply('Текущее обращение не найдено.');
       // Clear invalid assignment
       user.currentAssignmentId = null;
       await user.save();
-      await ctx.reply('Задание не найдено. Возможно, оно было отменено.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
       return;
     }
-    
+
     const statusMap = {
       'assigned': '🔄 В обработке',
-      'answered': '✅ Ответ отправлен на проверку'
+      'answered': '✅ Ответ на проверке'
     };
-    
-    const requesterName = request.userId.username 
-      ? `@${request.userId.username}` 
-      : `${request.userId.firstName || 'Пользователь'} (ID: ${request.userId.telegramId})`;
-    
-    let message = `👨‍🎓 Ваше текущее задание\n\n`;
-    message += `📨 Обращение #${request._id}\n`;
+
+    const userInfo = request.userId.username
+      ? `@${request.userId.username}`
+      : `ID:${request.userId.telegramId}`;
+
+    let message = `📨 Текущее обращение #${request._id}\n`;
     message += `📂 Категория: ${request.categoryId.name} ${request.categoryId.hashtag}\n`;
-    message += `👤 От: ${requesterName}\n`;
-    message += `📅 Дата: ${request.createdAt.toLocaleDateString('ru-RU')}\n`;
-    message += `📊 Статус: ${statusMap[request.status] || request.status}\n\n`;
-    message += `📝 Текст обращения:\n${request.text}\n\n`;
-    
+    message += `👤 Пользователь: ${userInfo}\n`;
+    message += `📊 Статус: ${statusMap[request.status]}\n`;
+    message += `📅 Дата получения: ${request.createdAt.toLocaleDateString('ru-RU')}\n\n`;
+    message += `📝 Текст обращения:\n${request.text}\n`;
+
     if (request.answerText) {
-      message += `✏️ Ваш ответ:\n${request.answerText}\n\n`;
+      message += `\n✏️ Ваш ответ:\n${request.answerText}`;
     }
-    
-    if (request.status === 'answered') {
-      message += `⏳ Ваш ответ отправлен администратору на проверку.`;
-      await ctx.reply(message, Markup.keyboard([['Назад']]).resize());
-    } else {
-      message += `💡 Напишите ваш ответ и нажмите "Подтвердить отправку ответа".`;
-      await ctx.reply(message, Markup.keyboard([
-        ['Подтвердить отправку ответа'],
-        ['Изменить ответ'],
+
+    if (request.adminComment) {
+      message += `\n💬 Комментарий администратора:\n${request.adminComment}`;
+    }
+
+    await ctx.reply(message);
+
+    // Show appropriate keyboard based on status
+    if (request.status === 'assigned') {
+      await ctx.reply('Выберите действие:', Markup.keyboard([
         ['Отказаться от обращения'],
         ['Назад']
       ]).resize());
+    } else {
+      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
     }
-    
-    await logAction('student_viewed_assignment', { 
-      userId: user._id, 
-      requestId: request._id 
+
+    await logAction('student_viewed_current_assignment', {
+      userId: user._id,
+      requestId: request._id
     });
   } catch (error) {
-    console.error('Error handling my assignment:', error);
+    console.error('Error handling current assignment:', error);
     await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+  }
+};
+
+/**
+ * Handle "Статистика" action for students
+ */
+const handleStudentStats = async (ctx) => {
+  try {
+    const user = await getOrCreateUser(ctx);
+
+    if (!isStudent(user)) {
+      await ctx.reply('Эта функция доступна только студентам.');
+      return;
+    }
+
+    const totalAssigned = await Request.countDocuments({ studentId: user._id });
+    const inProgress = await Request.countDocuments({
+      studentId: user._id,
+      status: 'assigned'
+    });
+    const awaitingReview = await Request.countDocuments({
+      studentId: user._id,
+      status: 'answered'
+    });
+    const completed = await Request.countDocuments({
+      studentId: user._id,
+      status: 'closed'
+    });
+
+    let message = `📊 Ваша статистика:\n\n`;
+    message += `📨 Всего обращений: ${totalAssigned}\n`;
+    message += `🔄 В работе: ${inProgress}\n`;
+    message += `✅ На проверке: ${awaitingReview}\n`;
+    message += `✅ Завершено: ${completed}\n`;
+
+    if (totalAssigned > 0) {
+      const completionRate = ((completed / totalAssigned) * 100).toFixed(1);
+      message += `\n📈 Процент завершения: ${completionRate}%`;
+    }
+
+    await ctx.reply(message);
+    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+
+    await logAction('student_viewed_stats', { userId: user._id });
+  } catch (error) {
+    console.error('Error handling student stats:', error);
+    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
   }
 };
 
@@ -453,11 +570,13 @@ ${request.text}
 
 module.exports = {
   handleTakeRequest,
-  handleMyAssignment,
   handleStudentAnswer,
   handleConfirmAnswer,
   handleEditAnswer,
   handleEditAnswerCallback,
   handleRejectAssignment,
+  handleMyAnswers,
+  handleCurrentAssignment,
+  handleStudentStats, 
   studentStates
 };
