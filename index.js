@@ -12,14 +12,14 @@ const faqHandlers = require('./handlers/faq');
 const requestHandlers = require('./handlers/request');
 
 // Import logger
-const { logAction } = require('./logger');
+const { logAction, logUserMessage, logError, logInfo, logWarn } = require('./logger');
 
 // Check required environment variables
 const requiredEnvVars = ['BOT_TOKEN', 'MONGO_URI', 'ADMIN_CHAT_ID', 'STUDENT_CHAT_ID'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
-  console.error(`Error: Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  logError(new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`));
   process.exit(1);
 }
 
@@ -29,26 +29,35 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('Connected to MongoDB');
+    logInfo('Connected to MongoDB', { database: process.env.MONGO_URI.split('/').pop() });
   })
   .catch(err => {
-    console.error('Error connecting to MongoDB:', err);
+    logError(err, { context: 'MongoDB connection failed' });
     process.exit(1);
   });
 
 // Setup middleware
 bot.use(session());
 
-// Log all messages
+// Enhanced logging middleware
 bot.use(async (ctx, next) => {
   try {
     if (ctx.message && ctx.message.text) {
-      const user = ctx.from;
-      console.log(`[${new Date().toISOString()}] ${user.username || user.id}: ${ctx.message.text}`);
+      logUserMessage(ctx.from, ctx.message.text);
     }
+    
+    // Log callback queries
+    if (ctx.callbackQuery) {
+      logAction('callback_query', {
+        userId: ctx.from.id,
+        username: ctx.from.username,
+        data: ctx.callbackQuery.data
+      });
+    }
+    
     return next();
   } catch (error) {
-    console.error('Error in logging middleware:', error);
+    logError(error, { context: 'Logging middleware error' });
     return next();
   }
 });
@@ -144,7 +153,7 @@ bot.on('message', async (ctx, next) => {
         return next();
     }
   } catch (error) {
-    console.error('Error in user state handler:', error);
+    logError(error, { context: 'User state handler error', userId: ctx.from.id });
     return next();
   }
 });
@@ -184,11 +193,17 @@ bot.on('message', async (ctx, next) => {
       case 'entering_faq_answer':
         await adminHandlers.handleFAQAnswer(ctx);
         break;
+      case 'entering_new_faq_question':
+        await adminHandlers.handleNewFAQQuestion(ctx);
+        break;
+      case 'entering_new_faq_answer':
+        await adminHandlers.handleNewFAQAnswer(ctx);
+        break;
       default:
         return next();
     }
   } catch (error) {
-    console.error('Error in admin state handler:', error);
+    logError(error, { context: 'Admin state handler error', userId: ctx.from.id });
     return next();
   }
 });
@@ -218,51 +233,59 @@ bot.on('message', async (ctx, next) => {
       return next();
     }
   } catch (error) {
-    console.error('Error in student answer handler:', error);
+    logError(error, { context: 'Student answer handler error', userId: ctx.from.id });
     return next();
   }
 });
 
-// Error handling
+// Enhanced error handling
 bot.catch((err, ctx) => {
-  console.error(`Error for ${ctx.updateType}:`, err);
+  const errorContext = {
+    updateType: ctx.updateType,
+    userId: ctx.from ? ctx.from.id : null,
+    username: ctx.from ? ctx.from.username : null,
+    chatId: ctx.chat ? ctx.chat.id : null,
+    messageId: ctx.message ? ctx.message.message_id : null
+  };
+  
+  logError(err, errorContext);
   
   // Try to respond to user when error occurs
   try {
     ctx.reply('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз позже.');
   } catch (replyErr) {
-    console.error('Error sending error message:', replyErr);
+    logError(replyErr, { context: 'Error sending error message to user' });
   }
-  
-  // Log the error
-  logAction('bot_error', {
-    error: err.message,
-    stack: err.stack,
-    updateType: ctx.updateType,
-    userId: ctx.from ? ctx.from.id : null
-  });
 });
+
+// Graceful shutdown handlers
+const gracefulShutdown = (signal) => {
+  logInfo(`Bot shutting down due to ${signal}...`);
+  
+  bot.stop(signal)
+    .then(() => {
+      logInfo(`Bot stopped successfully (${signal})`);
+      process.exit(0);
+    })
+    .catch((err) => {
+      logError(err, { context: `Error stopping bot on ${signal}` });
+      process.exit(1);
+    });
+};
 
 // Launch bot
 bot.launch()
   .then(() => {
-    console.log('Bot started successfully');
-    logAction('bot_started');
+    logInfo('Bot started successfully', { 
+      nodeEnv: process.env.NODE_ENV || 'production',
+      pid: process.pid
+    });
   })
   .catch(err => {
-    console.error('Error starting bot:', err);
+    logError(err, { context: 'Bot startup failed' });
     process.exit(1);
   });
 
 // Enable graceful stop
-process.once('SIGINT', () => {
-  bot.stop('SIGINT');
-  console.log('Bot stopped due to SIGINT');
-  process.exit(0);
-});
-
-process.once('SIGTERM', () => {
-  bot.stop('SIGTERM');
-  console.log('Bot stopped due to SIGTERM');
-  process.exit(0);
-});
+process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));

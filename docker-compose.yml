@@ -27,6 +27,9 @@ services:
       - MONGO_URI=mongodb://mongodb:${MONGODB_PORT}/${MONGO_DATABASE}
     env_file:
       - ./.env
+    volumes:
+      # Mount logs directory to host machine for persistent log storage
+      - ./logs:/app/logs
     networks:
       - buslab_net
 

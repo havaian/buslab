@@ -9,10 +9,10 @@ const { logAction } = require('../logger');
  */
 const getOrCreateUser = async (ctx) => {
   const telegramUser = ctx.from;
-  
+
   try {
     let user = await User.findOne({ telegramId: telegramUser.id });
-    
+
     if (!user) {
       user = new User({
         telegramId: telegramUser.id,
@@ -20,11 +20,11 @@ const getOrCreateUser = async (ctx) => {
         lastName: telegramUser.last_name,
         username: telegramUser.username
       });
-      
+
       await user.save();
-      await logAction('user_registered', { userId: user._id });
+      logAction('user_registered', { userId: user._id });
     }
-    
+
     return user;
   } catch (error) {
     console.error('Error getting or creating user:', error);
@@ -62,12 +62,21 @@ const isAdmin = (user) => {
 };
 
 /**
- * Check if user is student
- * @param {Object} user - User object
- * @returns {Boolean} - Is student
+ * Check if user is in student chat (can take requests)
+ * @param {Object} ctx - Telegram context
+ * @returns {Boolean} - Is in student chat
  */
-const isStudent = (user) => {
-  return user.role === 'student';
+const isInStudentChat = (ctx) => {
+  return ctx.chat && ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID;
+};
+
+/**
+ * Check if user can take requests (is in student chat)
+ * @param {Object} ctx - Telegram context
+ * @returns {Boolean} - Can take requests
+ */
+const canTakeRequests = (ctx) => {
+  return isInStudentChat(ctx);
 };
 
 module.exports = {
@@ -75,5 +84,6 @@ module.exports = {
   getMainMenuKeyboard,
   getBackKeyboard,
   isAdmin,
-  isStudent
+  isInStudentChat,
+  canTakeRequests
 };
