@@ -14,7 +14,7 @@ const handleTakeRequest = async (ctx, bot) => {
   try {
     // Check if user is in student chat
     if (!canTakeRequests(ctx)) {
-      await ctx.answerCallbackQuery('Эта функция доступна только в студенческом чате.');
+      await ctx.answerCbQuery('Эта функция доступна только в студенческом чате.');
       return;
     }
 
@@ -25,20 +25,27 @@ const handleTakeRequest = async (ctx, bot) => {
       .populate('categoryId');
 
     if (!request) {
-      await ctx.answerCallbackQuery('Обращение не найдено.');
+      await ctx.answerCbQuery('Обращение не найдено.');
       return;
     }
 
     if (request.status !== 'approved') {
-      await ctx.answerCallbackQuery('Это обращение уже взято в работу или находится в другом статусе.');
+      await ctx.answerCbQuery('Это обращение уже взято в работу или находится в другом статусе.');
       return;
     }
 
     const user = await getOrCreateUser(ctx);
 
+    // *** AUTO-ASSIGN STUDENT ROLE IF NOT ALREADY SET ***
+    if (user.role === 'user') {
+      user.role = 'student';
+      await user.save();
+      logAction('user_auto_became_student', { userId: user._id });
+    }
+
     // Check if user already has an active assignment
     if (user.currentAssignmentId) {
-      await ctx.answerCallbackQuery('Вы уже обрабатываете другое обращение. Завершите его, прежде чем брать новое.');
+      await ctx.answerCbQuery('Вы уже обрабатываете другое обращение. Завершите его, прежде чем брать новое.');
       return;
     }
 
@@ -73,6 +80,8 @@ ${request.text}
       user.telegramId,
       detailMessage,
       Markup.keyboard([
+        ['Подтвердить отправку ответа'],
+        ['Изменить ответ'],
         ['Отказаться от обращения']
       ]).resize()
     );
@@ -83,15 +92,91 @@ ${request.text}
       requestId: request._id
     });
 
-    await ctx.answerCallbackQuery('Обращение взято в работу.');
+    await ctx.answerCbQuery('Обращение взято в работу. Проверьте личные сообщения.');
     logAction('student_took_request', {
       studentId: user._id,
       requestId: request._id,
-      studentChat: true
+      autoPromoted: user.role === 'student'
     });
   } catch (error) {
     console.error('Error handling take request:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+  }
+};
+
+/**
+ * Handle "Текущее обращение" button for students
+ */
+const handleMyAssignment = async (ctx) => {
+  try {
+    const user = await getOrCreateUser(ctx);
+    
+    if (!isStudent(user)) {
+      await ctx.reply('У вас нет прав студента.');
+      return;
+    }
+    
+    if (!user.currentAssignmentId) {
+      await ctx.reply('У вас нет активных заданий.');
+      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      return;
+    }
+    
+    // Get current assignment details
+    const request = await Request.findById(user.currentAssignmentId)
+      .populate('categoryId')
+      .populate('userId');
+    
+    if (!request) {
+      // Clear invalid assignment
+      user.currentAssignmentId = null;
+      await user.save();
+      await ctx.reply('Задание не найдено. Возможно, оно было отменено.');
+      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      return;
+    }
+    
+    const statusMap = {
+      'assigned': '🔄 В обработке',
+      'answered': '✅ Ответ отправлен на проверку'
+    };
+    
+    const requesterName = request.userId.username 
+      ? `@${request.userId.username}` 
+      : `${request.userId.firstName || 'Пользователь'} (ID: ${request.userId.telegramId})`;
+    
+    let message = `👨‍🎓 Ваше текущее задание\n\n`;
+    message += `📨 Обращение #${request._id}\n`;
+    message += `📂 Категория: ${request.categoryId.name} ${request.categoryId.hashtag}\n`;
+    message += `👤 От: ${requesterName}\n`;
+    message += `📅 Дата: ${request.createdAt.toLocaleDateString('ru-RU')}\n`;
+    message += `📊 Статус: ${statusMap[request.status] || request.status}\n\n`;
+    message += `📝 Текст обращения:\n${request.text}\n\n`;
+    
+    if (request.answerText) {
+      message += `✏️ Ваш ответ:\n${request.answerText}\n\n`;
+    }
+    
+    if (request.status === 'answered') {
+      message += `⏳ Ваш ответ отправлен администратору на проверку.`;
+      await ctx.reply(message, Markup.keyboard([['Назад']]).resize());
+    } else {
+      message += `💡 Напишите ваш ответ и нажмите "Подтвердить отправку ответа".`;
+      await ctx.reply(message, Markup.keyboard([
+        ['Подтвердить отправку ответа'],
+        ['Изменить ответ'],
+        ['Отказаться от обращения'],
+        ['Назад']
+      ]).resize());
+    }
+    
+    await logAction('student_viewed_assignment', { 
+      userId: user._id, 
+      requestId: request._id 
+    });
+  } catch (error) {
+    console.error('Error handling my assignment:', error);
+    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -249,14 +334,14 @@ const handleEditAnswerCallback = async (ctx) => {
       .populate('categoryId');
 
     if (!request) {
-      await ctx.answerCallbackQuery('Обращение не найдено.');
+      await ctx.answerCbQuery('Обращение не найдено.');
       return;
     }
 
     const user = await getOrCreateUser(ctx);
 
     if (request.studentId.toString() !== user._id.toString()) {
-      await ctx.answerCallbackQuery('Это обращение назначено другому исполнителю.');
+      await ctx.answerCbQuery('Это обращение назначено другому исполнителю.');
       return;
     }
 
@@ -266,7 +351,7 @@ const handleEditAnswerCallback = async (ctx) => {
       requestId: request._id
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       'Введите ваш ответ заново:',
       Markup.keyboard([
@@ -275,7 +360,7 @@ const handleEditAnswerCallback = async (ctx) => {
     );
   } catch (error) {
     console.error('Error handling edit answer callback:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -288,7 +373,7 @@ const handleRejectAssignment = async (ctx, bot) => {
 
     if (!user.currentAssignmentId) {
       if (ctx.callbackQuery) {
-        await ctx.answerCallbackQuery('У вас нет активных обращений.');
+        await ctx.answerCbQuery('У вас нет активных обращений.');
       } else {
         await ctx.reply('У вас нет активных обращений.');
       }
@@ -300,7 +385,7 @@ const handleRejectAssignment = async (ctx, bot) => {
     // Handle both text button and callback
     if (ctx.callbackQuery) {
       requestId = ctx.callbackQuery.data.split(':')[1];
-      await ctx.answerCallbackQuery();
+      await ctx.answerCbQuery();
     } else {
       requestId = user.currentAssignmentId;
     }
@@ -357,7 +442,7 @@ ${request.text}
   } catch (error) {
     console.error('Error handling reject assignment:', error);
     if (ctx.callbackQuery) {
-      await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+      await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
     } else {
       await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
     }
@@ -366,6 +451,7 @@ ${request.text}
 
 module.exports = {
   handleTakeRequest,
+  handleMyAssignment,
   handleStudentAnswer,
   handleConfirmAnswer,
   handleEditAnswer,

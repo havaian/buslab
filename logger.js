@@ -9,42 +9,62 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Define log format
+// Define log format with timezone
 const logFormat = winston.format.combine(
   winston.format.timestamp({
-    format: 'YYYY-MM-DD HH:mm:ss'
+    format: () => {
+      // Add +5 timezone (Tashkent/Uzbekistan)
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const tashkentTime = new Date(utc + (5 * 3600000)); // UTC+5
+      return tashkentTime.toISOString().replace('T', ' ').replace(/\..+/, '');
+    }
   }),
   winston.format.errors({ stack: true }),
   winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
     let log = `${timestamp} [${level.toUpperCase()}]: ${message}`;
-    
+
     // Add metadata if present
     if (Object.keys(meta).length > 0) {
       log += ` | ${JSON.stringify(meta)}`;
     }
-    
+
     // Add stack trace for errors
     if (stack) {
       log += `\n${stack}`;
     }
-    
+
     return log;
   })
 );
 
-// Console format for development
+// Console format for development with timezone
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({
-    format: 'HH:mm:ss'
+    format: () => {
+      // Add +5 timezone for console output too
+      const now = new Date();
+      const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const tashkentTime = new Date(utc + (5 * 3600000)); // UTC+5
+      return tashkentTime.toLocaleString('en-GB', {
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$2-$1');
+    }
   }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
     let log = `${timestamp} ${level}: ${message}`;
-    
+
     if (Object.keys(meta).length > 0) {
       log += ` ${JSON.stringify(meta, null, 2)}`;
     }
-    
+
     return log;
   })
 );
@@ -66,7 +86,7 @@ const logger = winston.createLogger({
       handleExceptions: true,
       handleRejections: true
     }),
-    
+
     // Combined logs - all levels
     new DailyRotateFile({
       filename: path.join(logsDir, 'combined-%DATE%.log'),
@@ -75,7 +95,7 @@ const logger = winston.createLogger({
       maxFiles: '5', // Keep 5 days worth of logs (500MB total at 100MB per day)
       zippedArchive: true
     }),
-    
+
     // Console output
     new winston.transports.Console({
       format: consoleFormat,
@@ -83,7 +103,7 @@ const logger = winston.createLogger({
       handleRejections: true
     })
   ],
-  
+
   // Don't exit on handled exceptions
   exitOnError: false
 });
@@ -114,7 +134,7 @@ const logUserMessage = (user, message) => {
   const firstName = user.first_name || '';
   const lastName = user.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
-  
+
   logAction('user_message', {
     userId: user.id,
     username: user.username,

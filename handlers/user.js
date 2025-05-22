@@ -186,6 +186,42 @@ ${userState.requestText}
 };
 
 /**
+ * Handle "Изменить" (Edit request) button - NEW FUNCTION
+ */
+const handleEditRequest = async (ctx) => {
+  try {
+    const user = await getOrCreateUser(ctx);
+    const userState = userStates.get(user.telegramId);
+    
+    if (!userState || !userState.categoryId) {
+      await ctx.reply('Что-то пошло не так. Пожалуйста, начните заново.');
+      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      return;
+    }
+
+    // Update user state to allow re-entering request text
+    userStates.set(user.telegramId, { 
+      state: 'entering_request',
+      categoryId: userState.categoryId
+    });
+
+    await ctx.reply(
+      'Введите текст вашего юридического вопроса заново (не менее 150 символов):', 
+      getBackKeyboard()
+    );
+    
+    await logAction('user_editing_request', { 
+      userId: user._id, 
+      categoryId: userState.categoryId 
+    });
+  } catch (error) {
+    console.error('Error handling edit request:', error);
+    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+  }
+};
+
+/**
  * Handle "Мои обращения" action
  */
 const handleMyRequests = async (ctx) => {
@@ -496,6 +532,7 @@ module.exports = {
   handleCategorySelection,
   handleRequestText,
   handleRequestConfirmation,
+  handleEditRequest,
   handleMyRequests,
   handleFAQ,
   handleFAQCategorySelection,

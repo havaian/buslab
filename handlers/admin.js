@@ -46,12 +46,12 @@ const handleApproveRequest = async (ctx, bot) => {
       .populate('categoryId');
 
     if (!request) {
-      await ctx.answerCallbackQuery('Обращение не найдено.');
+      await ctx.answerCbQuery('Обращение не найдено.');
       return;
     }
 
     if (request.status !== 'pending') {
-      await ctx.answerCallbackQuery('Это обращение уже обработано.');
+      await ctx.answerCbQuery('Это обращение уже обработано.');
       return;
     }
 
@@ -91,14 +91,14 @@ ${request.text}
       { reply_markup: { inline_keyboard: [] } }
     );
 
-    await ctx.answerCallbackQuery('Обращение одобрено и отправлено исполнителям.');
+    await ctx.answerCbQuery('Обращение одобрено и отправлено исполнителям.');
     logAction('admin_approved_request', {
       adminId: ctx.from.id,
       requestId: request._id
     });
   } catch (error) {
     console.error('Error handling approve request:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -112,12 +112,12 @@ const handleDeclineRequest = async (ctx) => {
     const request = await Request.findById(requestId);
 
     if (!request) {
-      await ctx.answerCallbackQuery('Обращение не найдено.');
+      await ctx.answerCbQuery('Обращение не найдено.');
       return;
     }
 
     if (request.status !== 'pending') {
-      await ctx.answerCallbackQuery('Это обращение уже обработано.');
+      await ctx.answerCbQuery('Это обращение уже обработано.');
       return;
     }
 
@@ -128,14 +128,14 @@ const handleDeclineRequest = async (ctx) => {
       requestId
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Введите причину отклонения обращения #${requestId}:`,
       Markup.forceReply()
     );
   } catch (error) {
     console.error('Error handling decline request:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -219,12 +219,12 @@ const handleApproveAnswer = async (ctx, bot) => {
       .populate('studentId');
 
     if (!request) {
-      await ctx.answerCallbackQuery('Обращение не найдено.');
+      await ctx.answerCbQuery('Обращение не найдено.');
       return;
     }
 
     if (request.status !== 'answered') {
-      await ctx.answerCallbackQuery('Это обращение находится в неправильном статусе.');
+      await ctx.answerCbQuery('Это обращение находится в неправильном статусе.');
       return;
     }
 
@@ -255,7 +255,7 @@ const handleApproveAnswer = async (ctx, bot) => {
       { reply_markup: { inline_keyboard: [] } }
     );
 
-    await ctx.answerCallbackQuery('Ответ одобрен и отправлен пользователю.');
+    await ctx.answerCbQuery('Ответ одобрен и отправлен пользователю.');
     logAction('admin_approved_answer', {
       adminId: ctx.from.id,
       requestId: request._id,
@@ -263,7 +263,7 @@ const handleApproveAnswer = async (ctx, bot) => {
     });
   } catch (error) {
     console.error('Error handling approve answer:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -277,12 +277,12 @@ const handleDeclineAnswer = async (ctx) => {
     const request = await Request.findById(requestId);
 
     if (!request) {
-      await ctx.answerCallbackQuery('Обращение не найдено.');
+      await ctx.answerCbQuery('Обращение не найдено.');
       return;
     }
 
     if (request.status !== 'answered') {
-      await ctx.answerCallbackQuery('Это обращение находится в неправильном статусе.');
+      await ctx.answerCbQuery('Это обращение находится в неправильном статусе.');
       return;
     }
 
@@ -293,14 +293,14 @@ const handleDeclineAnswer = async (ctx) => {
       requestId
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Введите комментарий к ответу на обращение #${requestId}:`,
       Markup.forceReply()
     );
   } catch (error) {
     console.error('Error handling decline answer:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -530,7 +530,7 @@ const handleEditCategorySelection = async (ctx) => {
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -548,14 +548,14 @@ const handleEditCategorySelection = async (ctx) => {
       [{ text: 'Отмена', callback_data: 'cancel_edit_category' }]
     ];
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Редактирование категории: ${category.name} (${category.hashtag})`,
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling edit category selection:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -568,7 +568,7 @@ const handleEditCategoryName = async (ctx) => {
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -580,11 +580,11 @@ const handleEditCategoryName = async (ctx) => {
       categoryId
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(`Текущее название: ${category.name}\n\nВведите новое название категории:`);
   } catch (error) {
     console.error('Error handling edit category name:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -645,7 +645,7 @@ const handleEditCategoryHashtag = async (ctx) => {
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -657,11 +657,11 @@ const handleEditCategoryHashtag = async (ctx) => {
       categoryId
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(`Текущий хештег: ${category.hashtag}\n\nВведите новый хештег категории:`);
   } catch (error) {
     console.error('Error handling edit category hashtag:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -760,7 +760,7 @@ const handleDeleteCategorySelection = async (ctx) => {
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -769,7 +769,7 @@ const handleDeleteCategorySelection = async (ctx) => {
     const faqsCount = await FAQ.countDocuments({ categoryId });
 
     if (requestsCount > 0 || faqsCount > 0) {
-      await ctx.answerCallbackQuery();
+      await ctx.answerCbQuery();
       await ctx.reply(
         `Категория "${category.name}" не может быть удалена, так как она используется в ${requestsCount} обращениях и ${faqsCount} FAQ.`
       );
@@ -783,14 +783,14 @@ const handleDeleteCategorySelection = async (ctx) => {
       ]
     ];
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Вы уверены, что хотите удалить категорию "${category.name}" (${category.hashtag})?`,
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling delete category selection:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -803,7 +803,7 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -812,7 +812,7 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
     // Delete category
     await Category.deleteOne({ _id: categoryId });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.editMessageText(
       `✅ Категория "${categoryName}" успешно удалена.`,
       { reply_markup: { inline_keyboard: [] } }
@@ -825,7 +825,7 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
     });
   } catch (error) {
     console.error('Error handling delete category confirmation:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -934,7 +934,7 @@ const handleFAQCategorySelectionAdmin = async (ctx) => {
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -942,7 +942,7 @@ const handleFAQCategorySelectionAdmin = async (ctx) => {
     const adminState = adminStates.get(user.telegramId);
 
     if (!adminState || adminState.state !== 'selecting_faq_category') {
-      await ctx.answerCallbackQuery('Что-то пошло не так. Пожалуйста, начните заново.');
+      await ctx.answerCbQuery('Что-то пошло не так. Пожалуйста, начните заново.');
       return;
     }
 
@@ -955,7 +955,7 @@ const handleFAQCategorySelectionAdmin = async (ctx) => {
 
     await faq.save();
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.editMessageText(
       `✅ Вопрос успешно добавлен в категорию "${category.name}".`,
       { reply_markup: { inline_keyboard: [] } }
@@ -970,7 +970,7 @@ const handleFAQCategorySelectionAdmin = async (ctx) => {
     });
   } catch (error) {
     console.error('Error handling FAQ category selection:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -984,14 +984,14 @@ const handleCancel = async (ctx) => {
     // Clear admin state
     adminStates.delete(user.telegramId);
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.editMessageText(
       'Операция отменена.',
       { reply_markup: { inline_keyboard: [] } }
     );
   } catch (error) {
     console.error('Error handling cancel:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1033,7 +1033,7 @@ const handleEditFAQCategorySelection = async (ctx) => {
     const faqs = await FAQ.find({ categoryId }).sort({ question: 1 });
 
     if (faqs.length === 0) {
-      await ctx.answerCallbackQuery('В этой категории нет вопросов.');
+      await ctx.answerCbQuery('В этой категории нет вопросов.');
       return;
     }
 
@@ -1041,14 +1041,14 @@ const handleEditFAQCategorySelection = async (ctx) => {
       { text: faq.question.substring(0, 50), callback_data: `edit_faq:${faq._id}` }
     ]);
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       'Выберите вопрос для редактирования:',
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling edit FAQ category selection:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1058,7 +1058,7 @@ const handleEditFAQSelection = async (ctx) => {
 
     const faq = await FAQ.findById(faqId);
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
@@ -1069,14 +1069,14 @@ const handleEditFAQSelection = async (ctx) => {
       [{ text: 'Отмена', callback_data: 'cancel_edit_faq' }]
     ];
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Редактирование вопроса: ${faq.question}`,
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling edit FAQ selection:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1086,7 +1086,7 @@ const handleEditFAQQuestion = async (ctx) => {
 
     const faq = await FAQ.findById(faqId);
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
@@ -1097,11 +1097,11 @@ const handleEditFAQQuestion = async (ctx) => {
       faqId
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(`Текущий вопрос: ${faq.question}\n\nВведите новый вопрос:`);
   } catch (error) {
     console.error('Error handling edit FAQ question:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1148,7 +1148,7 @@ const handleEditFAQAnswer = async (ctx) => {
 
     const faq = await FAQ.findById(faqId);
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
@@ -1159,11 +1159,11 @@ const handleEditFAQAnswer = async (ctx) => {
       faqId
     });
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(`Текущий ответ: ${faq.answer}\n\nВведите новый ответ:`);
   } catch (error) {
     console.error('Error handling edit FAQ answer:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1210,7 +1210,7 @@ const handleEditFAQCategory = async (ctx) => {
       .populate('categoryId');
 
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
@@ -1219,7 +1219,7 @@ const handleEditFAQCategory = async (ctx) => {
     const categories = await Category.find().sort({ name: 1 });
 
     if (categories.length <= 1) {
-      await ctx.answerCallbackQuery('Недостаточно категорий для изменения.');
+      await ctx.answerCbQuery('Недостаточно категорий для изменения.');
       return;
     }
 
@@ -1234,14 +1234,14 @@ const handleEditFAQCategory = async (ctx) => {
         { text: category.name, callback_data: `set_faq_category:${faq._id}:${category._id}` }
       ]);
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Текущая категория: ${faq.categoryId.name}\n\nВыберите новую категорию:`,
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling edit FAQ category:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1255,13 +1255,13 @@ const handleSetFAQCategory = async (ctx) => {
       .populate('categoryId');
 
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
     const category = await Category.findById(categoryId);
     if (!category) {
-      await ctx.answerCallbackQuery('Категория не найдена.');
+      await ctx.answerCbQuery('Категория не найдена.');
       return;
     }
 
@@ -1272,7 +1272,7 @@ const handleSetFAQCategory = async (ctx) => {
 
     const user = await getOrCreateUser(ctx);
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.editMessageText(
       `✅ Категория вопроса изменена с "${oldCategory.name}" на "${category.name}".`,
       { reply_markup: { inline_keyboard: [] } }
@@ -1288,7 +1288,7 @@ const handleSetFAQCategory = async (ctx) => {
     });
   } catch (error) {
     console.error('Error handling set FAQ category:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1329,7 +1329,7 @@ const handleDeleteFAQSelection = async (ctx) => {
     const faqs = await FAQ.find({ categoryId }).sort({ question: 1 });
 
     if (faqs.length === 0) {
-      await ctx.answerCallbackQuery('В этой категории нет вопросов.');
+      await ctx.answerCbQuery('В этой категории нет вопросов.');
       return;
     }
 
@@ -1337,14 +1337,14 @@ const handleDeleteFAQSelection = async (ctx) => {
       { text: faq.question.substring(0, 50), callback_data: `delete_faq:${faq._id}` }
     ]);
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       'Выберите вопрос для удаления:',
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling delete FAQ selection:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1354,7 +1354,7 @@ const handleDeleteFAQFromCategory = async (ctx) => {
 
     const faq = await FAQ.findById(faqId);
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
@@ -1365,14 +1365,14 @@ const handleDeleteFAQFromCategory = async (ctx) => {
       ]
     ];
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.reply(
       `Вы уверены, что хотите удалить вопрос "${faq.question.substring(0, 50)}"?`,
       { reply_markup: { inline_keyboard: keyboard } }
     );
   } catch (error) {
     console.error('Error handling delete FAQ:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 
@@ -1382,7 +1382,7 @@ const handleConfirmDeleteFAQ = async (ctx) => {
 
     const faq = await FAQ.findById(faqId);
     if (!faq) {
-      await ctx.answerCallbackQuery('Вопрос не найден.');
+      await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
@@ -1390,7 +1390,7 @@ const handleConfirmDeleteFAQ = async (ctx) => {
 
     const user = await getOrCreateUser(ctx);
 
-    await ctx.answerCallbackQuery();
+    await ctx.answerCbQuery();
     await ctx.editMessageText(
       `✅ Вопрос успешно удален.`,
       { reply_markup: { inline_keyboard: [] } }
@@ -1402,7 +1402,7 @@ const handleConfirmDeleteFAQ = async (ctx) => {
     });
   } catch (error) {
     console.error('Error handling confirm delete FAQ:', error);
-    await ctx.answerCallbackQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
   }
 };
 

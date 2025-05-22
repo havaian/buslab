@@ -33,15 +33,25 @@ const getOrCreateUser = async (ctx) => {
 };
 
 /**
- * Get main menu keyboard
+ * Get main menu keyboard for regular users
  * @returns {Object} - Keyboard markup
  */
 const getMainMenuKeyboard = () => {
   return Markup.keyboard([
     ['Задать вопрос'],
     ['FAQ'],
-    ['Мои обращения'],
-    ['❓ Помощь']
+    ['Мои обращения']
+  ]).resize();
+};
+
+/**
+ * Get student menu keyboard
+ * @returns {Object} - Keyboard markup
+ */
+const getStudentMenuKeyboard = () => {
+  return Markup.keyboard([
+    ['Текущее обращение'],
+    ['Назад']
   ]).resize();
 };
 
@@ -60,6 +70,15 @@ const getBackKeyboard = (text = 'Назад') => {
  */
 const isAdmin = (user) => {
   return user.role === 'admin';
+};
+
+/**
+ * Check if user is student
+ * @param {Object} user - User object
+ * @returns {Boolean} - Is student
+ */
+const isStudent = (user) => {
+  return user.role === 'student';
 };
 
 /**
@@ -83,8 +102,10 @@ const canTakeRequests = (ctx) => {
 module.exports = {
   getOrCreateUser,
   getMainMenuKeyboard,
+  getStudentMenuKeyboard,
   getBackKeyboard,
   isAdmin,
+  isStudent,
   isInStudentChat,
   canTakeRequests
 };

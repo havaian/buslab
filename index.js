@@ -10,7 +10,7 @@ const studentHandlers = require('./handlers/student');
 const categoryHandlers = require('./handlers/category');
 const faqHandlers = require('./handlers/faq');
 const requestHandlers = require('./handlers/request');
-const helpHandlers = require('./handlers/help'); // Add help handlers
+const helpHandlers = require('./handlers/help'); // Keep help handlers
 
 // Import logger
 const { logAction, logUserMessage, logError, logInfo, logWarn } = require('./logger');
@@ -66,7 +66,7 @@ bot.use(async (ctx, next) => {
 // Command handlers
 bot.start(startHandler);
 
-// Help commands - context-aware
+// Help commands - context-aware (KEEP THIS)
 bot.command('help', (ctx) => {
   // Determine context and call appropriate help handler
   if (ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID) {
@@ -79,7 +79,7 @@ bot.command('help', (ctx) => {
   // If none of the conditions match, the command is ignored
 });
 
-// Admin commands
+// Admin commands (only work for admins)
 bot.command('getadmin', adminHandlers.handleGetAdmin);
 bot.command('add_category', adminHandlers.handleAddCategory);
 bot.command('edit_category', adminHandlers.handleEditCategory);
@@ -92,12 +92,18 @@ bot.command('faqs', faqHandlers.handleListFAQs);
 bot.command('requests', requestHandlers.handleListRequests);
 bot.command('stats', requestHandlers.handleStats);
 
-// User action handlers
+// User action handlers (available to all roles)
 bot.hears('Задать вопрос', userHandlers.handleAskQuestion);
 bot.hears('FAQ', userHandlers.handleFAQ);
 bot.hears('Мои обращения', userHandlers.handleMyRequests);
 bot.hears('Назад', userHandlers.handleBack);
-bot.hears('❓ Помощь', userHandlers.handleHelp); // Add help button handler
+bot.hears('❓ Помощь', userHandlers.handleHelp); // Keep help button handler
+
+// Student-specific handlers
+bot.hears('Текущее обращение', studentHandlers.handleMyAssignment);
+bot.hears('Подтвердить отправку ответа', (ctx) => studentHandlers.handleConfirmAnswer(ctx, bot));
+bot.hears('Изменить ответ', studentHandlers.handleEditAnswer);
+bot.hears('Отказаться от обращения', (ctx) => studentHandlers.handleRejectAssignment(ctx, bot));
 
 // Admin callback handlers
 bot.action(/approve_request:(.+)/, (ctx) => adminHandlers.handleApproveRequest(ctx, bot));
@@ -129,11 +135,6 @@ bot.action(/take_request:(.+)/, (ctx) => studentHandlers.handleTakeRequest(ctx, 
 bot.action(/edit_answer:(.+)/, studentHandlers.handleEditAnswerCallback);
 bot.action(/reject_assignment:(.+)/, (ctx) => studentHandlers.handleRejectAssignment(ctx, bot));
 
-// Student button handlers
-bot.hears('Подтвердить отправку ответа', (ctx) => studentHandlers.handleConfirmAnswer(ctx, bot));
-bot.hears('Изменить ответ', studentHandlers.handleEditAnswer);
-bot.hears('Отказаться от обращения', (ctx) => studentHandlers.handleRejectAssignment(ctx, bot));
-
 // Handle category selection in user flow
 bot.on('message', async (ctx, next) => {
   try {
@@ -155,7 +156,7 @@ bot.on('message', async (ctx, next) => {
         if (ctx.message.text === 'Подтвердить') {
           await userHandlers.handleRequestConfirmation(ctx, bot);
         } else if (ctx.message.text === 'Изменить') {
-          await userHandlers.handleEditAnswer(ctx);
+          await userHandlers.handleEditRequest(ctx);
         }
         break;
       case 'selecting_faq_category':
@@ -234,7 +235,7 @@ bot.on('message', async (ctx, next) => {
     // Skip if there's no text or button text is matched
     if (!ctx.message.text || (
       ['Подтвердить отправку ответа', 'Изменить ответ', 'Отказаться от обращения',
-        'Задать вопрос', 'FAQ', 'Мои обращения', 'Назад', 'Подтвердить', 'Изменить', '❓ Помощь']
+        'Задать вопрос', 'FAQ', 'Мои обращения', 'Назад', 'Подтвердить', 'Изменить', '❓ Помощь', 'Текущее обращение']
         .includes(ctx.message.text)
     )) {
       return next();
