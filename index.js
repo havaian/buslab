@@ -10,6 +10,7 @@ const studentHandlers = require('./handlers/student');
 const categoryHandlers = require('./handlers/category');
 const faqHandlers = require('./handlers/faq');
 const requestHandlers = require('./handlers/request');
+const helpHandlers = require('./handlers/help'); // Add help handlers
 
 // Import logger
 const { logAction, logUserMessage, logError, logInfo, logWarn } = require('./logger');
@@ -45,7 +46,7 @@ bot.use(async (ctx, next) => {
     if (ctx.message && ctx.message.text) {
       logUserMessage(ctx.from, ctx.message.text);
     }
-    
+
     // Log callback queries
     if (ctx.callbackQuery) {
       logAction('callback_query', {
@@ -54,7 +55,7 @@ bot.use(async (ctx, next) => {
         data: ctx.callbackQuery.data
       });
     }
-    
+
     return next();
   } catch (error) {
     logError(error, { context: 'Logging middleware error' });
@@ -64,6 +65,19 @@ bot.use(async (ctx, next) => {
 
 // Command handlers
 bot.start(startHandler);
+
+// Help commands - context-aware
+bot.command('help', (ctx) => {
+  // Determine context and call appropriate help handler
+  if (ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID) {
+    helpHandlers.handleAdminHelp(ctx);
+  } else if (ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID) {
+    helpHandlers.handleStudentHelp(ctx);
+  } else if (ctx.chat.type === 'private') {
+    helpHandlers.handleUserHelp(ctx);
+  }
+  // If none of the conditions match, the command is ignored
+});
 
 // Admin commands
 bot.command('getadmin', adminHandlers.handleGetAdmin);
@@ -83,6 +97,7 @@ bot.hears('Задать вопрос', userHandlers.handleAskQuestion);
 bot.hears('FAQ', userHandlers.handleFAQ);
 bot.hears('Мои обращения', userHandlers.handleMyRequests);
 bot.hears('Назад', userHandlers.handleBack);
+bot.hears('❓ Помощь', userHandlers.handleHelp); // Add help button handler
 
 // Admin callback handlers
 bot.action(/approve_request:(.+)/, (ctx) => adminHandlers.handleApproveRequest(ctx, bot));
@@ -102,7 +117,7 @@ bot.action(/edit_faq_answer:(.+)/, adminHandlers.handleEditFAQAnswer);
 bot.action(/edit_faq_category:(.+)/, adminHandlers.handleEditFAQCategory);
 bot.action(/set_faq_category:(.+)/, adminHandlers.handleSetFAQCategory);
 bot.action(/delete_faq_select_category:(.+)/, adminHandlers.handleDeleteFAQSelection);
-bot.action(/delete_faq:(.+)/, adminHandlers.handleDeleteFAQ);
+bot.action(/delete_faq:(.+)/, adminHandlers.handleDeleteFAQFromCategory);
 bot.action(/confirm_delete_faq:(.+)/, adminHandlers.handleConfirmDeleteFAQ);
 bot.action('cancel_edit_category', adminHandlers.handleCancel);
 bot.action('cancel_delete_category', adminHandlers.handleCancel);
@@ -123,11 +138,11 @@ bot.hears('Отказаться от обращения', (ctx) => studentHandle
 bot.on('message', async (ctx, next) => {
   try {
     const userState = userHandlers.userStates.get(ctx.from.id);
-    
+
     if (!userState) {
       return next();
     }
-    
+
     // Handle different states
     switch (userState.state) {
       case 'selecting_category':
@@ -162,11 +177,11 @@ bot.on('message', async (ctx, next) => {
 bot.on('message', async (ctx, next) => {
   try {
     const adminState = adminHandlers.adminStates.get(ctx.from.id);
-    
+
     if (!adminState) {
       return next();
     }
-    
+
     // Handle different admin states
     switch (adminState.state) {
       case 'entering_decline_reason':
@@ -215,18 +230,18 @@ bot.on('message', async (ctx, next) => {
     if (ctx.message.text && ctx.message.text.startsWith('/')) {
       return next();
     }
-    
+
     // Skip if there's no text or button text is matched
     if (!ctx.message.text || (
-      ['Подтвердить отправку ответа', 'Изменить ответ', 'Отказаться от обращения', 
-      'Задать вопрос', 'FAQ', 'Мои обращения', 'Назад', 'Подтвердить', 'Изменить']
+      ['Подтвердить отправку ответа', 'Изменить ответ', 'Отказаться от обращения',
+        'Задать вопрос', 'FAQ', 'Мои обращения', 'Назад', 'Подтвердить', 'Изменить', '❓ Помощь']
         .includes(ctx.message.text)
     )) {
       return next();
     }
-    
+
     const studentState = studentHandlers.studentStates.get(ctx.from.id);
-    
+
     if (studentState && studentState.state === 'writing_answer') {
       await studentHandlers.handleStudentAnswer(ctx);
     } else {
@@ -247,9 +262,9 @@ bot.catch((err, ctx) => {
     chatId: ctx.chat ? ctx.chat.id : null,
     messageId: ctx.message ? ctx.message.message_id : null
   };
-  
+
   logError(err, errorContext);
-  
+
   // Try to respond to user when error occurs
   try {
     ctx.reply('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз позже.');
@@ -261,7 +276,7 @@ bot.catch((err, ctx) => {
 // Graceful shutdown handlers
 const gracefulShutdown = (signal) => {
   logInfo(`Bot shutting down due to ${signal}...`);
-  
+
   bot.stop(signal)
     .then(() => {
       logInfo(`Bot stopped successfully (${signal})`);
@@ -276,7 +291,7 @@ const gracefulShutdown = (signal) => {
 // Launch bot
 bot.launch()
   .then(() => {
-    logInfo('Bot started successfully', { 
+    logInfo('Bot started successfully', {
       nodeEnv: process.env.NODE_ENV || 'production',
       pid: process.pid
     });

@@ -40,7 +40,8 @@ const getMainMenuKeyboard = () => {
   return Markup.keyboard([
     ['Задать вопрос'],
     ['FAQ'],
-    ['Мои обращения']
+    ['Мои обращения'],
+    ['❓ Помощь']
   ]).resize();
 };
 
