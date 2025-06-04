@@ -1,36 +1,4 @@
-stages:
-  - deploy
-
-deploy:
-  stage: deploy
-  tags:
-    - shell
-  variables:
-    PROJECT_DIR: "/home/root/projects/buslab"
-    GIT_STRATEGY: none  # Prevent automatic checkout
-  script:
-    - echo "Starting deployment..."
-    - git config --global --add safe.directory "$PROJECT_DIR"
-    - |
-      if [ ! -d "$PROJECT_DIR" ]; then
-        echo "❌ Directory $PROJECT_DIR does not exist"
-        exit 1
-      fi
-    - cd $PROJECT_DIR
-    - echo "✅ Pulling latest changes..."
-    # Use CI_JOB_TOKEN for authentication
-    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@${GITLAB_REMOTE_URL}
-    # Force checkout and pull latest changes
-    - echo "📥 Force pulling latest changes from repository..."
-    - git fetch --all || { echo "❌ Git fetch failed"; exit 1; }
-    - git reset --hard origin/main || { echo "❌ Git reset failed"; exit 1; }
-    - git pull origin main || { echo "❌ Git pull failed"; exit 1; }
-    - echo "✅ Executing deployment script..."
-    # Run the deploy script
-    - chmod +x deploy.sh
-    - ./deploy.sh
-  after_script:
-    # Reset remote URL to prevent token exposure
-    - cd $PROJECT_DIR && git remote set-url origin https://${GITLAB_REMOTE_URL}
-  only:
-    - main
+# Include the universal template for deployment
+include:
+  - project: 'templates/gitlab-ci'
+    file: '.gitlab-ci-template.yml'
