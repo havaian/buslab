@@ -10,6 +10,7 @@ deploy:
     GIT_STRATEGY: none  # Prevent automatic checkout
   script:
     - echo "Starting deployment..."
+    - git config --global --add safe.directory "$PROJECT_DIR"
     - |
       if [ ! -d "$PROJECT_DIR" ]; then
         echo "❌ Directory $PROJECT_DIR does not exist"
