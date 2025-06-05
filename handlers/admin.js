@@ -1373,10 +1373,8 @@ const handleDeleteFAQSelection = async (ctx) => {
 const handleDeleteFAQFromCategory = async (ctx) => {
   try {
     const faqId = ctx.callbackQuery.data.split(':')[1];
-    console.log(faqId);
 
     const faq = await FAQ.findById(faqId);
-    console.log(faq);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
       return;
@@ -1403,22 +1401,18 @@ const handleDeleteFAQFromCategory = async (ctx) => {
 const handleConfirmDeleteFAQ = async (ctx) => {
   try {
     const faqId = ctx.callbackQuery.data.split(':')[1];
-    console.log(faqId);
     
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
-    console.log(faq);
 
     // Store question text before deletion for logging
     const questionText = faq.question;
-    console.log(questionText);
 
     // Delete the FAQ
     const deleteResult = await FAQ.deleteOne({ _id: faqId });
-    console.log(deleteResult);
     
     // Check if deletion was successful
     if (deleteResult.deletedCount === 0) {
@@ -1427,10 +1421,7 @@ const handleConfirmDeleteFAQ = async (ctx) => {
       return;
     }
 
-    console.log('FAQ successfully deleted', { faqId, deletedCount: deleteResult.deletedCount });
-
     const user = await getOrCreateUser(ctx);
-    console.log(user);
 
     // Answer the callback query first
     await ctx.answerCbQuery('Вопрос успешно удален.');
