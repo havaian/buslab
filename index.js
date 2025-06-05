@@ -10,10 +10,13 @@ const studentHandlers = require('./handlers/student');
 const categoryHandlers = require('./handlers/category');
 const faqHandlers = require('./handlers/faq');
 const requestHandlers = require('./handlers/request');
-const helpHandlers = require('./handlers/help'); // Keep help handlers
+const helpHandlers = require('./handlers/help');
 
 // Import logger
 const { logAction, logUserMessage, logError, logInfo, logWarn } = require('./logger');
+
+// Import the translation helper
+const { t } = require('./utils/i18nHelper');
 
 // Check required environment variables
 const requiredEnvVars = ['BOT_TOKEN', 'MONGO_URI', 'ADMIN_CHAT_ID', 'STUDENT_CHAT_ID'];
@@ -39,6 +42,9 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Setup middleware
 bot.use(session());
+
+const { detectUserLanguage } = require('./i18n/middleware');
+bot.use(detectUserLanguage);
 
 // Enhanced logging middleware
 bot.use(async (ctx, next) => {
@@ -79,6 +85,151 @@ bot.command('help', (ctx) => {
   // If none of the conditions match, the command is ignored
 });
 
+const languageHandlers = require('./handlers/language');
+
+bot.command('language', languageHandlers.handleLanguageSelection);
+bot.action(/lang:(.+)/, languageHandlers.handleLanguageChange);
+
+// Replace ALL your existing bot.on('message') handlers with this single comprehensive one:
+
+bot.on('message', async (ctx, next) => {
+  try {
+    // Skip if no text
+    if (!ctx.message.text) return next();
+
+    const messageText = ctx.message.text;
+
+    // Skip command messages
+    if (messageText.startsWith('/')) {
+      return next();
+    }
+    
+    if (messageText === '🌐 Language') {
+      return languageHandlers.handleLanguageSelection(ctx);
+    }
+
+    // === BUTTON HANDLERS (i18n) ===
+
+    // Main user buttons
+    if (messageText === t(ctx, 'buttons.ask_question')) {
+      return userHandlers.handleAskQuestion(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.faq')) {
+      return userHandlers.handleFAQ(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.my_requests')) {
+      return userHandlers.handleMyRequests(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.back')) {
+      return userHandlers.handleBack(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.help')) {
+      return userHandlers.handleHelp(ctx);
+    }
+
+    // Student buttons
+    if (messageText === t(ctx, 'buttons.confirm_answer')) {
+      return studentHandlers.handleConfirmAnswer(ctx, bot);
+    }
+
+    if (messageText === t(ctx, 'buttons.edit_answer')) {
+      return studentHandlers.handleEditAnswer(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.reject_assignment')) {
+      return studentHandlers.handleRejectAssignment(ctx, bot);
+    }
+
+    if (messageText === t(ctx, 'buttons.my_answers')) {
+      return studentHandlers.handleMyAnswers(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.current_assignment')) {
+      return studentHandlers.handleCurrentAssignment(ctx);
+    }
+
+    if (messageText === t(ctx, 'buttons.statistics')) {
+      return studentHandlers.handleStudentStats(ctx);
+    }
+
+    // Generic flow buttons
+    if (messageText === t(ctx, 'buttons.confirm')) {
+      const userState = userHandlers.userStates.get(ctx.from.id);
+      if (userState && userState.state === 'confirming_request') {
+        return userHandlers.handleRequestConfirmation(ctx, bot);
+      }
+    }
+
+    if (messageText === t(ctx, 'buttons.edit')) {
+      const userState = userHandlers.userStates.get(ctx.from.id);
+      if (userState && userState.state === 'confirming_request') {
+        return userHandlers.handleEditRequest(ctx);
+      }
+    }
+
+    // === STATE-BASED HANDLERS ===
+
+    // User state management
+    const userState = userHandlers.userStates.get(ctx.from.id);
+    if (userState) {
+      switch (userState.state) {
+        case 'selecting_category':
+          return userHandlers.handleCategorySelection(ctx);
+        case 'entering_request':
+          return userHandlers.handleRequestText(ctx);
+        case 'selecting_faq_category':
+          return userHandlers.handleFAQCategorySelection(ctx);
+        case 'selecting_faq':
+          return userHandlers.handleFAQSelection(ctx);
+      }
+    }
+
+    // Admin state management
+    const adminState = adminHandlers.adminStates.get(ctx.from.id);
+    if (adminState) {
+      switch (adminState.state) {
+        case 'entering_decline_reason':
+          return adminHandlers.handleDeclineReason(ctx, bot);
+        case 'entering_answer_decline_reason':
+          return adminHandlers.handleAnswerDeclineReason(ctx, bot);
+        case 'entering_category_name':
+          return adminHandlers.handleCategoryName(ctx);
+        case 'entering_category_hashtag':
+          return adminHandlers.handleCategoryHashtag(ctx);
+        case 'entering_new_category_name':
+          return adminHandlers.handleNewCategoryName(ctx);
+        case 'entering_new_category_hashtag':
+          return adminHandlers.handleNewCategoryHashtag(ctx);
+        case 'entering_faq_question':
+          return adminHandlers.handleFAQQuestion(ctx);
+        case 'entering_faq_answer':
+          return adminHandlers.handleFAQAnswer(ctx);
+        case 'entering_new_faq_question':
+          return adminHandlers.handleNewFAQQuestion(ctx);
+        case 'entering_new_faq_answer':
+          return adminHandlers.handleNewFAQAnswer(ctx);
+      }
+    }
+
+    // Student answer submission
+    const studentState = studentHandlers.studentStates.get(ctx.from.id);
+    if (studentState && studentState.state === 'writing_answer') {
+      return studentHandlers.handleStudentAnswer(ctx);
+    }
+
+    // If no handlers matched, continue to next middleware
+    return next();
+
+  } catch (error) {
+    logError(error, { context: 'Combined message handler error', userId: ctx.from.id });
+    return next();
+  }
+});
+
 // Admin commands (only work for admins)
 bot.command('getadmin', adminHandlers.handleGetAdmin);
 bot.command('add_category', adminHandlers.handleAddCategory);
@@ -91,21 +242,6 @@ bot.command('categories', categoryHandlers.handleListCategories);
 bot.command('faqs', faqHandlers.handleListFAQs);
 bot.command('requests', requestHandlers.handleListRequests);
 bot.command('stats', requestHandlers.handleStats);
-
-// User action handlers (available to all roles)
-bot.hears('Задать вопрос', userHandlers.handleAskQuestion);
-bot.hears('FAQ', userHandlers.handleFAQ);
-bot.hears('Мои обращения', userHandlers.handleMyRequests);
-bot.hears('Назад', userHandlers.handleBack);
-bot.hears('❓ Помощь', userHandlers.handleHelp); // Keep help button handler
-
-// Student-specific handlers
-bot.hears('Подтвердить отправку ответа', (ctx) => studentHandlers.handleConfirmAnswer(ctx, bot));
-bot.hears('Изменить ответ', studentHandlers.handleEditAnswer);
-bot.hears('Отказаться от обращения', (ctx) => studentHandlers.handleRejectAssignment(ctx, bot));
-bot.hears('Мои ответы', studentHandlers.handleMyAnswers);
-bot.hears('Текущее обращение', studentHandlers.handleCurrentAssignment);
-bot.hears('Статистика', studentHandlers.handleStudentStats);
 
 // Admin callback handlers
 bot.action(/approve_request:(.+)/, (ctx) => adminHandlers.handleApproveRequest(ctx, bot));
@@ -137,125 +273,6 @@ bot.action(/take_request:(.+)/, (ctx) => studentHandlers.handleTakeRequest(ctx, 
 bot.action(/edit_answer:(.+)/, studentHandlers.handleEditAnswerCallback);
 bot.action(/reject_assignment:(.+)/, (ctx) => studentHandlers.handleRejectAssignment(ctx, bot));
 
-// Handle category selection in user flow
-bot.on('message', async (ctx, next) => {
-  try {
-    const userState = userHandlers.userStates.get(ctx.from.id);
-
-    if (!userState) {
-      return next();
-    }
-
-    // Handle different states
-    switch (userState.state) {
-      case 'selecting_category':
-        await userHandlers.handleCategorySelection(ctx);
-        break;
-      case 'entering_request':
-        await userHandlers.handleRequestText(ctx);
-        break;
-      case 'confirming_request':
-        if (ctx.message.text === 'Подтвердить') {
-          await userHandlers.handleRequestConfirmation(ctx, bot);
-        } else if (ctx.message.text === 'Изменить') {
-          await userHandlers.handleEditRequest(ctx);
-        }
-        break;
-      case 'selecting_faq_category':
-        await userHandlers.handleFAQCategorySelection(ctx);
-        break;
-      case 'selecting_faq':
-        await userHandlers.handleFAQSelection(ctx);
-        break;
-      default:
-        return next();
-    }
-  } catch (error) {
-    logError(error, { context: 'User state handler error', userId: ctx.from.id });
-    return next();
-  }
-});
-
-// Handle admin state management
-bot.on('message', async (ctx, next) => {
-  try {
-    const adminState = adminHandlers.adminStates.get(ctx.from.id);
-
-    if (!adminState) {
-      return next();
-    }
-
-    // Handle different admin states
-    switch (adminState.state) {
-      case 'entering_decline_reason':
-        await adminHandlers.handleDeclineReason(ctx, bot);
-        break;
-      case 'entering_answer_decline_reason':
-        await adminHandlers.handleAnswerDeclineReason(ctx, bot);
-        break;
-      case 'entering_category_name':
-        await adminHandlers.handleCategoryName(ctx);
-        break;
-      case 'entering_category_hashtag':
-        await adminHandlers.handleCategoryHashtag(ctx);
-        break;
-      case 'entering_new_category_name':
-        await adminHandlers.handleNewCategoryName(ctx);
-        break;
-      case 'entering_new_category_hashtag':
-        await adminHandlers.handleNewCategoryHashtag(ctx);
-        break;
-      case 'entering_faq_question':
-        await adminHandlers.handleFAQQuestion(ctx);
-        break;
-      case 'entering_faq_answer':
-        await adminHandlers.handleFAQAnswer(ctx);
-        break;
-      case 'entering_new_faq_question':
-        await adminHandlers.handleNewFAQQuestion(ctx);
-        break;
-      case 'entering_new_faq_answer':
-        await adminHandlers.handleNewFAQAnswer(ctx);
-        break;
-      default:
-        return next();
-    }
-  } catch (error) {
-    logError(error, { context: 'Admin state handler error', userId: ctx.from.id });
-    return next();
-  }
-});
-
-// Handle student answer submission
-bot.on('message', async (ctx, next) => {
-  try {
-    // Skip command messages
-    if (ctx.message.text && ctx.message.text.startsWith('/')) {
-      return next();
-    }
-
-    // Skip if there's no text or button text is matched
-    if (!ctx.message.text || (
-      ['Подтвердить отправку ответа', 'Изменить ответ', 'Отказаться от обращения',
-        'Задать вопрос', 'FAQ', 'Мои обращения', 'Назад', 'Подтвердить', 'Изменить', '❓ Помощь', 'Текущее обращение']
-        .includes(ctx.message.text)
-    )) {
-      return next();
-    }
-
-    const studentState = studentHandlers.studentStates.get(ctx.from.id);
-
-    if (studentState && studentState.state === 'writing_answer') {
-      await studentHandlers.handleStudentAnswer(ctx);
-    } else {
-      return next();
-    }
-  } catch (error) {
-    logError(error, { context: 'Student answer handler error', userId: ctx.from.id });
-    return next();
-  }
-});
-
 // Enhanced error handling
 bot.catch((err, ctx) => {
   const errorContext = {
@@ -270,9 +287,16 @@ bot.catch((err, ctx) => {
 
   // Try to respond to user when error occurs
   try {
-    ctx.reply('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз позже.');
+    // Use translated error message
+    ctx.reply(t(ctx, 'errors.general'));
   } catch (replyErr) {
     logError(replyErr, { context: 'Error sending error message to user' });
+    // Fallback to hardcoded message if translation fails
+    try {
+      ctx.reply('Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз позже.');
+    } catch (finalErr) {
+      logError(finalErr, { context: 'Final error fallback failed' });
+    }
   }
 });
 

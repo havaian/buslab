@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String
   },
+  language: {
+    type: String,
+    enum: ['ru', 'uz', 'en', 'kk'],
+    default: 'ru'
+  },
   currentAssignmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Request',

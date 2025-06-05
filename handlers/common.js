@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 const User = require('../models/user');
 const { logAction } = require('../logger');
+const { t } = require('../utils/i18nHelper');
 
 /**
  * Create or update user in database
@@ -18,7 +19,8 @@ const getOrCreateUser = async (ctx) => {
         telegramId: telegramUser.id,
         firstName: telegramUser.first_name,
         lastName: telegramUser.last_name,
-        username: telegramUser.username
+        username: telegramUser.username,
+        language: 'ru' // Default language
       });
 
       await user.save();
@@ -34,34 +36,39 @@ const getOrCreateUser = async (ctx) => {
 
 /**
  * Get main menu keyboard for regular users
+ * @param {Object} ctx - Telegram context for translations
  * @returns {Object} - Keyboard markup
  */
-const getMainMenuKeyboard = () => {
+const getMainMenuKeyboard = (ctx) => {
   return Markup.keyboard([
-    ['Задать вопрос'],
-    ['FAQ'],
-    ['Мои обращения'],
-    ['❓ Помощь']
+    [t(ctx, 'buttons.ask_question')],
+    [t(ctx, 'buttons.faq')],
+    [t(ctx, 'buttons.my_requests')],
+    [t(ctx, 'buttons.help'), '🌐 Language']
   ]).resize();
 };
 
 /**
  * Get student menu keyboard
+ * @param {Object} ctx - Telegram context for translations
  * @returns {Object} - Keyboard markup
  */
-const getStudentMenuKeyboard = () => {
+const getStudentMenuKeyboard = (ctx) => {
   return Markup.keyboard([
-    ['Текущее обращение'],
-    ['Мои ответы']
+    [t(ctx, 'buttons.current_assignment')],
+    [t(ctx, 'buttons.my_answers')]
   ]).resize();
 };
 
 /**
  * Back button keyboard
+ * @param {Object} ctx - Telegram context for translations
+ * @param {String} text - Custom text (optional)
  * @returns {Object} - Keyboard markup
  */
-const getBackKeyboard = (text = 'Назад') => {
-  return Markup.keyboard([[text]]).resize();
+const getBackKeyboard = (ctx, text = null) => {
+  const buttonText = text || t(ctx, 'buttons.back');
+  return Markup.keyboard([[buttonText]]).resize();
 };
 
 /**

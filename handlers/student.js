@@ -3,6 +3,7 @@ const User = require('../models/user');
 const Request = require('../models/request');
 const { isStudent, getOrCreateUser, getStudentMenuKeyboard, canTakeRequests } = require('./common');
 const { logAction, logWarn } = require('../logger');
+const { t } = require('../utils/i18nHelper');
 
 // Student state management (in-memory for simplicity)
 const studentStates = new Map();
@@ -45,7 +46,7 @@ const handleTakeRequest = async (ctx, bot) => {
 
     // Check if user already has an active assignment
     if (user.currentAssignmentId) {
-      await ctx.answerCbQuery('Вы уже обрабатываете другое обращение. Завершите его, прежде чем брать новое.');
+      await ctx.answerCbQuery(t(ctx, 'errors.already_has_assignment'));
       return;
     }
 
@@ -73,16 +74,16 @@ const handleTakeRequest = async (ctx, bot) => {
 📝 Текст обращения:
 ${request.text}
 
-Напишите ваш ответ на это обращение и отправьте его. После этого нажмите кнопку "Подтвердить отправку ответа".
+${t(ctx, 'prompts.enter_answer')}
 `;
 
     await bot.telegram.sendMessage(
       user.telegramId,
       detailMessage,
       Markup.keyboard([
-        ['Подтвердить отправку ответа'],
-        ['Изменить ответ'],
-        ['Отказаться от обращения']
+        [t(ctx, 'buttons.confirm_answer')],
+        [t(ctx, 'buttons.edit_answer')],
+        [t(ctx, 'buttons.reject_assignment')]
       ]).resize()
     );
 
@@ -100,19 +101,19 @@ ${request.text}
     });
   } catch (error) {
     console.error('Error handling take request:', error);
-    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery(t(ctx, 'errors.general'));
   }
 };
 
 /**
- * Handle "Мои ответы" action for students
+ * Handle "Мои ответы" / "Mening javoblarim" action for students
  */
 const handleMyAnswers = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
 
     if (!isStudent(user)) {
-      await ctx.reply('Эта функция доступна только студентам.');
+      await ctx.reply(t(ctx, 'errors.student_only'));
       return;
     }
 
@@ -124,33 +125,27 @@ const handleMyAnswers = async (ctx) => {
 
     if (requests.length === 0) {
       await ctx.reply('Вы пока не обработали ни одного обращения.');
-      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
       return;
     }
 
     let message = '📋 Ваши ответы на обращения:\n\n';
 
     requests.forEach((request, index) => {
-      const statusMap = {
-        'assigned': '🔄 В обработке',
-        'answered': '✅ Ответ на проверке',
-        'closed': '✅ Принято'
-      };
-
       const date = request.updatedAt.toLocaleDateString('ru-RU');
       const userInfo = request.userId.username
         ? `@${request.userId.username}`
         : `ID:${request.userId.telegramId}`;
 
-      message += `${index + 1}. ${request.categoryId.name} - ${statusMap[request.status]}\n`;
+      message += `${index + 1}. ${request.categoryId.name} - ${t(ctx, `statuses.${request.status}`)}\n`;
       message += `   Пользователь: ${userInfo}\n`;
-      message += `   Дата: ${date}\n`;
+      message += `   ${t(ctx, 'lists.request_date')} ${date}\n`;
 
       if (request.answerText) {
         const truncatedAnswer = request.answerText.length > 150
           ? request.answerText.substring(0, 147) + '...'
           : request.answerText;
-        message += `   📝 Ваш ответ: ${truncatedAnswer}\n`;
+        message += `   ${t(ctx, 'lists.answer_label')} ${truncatedAnswer}\n`;
       }
 
       if (request.adminComment) {
@@ -161,31 +156,31 @@ const handleMyAnswers = async (ctx) => {
     });
 
     await ctx.reply(message);
-    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
 
     await logAction('student_viewed_answers', { userId: user._id });
   } catch (error) {
     console.error('Error handling student answers:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
   }
 };
 
 /**
- * Handle "Текущее обращение" action for students
+ * Handle "Текущее обращение" / "Joriy murojaat" action for students
  */
 const handleCurrentAssignment = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
 
     if (!isStudent(user)) {
-      await ctx.reply('Эта функция доступна только студентам.');
+      await ctx.reply(t(ctx, 'errors.student_only'));
       return;
     }
 
     if (!user.currentAssignmentId) {
-      await ctx.reply('У вас нет активных обращений в работе.');
-      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.no_active_assignment'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
       return;
     }
 
@@ -198,14 +193,9 @@ const handleCurrentAssignment = async (ctx) => {
       // Clear invalid assignment
       user.currentAssignmentId = null;
       await user.save();
-      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
       return;
     }
-
-    const statusMap = {
-      'assigned': '🔄 В обработке',
-      'answered': '✅ Ответ на проверке'
-    };
 
     const userInfo = request.userId.username
       ? `@${request.userId.username}`
@@ -214,7 +204,7 @@ const handleCurrentAssignment = async (ctx) => {
     let message = `📨 Текущее обращение #${request._id}\n`;
     message += `📂 Категория: ${request.categoryId.name} ${request.categoryId.hashtag}\n`;
     message += `👤 Пользователь: ${userInfo}\n`;
-    message += `📊 Статус: ${statusMap[request.status]}\n`;
+    message += `📊 Статус: ${t(ctx, `statuses.${request.status}`)}\n`;
     message += `📅 Дата получения: ${request.createdAt.toLocaleDateString('ru-RU')}\n\n`;
     message += `📝 Текст обращения:\n${request.text}\n`;
 
@@ -230,12 +220,12 @@ const handleCurrentAssignment = async (ctx) => {
 
     // Show appropriate keyboard based on status
     if (request.status === 'assigned') {
-      await ctx.reply('Выберите действие:', Markup.keyboard([
-        ['Отказаться от обращения'],
-        ['Назад']
+      await ctx.reply(t(ctx, 'lists.select_action'), Markup.keyboard([
+        [t(ctx, 'buttons.reject_assignment')],
+        [t(ctx, 'buttons.back')]
       ]).resize());
     } else {
-      await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
     }
 
     await logAction('student_viewed_current_assignment', {
@@ -244,20 +234,20 @@ const handleCurrentAssignment = async (ctx) => {
     });
   } catch (error) {
     console.error('Error handling current assignment:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
   }
 };
 
 /**
- * Handle "Статистика" action for students
+ * Handle "Статистика" / "Statistika" action for students
  */
 const handleStudentStats = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
 
     if (!isStudent(user)) {
-      await ctx.reply('Эта функция доступна только студентам.');
+      await ctx.reply(t(ctx, 'errors.student_only'));
       return;
     }
 
@@ -287,13 +277,13 @@ const handleStudentStats = async (ctx) => {
     }
 
     await ctx.reply(message);
-    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
 
     await logAction('student_viewed_stats', { userId: user._id });
   } catch (error) {
     console.error('Error handling student stats:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
   }
 };
 
@@ -323,28 +313,28 @@ const handleStudentAnswer = async (ctx) => {
     });
 
     await ctx.reply(
-      'Проверьте ваш ответ:\n\n' + answerText,
+      t(ctx, 'prompts.check_answer') + '\n\n' + answerText,
       Markup.keyboard([
-        ['Подтвердить отправку ответа'],
-        ['Изменить ответ'],
-        ['Отказаться от обращения']
+        [t(ctx, 'buttons.confirm_answer')],
+        [t(ctx, 'buttons.edit_answer')],
+        [t(ctx, 'buttons.reject_assignment')]
       ]).resize()
     );
   } catch (error) {
     console.error('Error handling student answer:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply(t(ctx, 'errors.general'));
   }
 };
 
 /**
- * Handle "Подтвердить отправку ответа" button
+ * Handle "Подтвердить отправку ответа" / "Javob yuborishni tasdiqlash" button
  */
 const handleConfirmAnswer = async (ctx, bot) => {
   try {
     const user = await getOrCreateUser(ctx);
 
     if (!user.currentAssignmentId) {
-      await ctx.reply('У вас нет активных обращений.');
+      await ctx.reply(t(ctx, 'errors.no_active_assignment'));
       return;
     }
 
@@ -401,19 +391,19 @@ ${request.answerText}
     });
   } catch (error) {
     console.error('Error handling confirm answer:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply(t(ctx, 'errors.general'));
   }
 };
 
 /**
- * Handle "Изменить ответ" button
+ * Handle "Изменить ответ" / "Javobni o'zgartirish" button
  */
 const handleEditAnswer = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
 
     if (!user.currentAssignmentId) {
-      await ctx.reply('У вас нет активных обращений.');
+      await ctx.reply(t(ctx, 'errors.no_active_assignment'));
       return;
     }
 
@@ -431,12 +421,12 @@ const handleEditAnswer = async (ctx) => {
     await ctx.reply(
       'Введите ваш ответ заново:',
       Markup.keyboard([
-        ['Отказаться от обращения']
+        [t(ctx, 'buttons.reject_assignment')]
       ]).resize()
     );
   } catch (error) {
     console.error('Error handling edit answer:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply(t(ctx, 'errors.general'));
   }
 };
 
@@ -472,17 +462,17 @@ const handleEditAnswerCallback = async (ctx) => {
     await ctx.reply(
       'Введите ваш ответ заново:',
       Markup.keyboard([
-        ['Отказаться от обращения']
+        [t(ctx, 'buttons.reject_assignment')]
       ]).resize()
     );
   } catch (error) {
     console.error('Error handling edit answer callback:', error);
-    await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.answerCbQuery(t(ctx, 'errors.general'));
   }
 };
 
 /**
- * Handle "Отказаться от обращения" button or callback
+ * Handle "Отказаться от обращения" / "Murojaatdan voz kechish" button or callback
  */
 const handleRejectAssignment = async (ctx, bot) => {
   try {
@@ -490,9 +480,9 @@ const handleRejectAssignment = async (ctx, bot) => {
 
     if (!user.currentAssignmentId) {
       if (ctx.callbackQuery) {
-        await ctx.answerCbQuery('У вас нет активных обращений.');
+        await ctx.answerCbQuery(t(ctx, 'errors.no_active_assignment'));
       } else {
-        await ctx.reply('У вас нет активных обращений.');
+        await ctx.reply(t(ctx, 'errors.no_active_assignment'));
       }
       return;
     }
@@ -551,7 +541,7 @@ ${request.text}
       await ctx.reply('Вы отказались от обращения. Оно возвращено в общую очередь.');
     }
 
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
     studentStates.delete(user.telegramId);
 
     logAction('student_rejected_assignment', {
@@ -561,9 +551,9 @@ ${request.text}
   } catch (error) {
     console.error('Error handling reject assignment:', error);
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+      await ctx.answerCbQuery(t(ctx, 'errors.general'));
     } else {
-      await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+      await ctx.reply(t(ctx, 'errors.general'));
     }
   }
 };
@@ -577,6 +567,6 @@ module.exports = {
   handleRejectAssignment,
   handleMyAnswers,
   handleCurrentAssignment,
-  handleStudentStats, 
+  handleStudentStats,
   studentStates
 };

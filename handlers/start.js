@@ -1,5 +1,6 @@
 const { getOrCreateUser, getMainMenuKeyboard, getStudentMenuKeyboard, isStudent } = require('./common');
 const { logAction } = require('../logger');
+const { t } = require('../utils/i18nHelper');
 
 module.exports = async (ctx) => {
   try {
@@ -9,35 +10,17 @@ module.exports = async (ctx) => {
     let keyboard;
 
     if (isStudent(user)) {
-      welcomeMessage = `
-Добро пожаловать, студент!
-
-Здесь вы можете:
-- Просмотреть свои ответы на обращения
-- Проверить текущее обращение в работе
-- Посмотреть статистику своей работы
-
-Выберите действие из меню ниже:
-`;
-      keyboard = getStudentMenuKeyboard();
+      welcomeMessage = t(ctx, 'commands.start.welcome_student');
+      keyboard = getStudentMenuKeyboard(ctx);
     } else {
-      welcomeMessage = `
-Добро пожаловать в бот юридической клиники!
-
-Здесь вы можете:
-- Задать юридический вопрос
-- Просмотреть часто задаваемые вопросы (FAQ)
-- Отслеживать статус ваших обращений
-
-Выберите действие из меню ниже:
-`;
-      keyboard = getMainMenuKeyboard();
+      welcomeMessage = t(ctx, 'commands.start.welcome_user');
+      keyboard = getMainMenuKeyboard(ctx);
     }
 
     await ctx.reply(welcomeMessage, keyboard);
     await logAction('user_start_command', { userId: user._id, role: user.role });
   } catch (error) {
     console.error('Error in start handler:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
+    await ctx.reply(t(ctx, 'errors.general'));
   }
 };

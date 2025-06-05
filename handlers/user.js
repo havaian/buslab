@@ -4,12 +4,13 @@ const Category = require('../models/category');
 const Request = require('../models/request');
 const FAQ = require('../models/faq');
 const { logAction } = require('../logger');
+const { t } = require('../utils/i18nHelper');
 
 // User state management (in-memory for simplicity)
 const userStates = new Map();
 
 /**
- * Handle "Задать вопрос" action
+ * Handle "Задать вопрос" / "Savol berish" action
  */
 const handleAskQuestion = async (ctx) => {
   try {
@@ -17,8 +18,8 @@ const handleAskQuestion = async (ctx) => {
     const categories = await Category.find().sort({ name: 1 });
 
     if (categories.length === 0) {
-      await ctx.reply('В данный момент нет доступных категорий. Пожалуйста, попробуйте позже.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.no_categories'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
 
@@ -27,19 +28,19 @@ const handleAskQuestion = async (ctx) => {
     categories.forEach(category => {
       keyboard.push([category.name]);
     });
-    keyboard.push(['Назад']);
+    keyboard.push([t(ctx, 'buttons.back')]);
 
     // Set user state to selecting category
-    userStates.set(user.telegramId, { 
+    userStates.set(user.telegramId, {
       state: 'selecting_category'
     });
 
-    await ctx.reply('Выберите категорию вашего вопроса:', Markup.keyboard(keyboard).resize());
+    await ctx.reply(t(ctx, 'prompts.select_category'), Markup.keyboard(keyboard).resize());
     await logAction('user_selecting_category', { userId: user._id });
   } catch (error) {
     console.error('Error handling ask question:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
@@ -53,28 +54,25 @@ const handleCategorySelection = async (ctx) => {
 
     const category = await Category.findOne({ name: categoryName });
     if (!category) {
-      await ctx.reply('Категория не найдена. Пожалуйста, выберите из списка.');
+      await ctx.reply(t(ctx, 'errors.category_not_found'));
       return;
     }
 
     // Update user state with selected category
-    userStates.set(user.telegramId, { 
+    userStates.set(user.telegramId, {
       state: 'entering_request',
       categoryId: category._id
     });
 
-    await ctx.reply(
-      'Введите текст вашего юридического вопроса (не менее 150 символов):', 
-      getBackKeyboard()
-    );
-    await logAction('user_selected_category', { 
-      userId: user._id, 
-      categoryId: category._id 
+    await ctx.reply(t(ctx, 'prompts.enter_request'), getBackKeyboard(ctx));
+    await logAction('user_selected_category', {
+      userId: user._id,
+      categoryId: category._id
     });
   } catch (error) {
     console.error('Error handling category selection:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
@@ -87,37 +85,37 @@ const handleRequestText = async (ctx) => {
     const requestText = ctx.message.text;
 
     if (requestText.length < 150) {
-      await ctx.reply('Текст обращения должен содержать не менее 150 символов. Пожалуйста, дополните ваш вопрос.');
+      await ctx.reply(t(ctx, 'errors.invalid_length', { min: 150 }));
       return;
     }
 
     const userState = userStates.get(user.telegramId);
-    
+
     // Update user state with request text
-    userStates.set(user.telegramId, { 
+    userStates.set(user.telegramId, {
       ...userState,
       state: 'confirming_request',
       requestText
     });
 
     await ctx.reply(
-      'Проверьте текст вашего обращения:\n\n' + requestText,
+      t(ctx, 'prompts.confirm_request') + '\n\n' + requestText,
       Markup.keyboard([
-        ['Подтвердить'],
-        ['Изменить'],
-        ['Назад']
+        [t(ctx, 'buttons.confirm')],
+        [t(ctx, 'buttons.edit')],
+        [t(ctx, 'buttons.back')]
       ]).resize()
     );
-    
-    await logAction('user_entered_request', { 
-      userId: user._id, 
+
+    await logAction('user_entered_request', {
+      userId: user._id,
       categoryId: userState.categoryId,
       textLength: requestText.length
     });
   } catch (error) {
     console.error('Error handling request text:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
@@ -128,15 +126,15 @@ const handleRequestConfirmation = async (ctx, bot) => {
   try {
     const user = await getOrCreateUser(ctx);
     const userState = userStates.get(user.telegramId);
-    
+
     if (!userState || !userState.categoryId || !userState.requestText) {
-      await ctx.reply('Что-то пошло не так. Пожалуйста, начните заново.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.general'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
 
     const category = await Category.findById(userState.categoryId);
-    
+
     // Create request in database
     const request = new Request({
       userId: user._id,
@@ -144,9 +142,9 @@ const handleRequestConfirmation = async (ctx, bot) => {
       text: userState.requestText,
       status: 'pending'
     });
-    
+
     await request.save();
-    
+
     // Send request to admin chat
     const adminChatId = process.env.ADMIN_CHAT_ID;
     const adminMessage = `
@@ -170,114 +168,102 @@ ${userState.requestText}
 
     // Reset user state
     userStates.delete(user.telegramId);
-    
-    await ctx.reply('Ваше обращение успешно отправлено! Мы уведомим вас, когда оно будет рассмотрено.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
-    
-    await logAction('user_submitted_request', { 
-      userId: user._id, 
+
+    await ctx.reply(t(ctx, 'success.request_sent'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
+
+    await logAction('user_submitted_request', {
+      userId: user._id,
       requestId: request._id
     });
   } catch (error) {
     console.error('Error handling request confirmation:', error);
-    await ctx.reply('Произошла ошибка при отправке обращения. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
 /**
- * Handle "Изменить" (Edit request) button - NEW FUNCTION
+ * Handle "Изменить" / "O'zgartirish" (Edit request) button
  */
 const handleEditRequest = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
     const userState = userStates.get(user.telegramId);
-    
+
     if (!userState || !userState.categoryId) {
-      await ctx.reply('Что-то пошло не так. Пожалуйста, начните заново.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.general'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
 
     // Update user state to allow re-entering request text
-    userStates.set(user.telegramId, { 
+    userStates.set(user.telegramId, {
       state: 'entering_request',
       categoryId: userState.categoryId
     });
 
-    await ctx.reply(
-      'Введите текст вашего юридического вопроса заново (не менее 150 символов):', 
-      getBackKeyboard()
-    );
-    
-    await logAction('user_editing_request', { 
-      userId: user._id, 
-      categoryId: userState.categoryId 
+    await ctx.reply(t(ctx, 'prompts.enter_request'), getBackKeyboard(ctx));
+
+    await logAction('user_editing_request', {
+      userId: user._id,
+      categoryId: userState.categoryId
     });
   } catch (error) {
     console.error('Error handling edit request:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
 /**
- * Handle "Мои обращения" action
+ * Handle "Мои обращения" / "Mening murojaatlarim" action
  */
 const handleMyRequests = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
-    
+
     const requests = await Request.find({ userId: user._id })
       .sort({ createdAt: -1 })
       .populate('categoryId');
-    
+
     if (requests.length === 0) {
-      await ctx.reply('У вас пока нет обращений.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'lists.no_requests'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
-    
-    let message = '📋 Ваши обращения:\n\n';
-    
+
+    let message = t(ctx, 'lists.my_requests_title') + '\n\n';
+
     requests.forEach((request, index) => {
-      const statusMap = {
-        'pending': '⏳ На рассмотрении',
-        'approved': '👨‍💼 Ожидает исполнителя',
-        'declined': '❌ Отклонено',
-        'assigned': '🔄 В обработке',
-        'answered': '✅ Ответ на проверке',
-        'closed': '✅ Закрыто'
-      };
-      
       const date = request.createdAt.toLocaleDateString('ru-RU');
-      
-      message += `${index + 1}. ${request.categoryId.name} - ${statusMap[request.status]}\n`;
-      message += `   Дата: ${date}\n`;
-      
+
+      message += `${index + 1}. ${request.categoryId.name} - ${t(ctx, `statuses.${request.status}`)}\n`;
+      message += `   ${t(ctx, 'lists.request_date')} ${date}\n`;
+
       if (request.status === 'closed' && request.answerText) {
         // Truncate long answers for better readability
-        const truncatedAnswer = request.answerText.length > 200 
-          ? request.answerText.substring(0, 197) + '...' 
+        const truncatedAnswer = request.answerText.length > 200
+          ? request.answerText.substring(0, 197) + '...'
           : request.answerText;
-        message += `   📝 Ответ: ${truncatedAnswer}\n`;
+        message += `   ${t(ctx, 'lists.answer_label')} ${truncatedAnswer}\n`;
       }
-      
+
       if (request.status === 'declined' && request.adminComment) {
-        message += `   Комментарий: ${request.adminComment}\n`;
+        message += `   ${t(ctx, 'lists.comment_label')} ${request.adminComment}\n`;
       }
-      
+
       message += '\n';
     });
-    
+
     await ctx.reply(message);
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
-    
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
+
     await logAction('user_viewed_requests', { userId: user._id });
   } catch (error) {
     console.error('Error handling my requests:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
@@ -290,8 +276,8 @@ const handleFAQ = async (ctx) => {
     const categories = await Category.find().sort({ name: 1 });
 
     if (categories.length === 0) {
-      await ctx.reply('В данный момент нет доступных категорий FAQ. Пожалуйста, попробуйте позже.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.no_categories'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
 
@@ -300,19 +286,19 @@ const handleFAQ = async (ctx) => {
     categories.forEach(category => {
       keyboard.push([category.name]);
     });
-    keyboard.push(['Назад']);
+    keyboard.push([t(ctx, 'buttons.back')]);
 
     // Set user state to selecting FAQ category
-    userStates.set(user.telegramId, { 
+    userStates.set(user.telegramId, {
       state: 'selecting_faq_category'
     });
 
-    await ctx.reply('Выберите категорию FAQ:', Markup.keyboard(keyboard).resize());
+    await ctx.reply(t(ctx, 'prompts.select_faq_category'), Markup.keyboard(keyboard).resize());
     await logAction('user_viewing_faq', { userId: user._id });
   } catch (error) {
     console.error('Error handling FAQ:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
@@ -326,15 +312,15 @@ const handleFAQCategorySelection = async (ctx) => {
 
     const category = await Category.findOne({ name: categoryName });
     if (!category) {
-      await ctx.reply('Категория не найдена. Пожалуйста, выберите из списка.');
+      await ctx.reply(t(ctx, 'errors.category_not_found'));
       return;
     }
 
     const faqs = await FAQ.find({ categoryId: category._id });
 
     if (faqs.length === 0) {
-      await ctx.reply('В этой категории пока нет вопросов.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.not_found'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
 
@@ -343,10 +329,10 @@ const handleFAQCategorySelection = async (ctx) => {
     faqs.forEach(faq => {
       keyboard.push([faq.question]);
     });
-    keyboard.push(['Назад']);
+    keyboard.push([t(ctx, 'buttons.back')]);
 
     // Update user state with selected category
-    userStates.set(user.telegramId, { 
+    userStates.set(user.telegramId, {
       state: 'selecting_faq',
       categoryId: category._id,
       faqs: faqs.reduce((acc, faq) => {
@@ -355,15 +341,15 @@ const handleFAQCategorySelection = async (ctx) => {
       }, {})
     });
 
-    await ctx.reply('Выберите вопрос:', Markup.keyboard(keyboard).resize());
-    await logAction('user_selected_faq_category', { 
-      userId: user._id, 
-      categoryId: category._id 
+    await ctx.reply(t(ctx, 'prompts.select_faq_question'), Markup.keyboard(keyboard).resize());
+    await logAction('user_selected_faq_category', {
+      userId: user._id,
+      categoryId: category._id
     });
   } catch (error) {
     console.error('Error handling FAQ category selection:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
@@ -374,164 +360,116 @@ const handleFAQSelection = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
     const userState = userStates.get(user.telegramId);
-    
+
     if (!userState || !userState.faqs) {
-      await ctx.reply('Что-то пошло не так. Пожалуйста, начните заново.');
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'errors.general'));
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
-    
+
     const question = ctx.message.text;
     const faq = userState.faqs[question];
-    
+
     if (!faq) {
-      await ctx.reply('Вопрос не найден. Пожалуйста, выберите из списка.');
+      await ctx.reply(t(ctx, 'errors.category_not_found'));
       return;
     }
-    
+
     // Send FAQ answer
     await ctx.reply(`📌 Вопрос: ${faq.question}\n\n📝 Ответ: ${faq.answer}`);
-    await ctx.reply('Выберите другой вопрос или вернитесь назад:', getBackKeyboard());
-    
-    await logAction('user_viewed_faq', { 
-      userId: user._id, 
-      faqId: faq._id 
+    await ctx.reply(t(ctx, 'lists.select_action'), getBackKeyboard(ctx));
+
+    await logAction('user_viewed_faq', {
+      userId: user._id,
+      faqId: faq._id
     });
   } catch (error) {
     console.error('Error handling FAQ selection:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
 /**
- * Handle "Назад" (back) button
+ * Handle "Назад" / "Orqaga" (back) button
  */
 const handleBack = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
     const userState = userStates.get(user.telegramId);
-    
+
     if (!userState) {
-      await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+      await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
       return;
     }
-    
+
     // Depending on current state, go back to appropriate menu
     switch (userState.state) {
       case 'selecting_category':
       case 'selecting_faq_category':
         userStates.delete(user.telegramId);
-        await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+        await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
         break;
-        
+
       case 'entering_request':
         userStates.set(user.telegramId, { state: 'selecting_category' });
         const categories = await Category.find().sort({ name: 1 });
         const keyboard = categories.map(category => [category.name]);
-        keyboard.push(['Назад']);
-        await ctx.reply('Выберите категорию вашего вопроса:', Markup.keyboard(keyboard).resize());
+        keyboard.push([t(ctx, 'buttons.back')]);
+        await ctx.reply(t(ctx, 'prompts.select_category'), Markup.keyboard(keyboard).resize());
         break;
-        
+
       case 'confirming_request':
-        userStates.set(user.telegramId, { 
+        userStates.set(user.telegramId, {
           state: 'entering_request',
           categoryId: userState.categoryId
         });
-        await ctx.reply('Введите текст вашего юридического вопроса (не менее 150 символов):', getBackKeyboard());
+        await ctx.reply(t(ctx, 'prompts.enter_request'), getBackKeyboard(ctx));
         break;
-        
+
       case 'selecting_faq':
         userStates.set(user.telegramId, { state: 'selecting_faq_category' });
         const faqCategories = await Category.find().sort({ name: 1 });
         const faqKeyboard = faqCategories.map(category => [category.name]);
-        faqKeyboard.push(['Назад']);
-        await ctx.reply('Выберите категорию FAQ:', Markup.keyboard(faqKeyboard).resize());
+        faqKeyboard.push([t(ctx, 'buttons.back')]);
+        await ctx.reply(t(ctx, 'prompts.select_faq_category'), Markup.keyboard(faqKeyboard).resize());
         break;
-      
+
       default:
         userStates.delete(user.telegramId);
         if (isStudent(user)) {
-          await ctx.reply('Выберите действие:', getStudentMenuKeyboard());
+          await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
         } else {
-          await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+          await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
         }
     }
-    
+
     await logAction('user_pressed_back', { userId: user._id });
   } catch (error) {
     console.error('Error handling back button:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
 /**
- * Handle "❓ Помощь" action
+ * Handle "❓ Помощь" / "❓ Yordam" / "❓ Help" action
  */
 const handleHelp = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
-    
-    const helpMessage = `
-📚 **Помощь по использованию бота юридической клиники**
 
-**Основные функции:**
+    // Use the updated help handler that supports multiple languages
+    const helpHandlers = require('./help');
+    await helpHandlers.handleUserHelp(ctx);
 
-🔸 **Задать вопрос**
-   • Выберите подходящую категорию для вашего юридического вопроса
-   • Опишите вашу ситуацию подробно (минимум 150 символов)
-   • Проверьте текст и подтвердите отправку
-   • Ваш вопрос будет рассмотрен администратором
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
 
-🔸 **FAQ (Часто задаваемые вопросы)**
-   • Просмотрите готовые ответы на популярные вопросы
-   • Выберите категорию и найдите подходящий вопрос
-   • Возможно, ваш вопрос уже имеет готовый ответ
-
-🔸 **Мои обращения**
-   • Отслеживайте статус ваших обращений
-   • Просматривайте полученные ответы
-   • Узнавайте причины отклонения (если применимо)
-
-**📋 Статусы обращений:**
-• ⏳ На рассмотрении - ваше обращение проверяется администратором
-• 👨‍💼 Ожидает исполнителя - обращение одобрено, ищется исполнитель
-• 🔄 В обработке - студент работает над ответом
-• ✅ Ответ на проверке - ответ готов, проверяется администратором
-• ✅ Закрыто - вы получили ответ на ваш вопрос
-• ❌ Отклонено - обращение не принято к рассмотрению
-
-**📝 Требования к вопросам:**
-• Минимум 150 символов в тексте обращения
-• Четко сформулируйте вашу правовую ситуацию
-• Укажите все важные детали и обстоятельства
-• Выберите подходящую категорию права
-
-**⏰ Время обработки:**
-• Рассмотрение админом: обычно в течение 1-2 дней  
-• Подготовка ответа студентом: 3-7 дней
-• Проверка ответа админом: 1-2 дня
-
-**❓ Если возникли проблемы:**
-• Убедитесь, что ваш вопрос содержит достаточно деталей
-• Проверьте, правильно ли выбрана категория
-• При отклонении внимательно прочитайте комментарий администратора
-
-**⚠️ Важно помнить:**
-- Консультации носят информационный характер
-- Не заменяют полноценную юридическую помощь
-- При серьезных правовых вопросах обратитесь к практикующему юристу
-`;
-
-    await ctx.reply(helpMessage, { parse_mode: 'Markdown' });
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
-    
     await logAction('user_viewed_help', { userId: user._id });
   } catch (error) {
     console.error('Error handling help:', error);
-    await ctx.reply('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
-    await ctx.reply('Выберите действие:', getMainMenuKeyboard());
+    await ctx.reply(t(ctx, 'errors.general'));
+    await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
   }
 };
 
