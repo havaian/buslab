@@ -46,23 +46,33 @@ bot.use(session());
 const { detectUserLanguage } = require('./i18n/middleware');
 bot.use(detectUserLanguage);
 
+// Keyboard removal middleware for group chats
 bot.use(async (ctx, next) => {
   try {
     // Check if this is admin or student chat
     const isAdminChat = ctx.chat && ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID;
     const isStudentChat = ctx.chat && ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID;
 
-    if (isAdminChat || isStudentChat) {
-      // If there's a message and it's not a command, hide any existing keyboard
-      if (ctx.message && ctx.message.text && !ctx.message.text.startsWith('/')) {
-        // Add removal keyboard to context so handlers can use it
-        ctx.hideKeyboard = true;
-      }
+    // If it's a group chat and there's a message with keyboard buttons (not commands or callbacks)
+    if ((isAdminChat || isStudentChat) && ctx.message && ctx.message.text && !ctx.message.text.startsWith('/')) {
+      // Add context flag to force keyboard removal
+      ctx.shouldRemoveKeyboard = true;
+      
+      // Override the reply function to always remove keyboards in group chats
+      const originalReply = ctx.reply.bind(ctx);
+      ctx.reply = (text, extra = {}) => {
+        // Always remove keyboard in group chats
+        const newExtra = {
+          ...extra,
+          reply_markup: { remove_keyboard: true }
+        };
+        return originalReply(text, newExtra);
+      };
     }
 
     return next();
   } catch (error) {
-    logError(error, { context: 'Keyboard remover middleware error' });
+    logError(error, { context: 'Keyboard removal middleware error' });
     return next();
   }
 });

@@ -49,11 +49,11 @@ const isGroupChat = (ctx) => {
 /**
  * Get main menu keyboard for regular users
  * @param {Object} ctx - Telegram context for translations
- * @returns {Object} - Keyboard markup or empty if group chat
+ * @returns {Object} - Keyboard markup or remove keyboard if group chat
  */
 const getMainMenuKeyboard = (ctx) => {
   if (isGroupChat(ctx)) {
-    return Markup.removeKeyboard(); // Hide keyboard in group chats
+    return { reply_markup: { remove_keyboard: true } }; // Properly remove keyboard in group chats
   }
 
   return Markup.keyboard([
@@ -67,11 +67,11 @@ const getMainMenuKeyboard = (ctx) => {
 /**
  * Get student menu keyboard
  * @param {Object} ctx - Telegram context for translations
- * @returns {Object} - Keyboard markup or empty if group chat
+ * @returns {Object} - Keyboard markup or remove keyboard if group chat
  */
 const getStudentMenuKeyboard = (ctx) => {
   if (isGroupChat(ctx)) {
-    return Markup.removeKeyboard(); // Hide keyboard in group chats
+    return { reply_markup: { remove_keyboard: true } }; // Properly remove keyboard in group chats
   }
 
   return Markup.keyboard([
@@ -84,15 +84,32 @@ const getStudentMenuKeyboard = (ctx) => {
  * Back button keyboard
  * @param {Object} ctx - Telegram context for translations
  * @param {String} text - Custom text (optional)
- * @returns {Object} - Keyboard markup or empty if group chat
+ * @returns {Object} - Keyboard markup or remove keyboard if group chat
  */
 const getBackKeyboard = (ctx, text = null) => {
   if (isGroupChat(ctx)) {
-    return Markup.removeKeyboard(); // Hide keyboard in group chats
+    return { reply_markup: { remove_keyboard: true } }; // Properly remove keyboard in group chats
   }
 
   const buttonText = text || t(ctx, 'buttons.back');
   return Markup.keyboard([[buttonText]]).resize();
+};
+
+/**
+ * Safe reply function that automatically handles keyboard removal in group chats
+ * @param {Object} ctx - Telegram context
+ * @param {String} text - Message text
+ * @param {Object} keyboard - Keyboard markup (optional)
+ * @returns {Promise} - Reply promise
+ */
+const safeReply = async (ctx, text, keyboard = null) => {
+  if (isGroupChat(ctx)) {
+    // In group chats, always send without keyboard or with removed keyboard
+    return ctx.reply(text, { reply_markup: { remove_keyboard: true } });
+  } else {
+    // In private chats, use provided keyboard or no keyboard
+    return keyboard ? ctx.reply(text, keyboard) : ctx.reply(text);
+  }
 };
 
 /**
@@ -136,6 +153,7 @@ module.exports = {
   getMainMenuKeyboard,
   getStudentMenuKeyboard,
   getBackKeyboard,
+  safeReply,
   isAdmin,
   isStudent,
   isInStudentChat,

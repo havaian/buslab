@@ -1,4 +1,4 @@
-const { getOrCreateUser, getMainMenuKeyboard, getStudentMenuKeyboard, isStudent, isGroupChat } = require('./common');
+const { getOrCreateUser, getMainMenuKeyboard, getStudentMenuKeyboard, isStudent, isGroupChat, safeReply } = require('./common');
 const { logAction } = require('../logger');
 const { t } = require('../utils/i18nHelper');
 
@@ -6,7 +6,7 @@ module.exports = async (ctx) => {
   try {
     const user = await getOrCreateUser(ctx);
 
-    // Don't show keyboards in group chats
+    // Use safeReply for group chat handling
     if (isGroupChat(ctx)) {
       let welcomeMessage;
       if (isStudent(user)) {
@@ -14,7 +14,7 @@ module.exports = async (ctx) => {
       } else {
         welcomeMessage = "Добро пожаловать! Используйте команды для взаимодействия с ботом.";
       }
-      await ctx.reply(welcomeMessage);
+      await safeReply(ctx, welcomeMessage);
       await logAction('user_start_command', { userId: user._id, role: user.role, chatType: 'group' });
       return;
     }
@@ -31,10 +31,10 @@ module.exports = async (ctx) => {
       keyboard = getMainMenuKeyboard(ctx);
     }
 
-    await ctx.reply(welcomeMessage, keyboard);
+    await safeReply(ctx, welcomeMessage, keyboard);
     await logAction('user_start_command', { userId: user._id, role: user.role, chatType: 'private' });
   } catch (error) {
     console.error('Error in start handler:', error);
-    await ctx.reply(t(ctx, 'errors.general'));
+    await safeReply(ctx, t(ctx, 'errors.general'));
   }
 };
