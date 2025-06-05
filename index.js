@@ -102,8 +102,55 @@ bot.on('message', async (ctx, next) => {
       return next();
     }
 
-    // === PRIORITY 1: NAVIGATION BUTTONS (Always work, regardless of state) ===
-    
+    // === DISABLE MENU BUTTONS IN ADMIN/STUDENT CHATS ===
+
+    // Check if this is admin or student chat
+    const isAdminChat = ctx.chat && ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID;
+    const isStudentChat = ctx.chat && ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID;
+
+    // If it's a group chat (admin/student), skip all menu button processing
+    if (isAdminChat || isStudentChat) {
+      // Only allow admin/student state management in group chats
+
+      // Admin state management (only in admin chat)
+      if (isAdminChat) {
+        const adminState = adminHandlers.adminStates.get(ctx.from.id);
+        if (adminState) {
+          switch (adminState.state) {
+            case 'entering_decline_reason':
+              return adminHandlers.handleDeclineReason(ctx, bot);
+            case 'entering_answer_decline_reason':
+              return adminHandlers.handleAnswerDeclineReason(ctx, bot);
+            case 'entering_category_name':
+              return adminHandlers.handleCategoryName(ctx);
+            case 'entering_category_hashtag':
+              return adminHandlers.handleCategoryHashtag(ctx);
+            case 'entering_new_category_name':
+              return adminHandlers.handleNewCategoryName(ctx);
+            case 'entering_new_category_hashtag':
+              return adminHandlers.handleNewCategoryHashtag(ctx);
+            case 'entering_faq_question':
+              return adminHandlers.handleFAQQuestion(ctx);
+            case 'entering_faq_answer':
+              return adminHandlers.handleFAQAnswer(ctx);
+            case 'entering_new_faq_question':
+              return adminHandlers.handleNewFAQQuestion(ctx);
+            case 'entering_new_faq_answer':
+              return adminHandlers.handleNewFAQAnswer(ctx);
+          }
+        }
+      }
+
+      // Student chat doesn't process text messages (only callbacks)
+      // All student interactions happen via inline buttons and private messages
+
+      return next(); // Skip all other processing for group chats
+    }
+
+    // === PRIVATE CHAT ONLY - FULL MENU FUNCTIONALITY ===
+
+    // === PRIORITY 1: NAVIGATION BUTTONS (Always work in private chat) ===
+
     // Language button - always works
     if (messageText === '🌐 Language') {
       return languageHandlers.handleLanguageSelection(ctx);
@@ -120,7 +167,7 @@ bot.on('message', async (ctx, next) => {
     }
 
     // === PRIORITY 2: STATE-BASED HANDLERS (Check states first) ===
-    
+
     // User state management - check before button matching
     const userState = userHandlers.userStates.get(ctx.from.id);
     if (userState) {
@@ -145,48 +192,21 @@ bot.on('message', async (ctx, next) => {
       }
     }
 
-    // Admin state management
-    const adminState = adminHandlers.adminStates.get(ctx.from.id);
-    if (adminState) {
-      switch (adminState.state) {
-        case 'entering_decline_reason':
-          return adminHandlers.handleDeclineReason(ctx, bot);
-        case 'entering_answer_decline_reason':
-          return adminHandlers.handleAnswerDeclineReason(ctx, bot);
-        case 'entering_category_name':
-          return adminHandlers.handleCategoryName(ctx);
-        case 'entering_category_hashtag':
-          return adminHandlers.handleCategoryHashtag(ctx);
-        case 'entering_new_category_name':
-          return adminHandlers.handleNewCategoryName(ctx);
-        case 'entering_new_category_hashtag':
-          return adminHandlers.handleNewCategoryHashtag(ctx);
-        case 'entering_faq_question':
-          return adminHandlers.handleFAQQuestion(ctx);
-        case 'entering_faq_answer':
-          return adminHandlers.handleFAQAnswer(ctx);
-        case 'entering_new_faq_question':
-          return adminHandlers.handleNewFAQQuestion(ctx);
-        case 'entering_new_faq_answer':
-          return adminHandlers.handleNewFAQAnswer(ctx);
-      }
-    }
-
-    // Student state management
+    // Student state management (private chat interactions)
     const studentState = studentHandlers.studentStates.get(ctx.from.id);
     if (studentState) {
       switch (studentState.state) {
         case 'writing_answer':
           return studentHandlers.handleStudentAnswer(ctx);
         case 'confirming_answer':
-          // Only handle student buttons if in this state
-          if (messageText === t(ctx, 'buttons.confirm_answer')) {
+          // Handle Russian student buttons (hardcoded for consistency)
+          if (messageText === 'Подтвердить отправку ответа') {
             return studentHandlers.handleConfirmAnswer(ctx, bot);
           }
-          if (messageText === t(ctx, 'buttons.edit_answer')) {
+          if (messageText === 'Изменить ответ') {
             return studentHandlers.handleEditAnswer(ctx);
           }
-          if (messageText === t(ctx, 'buttons.reject_assignment')) {
+          if (messageText === 'Отказаться от обращения') {
             return studentHandlers.handleRejectAssignment(ctx, bot);
           }
           break;
@@ -194,10 +214,10 @@ bot.on('message', async (ctx, next) => {
     }
 
     // === PRIORITY 3: MAIN MENU BUTTONS (Only if no active state) ===
-    
+
     // Only process main menu buttons if user has no active state
-    if (!userState && !adminState && !studentState) {
-      
+    if (!userState && !studentState) {
+
       // Main user buttons
       if (messageText === t(ctx, 'buttons.ask_question')) {
         return userHandlers.handleAskQuestion(ctx);
@@ -239,7 +259,7 @@ bot.on('message', async (ctx, next) => {
     }
 
     // === PRIORITY 4: FALLBACK ===
-    
+
     // If no handlers matched, continue to next middleware
     return next();
 

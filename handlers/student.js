@@ -66,7 +66,7 @@ const handleTakeRequest = async (ctx, bot) => {
       { reply_markup: { inline_keyboard: [] } }
     );
 
-    // Send request details to student in private chat
+    // Send request details to student in private chat (in Russian)
     const detailMessage = `
 📨 Обращение #${request._id}
 📂 Категория: ${request.categoryId.name} ${request.categoryId.hashtag}
@@ -74,16 +74,16 @@ const handleTakeRequest = async (ctx, bot) => {
 📝 Текст обращения:
 ${request.text}
 
-${t(ctx, 'prompts.enter_answer')}
+Введите ваш ответ на это обращение и отправьте его. После этого нажмите кнопку "Подтвердить отправку ответа".
 `;
 
     await bot.telegram.sendMessage(
       user.telegramId,
       detailMessage,
       Markup.keyboard([
-        [t(ctx, 'buttons.confirm_answer')],
-        [t(ctx, 'buttons.edit_answer')],
-        [t(ctx, 'buttons.reject_assignment')]
+        ['Подтвердить отправку ответа'],
+        ['Изменить ответ'],
+        ['Отказаться от обращения']
       ]).resize()
     );
 

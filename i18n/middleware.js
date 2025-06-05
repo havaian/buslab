@@ -4,8 +4,17 @@ const detectUserLanguage = async (ctx, next) => {
     try {
         let userLocale = 'ru'; // Default
 
-        // Try to get user from database first
-        if (ctx.from) {
+        // Force Russian for admin and student chats
+        if (ctx.chat && (
+            ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID ||
+            ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID
+        )) {
+            ctx.locale = 'ru';
+            return next();
+        }
+
+        // Only detect language for private chats
+        if (ctx.from && ctx.chat && ctx.chat.type === 'private') {
             const user = await User.findOne({ telegramId: ctx.from.id });
             if (user && user.language) {
                 userLocale = user.language;
