@@ -1,7 +1,7 @@
 const { Markup } = require('telegraf');
 const User = require('../models/user');
 const Request = require('../models/request');
-const { isStudent, getOrCreateUser, getStudentMenuKeyboard, canTakeRequests } = require('./common');
+const { isStudent, getOrCreateUser, getStudentMenuKeyboard, canTakeRequests, isGroupChat } = require('./common');
 const { logAction, logWarn } = require('../logger');
 const { t } = require('../utils/i18nHelper');
 
@@ -125,7 +125,9 @@ const handleMyAnswers = async (ctx) => {
 
     if (requests.length === 0) {
       await ctx.reply('Вы пока не обработали ни одного обращения.');
-      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+      if (!isGroupChat(ctx)) {
+        await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+      }
       return;
     }
 
@@ -156,13 +158,17 @@ const handleMyAnswers = async (ctx) => {
     });
 
     await ctx.reply(message);
-    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+    if (!isGroupChat(ctx)) {
+      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+    }
 
     await logAction('student_viewed_answers', { userId: user._id });
   } catch (error) {
     console.error('Error handling student answers:', error);
     await ctx.reply(t(ctx, 'errors.general'));
-    await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+    if (!isGroupChat(ctx)) {
+      await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+    }
   }
 };
 

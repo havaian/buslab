@@ -35,11 +35,27 @@ const getOrCreateUser = async (ctx) => {
 };
 
 /**
+ * Check if context is in a group chat (admin or student)
+ * @param {Object} ctx - Telegram context
+ * @returns {Boolean} - Is group chat
+ */
+const isGroupChat = (ctx) => {
+  return ctx.chat && (
+    ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID ||
+    ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID
+  );
+};
+
+/**
  * Get main menu keyboard for regular users
  * @param {Object} ctx - Telegram context for translations
- * @returns {Object} - Keyboard markup
+ * @returns {Object} - Keyboard markup or empty if group chat
  */
 const getMainMenuKeyboard = (ctx) => {
+  if (isGroupChat(ctx)) {
+    return Markup.removeKeyboard(); // Hide keyboard in group chats
+  }
+
   return Markup.keyboard([
     [t(ctx, 'buttons.ask_question')],
     [t(ctx, 'buttons.faq')],
@@ -51,9 +67,13 @@ const getMainMenuKeyboard = (ctx) => {
 /**
  * Get student menu keyboard
  * @param {Object} ctx - Telegram context for translations
- * @returns {Object} - Keyboard markup
+ * @returns {Object} - Keyboard markup or empty if group chat
  */
 const getStudentMenuKeyboard = (ctx) => {
+  if (isGroupChat(ctx)) {
+    return Markup.removeKeyboard(); // Hide keyboard in group chats
+  }
+
   return Markup.keyboard([
     [t(ctx, 'buttons.current_assignment')],
     [t(ctx, 'buttons.my_answers')]
@@ -64,9 +84,13 @@ const getStudentMenuKeyboard = (ctx) => {
  * Back button keyboard
  * @param {Object} ctx - Telegram context for translations
  * @param {String} text - Custom text (optional)
- * @returns {Object} - Keyboard markup
+ * @returns {Object} - Keyboard markup or empty if group chat
  */
 const getBackKeyboard = (ctx, text = null) => {
+  if (isGroupChat(ctx)) {
+    return Markup.removeKeyboard(); // Hide keyboard in group chats
+  }
+
   const buttonText = text || t(ctx, 'buttons.back');
   return Markup.keyboard([[buttonText]]).resize();
 };
@@ -115,5 +139,6 @@ module.exports = {
   isAdmin,
   isStudent,
   isInStudentChat,
-  canTakeRequests
+  canTakeRequests,
+  isGroupChat
 };

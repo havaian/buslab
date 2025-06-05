@@ -1,4 +1,4 @@
-const { getOrCreateUser } = require('./common');
+const { getOrCreateUser, isGroupChat } = require('./common');
 const { t } = require('../utils/i18nHelper');
 const { logAction } = require('../logger');
 
@@ -7,6 +7,12 @@ const { logAction } = require('../logger');
  */
 const handleLanguageSelection = async (ctx) => {
     try {
+        // Don't allow language selection in group chats
+        if (isGroupChat(ctx)) {
+            await ctx.reply('Смена языка доступна только в личных сообщениях.');
+            return;
+        }
+
         const keyboard = [
             [{ text: '🇷🇺 Русский', callback_data: 'lang:ru' }],
             [{ text: '🇺🇿 O\'zbek', callback_data: 'lang:uz' }],
@@ -46,11 +52,13 @@ const handleLanguageChange = async (ctx) => {
             { reply_markup: { inline_keyboard: [] } }
         );
 
-        // Send updated keyboard based on user role
-        if (isStudent(user)) {
-            await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
-        } else {
-            await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
+        // Send updated keyboard based on user role (only in private chat)
+        if (!isGroupChat(ctx)) {
+            if (isStudent(user)) {
+                await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+            } else {
+                await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
+            }
         }
 
         logAction('user_changed_language', {

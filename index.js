@@ -46,6 +46,27 @@ bot.use(session());
 const { detectUserLanguage } = require('./i18n/middleware');
 bot.use(detectUserLanguage);
 
+bot.use(async (ctx, next) => {
+  try {
+    // Check if this is admin or student chat
+    const isAdminChat = ctx.chat && ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID;
+    const isStudentChat = ctx.chat && ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID;
+
+    if (isAdminChat || isStudentChat) {
+      // If there's a message and it's not a command, hide any existing keyboard
+      if (ctx.message && ctx.message.text && !ctx.message.text.startsWith('/')) {
+        // Add removal keyboard to context so handlers can use it
+        ctx.hideKeyboard = true;
+      }
+    }
+
+    return next();
+  } catch (error) {
+    logError(error, { context: 'Keyboard remover middleware error' });
+    return next();
+  }
+});
+
 // Enhanced logging middleware
 bot.use(async (ctx, next) => {
   try {
