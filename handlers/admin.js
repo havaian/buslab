@@ -797,7 +797,7 @@ const handleDeleteCategorySelection = async (ctx) => {
 };
 
 /**
- * Handle delete category confirmation
+ * Handle delete category confirmation with cleanup
  */
 const handleDeleteCategoryConfirmation = async (ctx) => {
   try {
@@ -811,19 +811,51 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
 
     const categoryName = category.name;
 
-    // Delete category
+    // Get counts for logging
+    const requestsCount = await Request.countDocuments({ categoryId });
+    const faqsCount = await FAQ.countDocuments({ categoryId });
+
+    // Delete all associated FAQs
+    if (faqsCount > 0) {
+      await FAQ.deleteMany({ categoryId });
+    }
+
+    // For requests, you have options:
+    // Option 1: Prevent deletion if there are active requests
+    if (requestsCount > 0) {
+      const activeRequestsCount = await Request.countDocuments({ 
+        categoryId, 
+        status: { $in: ['pending', 'approved', 'assigned', 'answered'] } 
+      });
+      
+      if (activeRequestsCount > 0) {
+        await ctx.answerCbQuery();
+        await ctx.editMessageText(
+          `❌ Категория "${categoryName}" не может быть удалена, так как есть ${activeRequestsCount} активных обращений. Завершите или отклоните их сначала.`,
+          { reply_markup: { inline_keyboard: [] } }
+        );
+        return;
+      }
+    }
+
+    // Option 2: Or just delete the category and leave historical requests
+    // (requests will keep the categoryId but category won't exist)
+
+    // Delete the category
     await Category.deleteOne({ _id: categoryId });
 
     await ctx.answerCbQuery();
     await ctx.editMessageText(
-      `✅ Категория "${categoryName}" успешно удалена.`,
+      `✅ Категория "${categoryName}" успешно удалена.${faqsCount > 0 ? ` Удалено ${faqsCount} FAQ.` : ''}`,
       { reply_markup: { inline_keyboard: [] } }
     );
 
     const user = await getOrCreateUser(ctx);
     logAction('admin_deleted_category', {
       adminId: user._id,
-      categoryName
+      categoryName,
+      deletedFAQs: faqsCount,
+      existingRequests: requestsCount
     });
   } catch (error) {
     console.error('Error handling delete category confirmation:', error);
@@ -1381,26 +1413,50 @@ const handleDeleteFAQFromCategory = async (ctx) => {
 const handleConfirmDeleteFAQ = async (ctx) => {
   try {
     const faqId = ctx.callbackQuery.data.split(':')[1];
-
+    
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
 
-    await FAQ.deleteOne({ _id: faqId });
+    // Store question text before deletion for logging
+    const questionText = faq.question;
+
+    // Delete the FAQ
+    const deleteResult = await FAQ.deleteOne({ _id: faqId });
+    
+    // Check if deletion was successful
+    if (deleteResult.deletedCount === 0) {
+      console.error('FAQ deletion failed - no documents were deleted', { faqId });
+      await ctx.answerCbQuery('Ошибка при удалении вопроса.');
+      return;
+    }
+
+    console.log('FAQ successfully deleted', { faqId, deletedCount: deleteResult.deletedCount });
 
     const user = await getOrCreateUser(ctx);
 
-    await ctx.answerCbQuery();
-    await ctx.editMessageText(
-      `✅ Вопрос успешно удален.`,
-      { reply_markup: { inline_keyboard: [] } }
-    );
+    // Answer the callback query first
+    await ctx.answerCbQuery('Вопрос успешно удален.');
+
+    // Edit the message to show deletion confirmation
+    try {
+      await ctx.editMessageText(
+        `✅ Вопрос успешно удален.`,
+        { reply_markup: { inline_keyboard: [] } }
+      );
+    } catch (editError) {
+      // If editing fails, send a new message instead
+      console.warn('Failed to edit message, sending new one:', editError.message);
+      await ctx.reply('✅ Вопрос успешно удален.');
+    }
 
     logAction('admin_deleted_faq', {
       adminId: user._id,
-      question: faq.question
+      question: questionText,
+      faqId: faqId,
+      deletedCount: deleteResult.deletedCount
     });
   } catch (error) {
     console.error('Error handling confirm delete FAQ:', error);
