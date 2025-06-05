@@ -1373,8 +1373,10 @@ const handleDeleteFAQSelection = async (ctx) => {
 const handleDeleteFAQFromCategory = async (ctx) => {
   try {
     const faqId = ctx.callbackQuery.data.split(':')[1];
+    console.log(faqId);
 
     const faq = await FAQ.findById(faqId);
+    console.log(faq);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
       return;
