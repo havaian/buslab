@@ -838,18 +838,6 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
       }
     }
 
-    // Option 2: Or just delete the category and leave historical requests
-    // (requests will keep the categoryId but category won't exist)
-
-    // Delete the category
-    await Category.deleteOne({ _id: categoryId });
-
-    await ctx.answerCbQuery();
-    await ctx.editMessageText(
-      `✅ Категория "${categoryName}" успешно удалена.${faqsCount > 0 ? ` Удалено ${faqsCount} FAQ.` : ''}`,
-      { reply_markup: { inline_keyboard: [] } }
-    );
-
     const user = await getOrCreateUser(ctx);
     logAction('admin_deleted_category', {
       adminId: user._id,
@@ -1413,18 +1401,22 @@ const handleDeleteFAQFromCategory = async (ctx) => {
 const handleConfirmDeleteFAQ = async (ctx) => {
   try {
     const faqId = ctx.callbackQuery.data.split(':')[1];
+    console.log(faqId);
     
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
       return;
     }
+    console.log(faq);
 
     // Store question text before deletion for logging
     const questionText = faq.question;
+    console.log(questionText);
 
     // Delete the FAQ
     const deleteResult = await FAQ.deleteOne({ _id: faqId });
+    console.log(deleteResult);
     
     // Check if deletion was successful
     if (deleteResult.deletedCount === 0) {
@@ -1436,6 +1428,7 @@ const handleConfirmDeleteFAQ = async (ctx) => {
     console.log('FAQ successfully deleted', { faqId, deletedCount: deleteResult.deletedCount });
 
     const user = await getOrCreateUser(ctx);
+    console.log(user);
 
     // Answer the callback query first
     await ctx.answerCbQuery('Вопрос успешно удален.');
