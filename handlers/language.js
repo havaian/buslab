@@ -38,11 +38,20 @@ const handleLanguageChange = async (ctx) => {
         // Update current context
         ctx.locale = locale;
 
+        const { getMainMenuKeyboard, getStudentMenuKeyboard, isStudent } = require('./common');
+
         await ctx.answerCbQuery();
         await ctx.editMessageText(
             t(ctx, 'language.changed'),
             { reply_markup: { inline_keyboard: [] } }
         );
+
+        // Send updated keyboard based on user role
+        if (isStudent(user)) {
+            await ctx.reply(t(ctx, 'lists.select_action'), getStudentMenuKeyboard(ctx));
+        } else {
+            await ctx.reply(t(ctx, 'lists.select_action'), getMainMenuKeyboard(ctx));
+        }
 
         logAction('user_changed_language', {
             userId: user._id,

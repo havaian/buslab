@@ -90,8 +90,6 @@ const languageHandlers = require('./handlers/language');
 bot.command('language', languageHandlers.handleLanguageSelection);
 bot.action(/lang:(.+)/, languageHandlers.handleLanguageChange);
 
-// Replace ALL your existing bot.on('message') handlers with this single comprehensive one:
-
 bot.on('message', async (ctx, next) => {
   try {
     // Skip if no text
@@ -103,77 +101,27 @@ bot.on('message', async (ctx, next) => {
     if (messageText.startsWith('/')) {
       return next();
     }
+
+    // === PRIORITY 1: NAVIGATION BUTTONS (Always work, regardless of state) ===
     
+    // Language button - always works
     if (messageText === '🌐 Language') {
       return languageHandlers.handleLanguageSelection(ctx);
     }
 
-    // === BUTTON HANDLERS (i18n) ===
-
-    // Main user buttons
-    if (messageText === t(ctx, 'buttons.ask_question')) {
-      return userHandlers.handleAskQuestion(ctx);
-    }
-
-    if (messageText === t(ctx, 'buttons.faq')) {
-      return userHandlers.handleFAQ(ctx);
-    }
-
-    if (messageText === t(ctx, 'buttons.my_requests')) {
-      return userHandlers.handleMyRequests(ctx);
-    }
-
+    // Back button - always works and handles states
     if (messageText === t(ctx, 'buttons.back')) {
       return userHandlers.handleBack(ctx);
     }
 
+    // Help button - always works
     if (messageText === t(ctx, 'buttons.help')) {
       return userHandlers.handleHelp(ctx);
     }
 
-    // Student buttons
-    if (messageText === t(ctx, 'buttons.confirm_answer')) {
-      return studentHandlers.handleConfirmAnswer(ctx, bot);
-    }
-
-    if (messageText === t(ctx, 'buttons.edit_answer')) {
-      return studentHandlers.handleEditAnswer(ctx);
-    }
-
-    if (messageText === t(ctx, 'buttons.reject_assignment')) {
-      return studentHandlers.handleRejectAssignment(ctx, bot);
-    }
-
-    if (messageText === t(ctx, 'buttons.my_answers')) {
-      return studentHandlers.handleMyAnswers(ctx);
-    }
-
-    if (messageText === t(ctx, 'buttons.current_assignment')) {
-      return studentHandlers.handleCurrentAssignment(ctx);
-    }
-
-    if (messageText === t(ctx, 'buttons.statistics')) {
-      return studentHandlers.handleStudentStats(ctx);
-    }
-
-    // Generic flow buttons
-    if (messageText === t(ctx, 'buttons.confirm')) {
-      const userState = userHandlers.userStates.get(ctx.from.id);
-      if (userState && userState.state === 'confirming_request') {
-        return userHandlers.handleRequestConfirmation(ctx, bot);
-      }
-    }
-
-    if (messageText === t(ctx, 'buttons.edit')) {
-      const userState = userHandlers.userStates.get(ctx.from.id);
-      if (userState && userState.state === 'confirming_request') {
-        return userHandlers.handleEditRequest(ctx);
-      }
-    }
-
-    // === STATE-BASED HANDLERS ===
-
-    // User state management
+    // === PRIORITY 2: STATE-BASED HANDLERS (Check states first) ===
+    
+    // User state management - check before button matching
     const userState = userHandlers.userStates.get(ctx.from.id);
     if (userState) {
       switch (userState.state) {
@@ -181,6 +129,15 @@ bot.on('message', async (ctx, next) => {
           return userHandlers.handleCategorySelection(ctx);
         case 'entering_request':
           return userHandlers.handleRequestText(ctx);
+        case 'confirming_request':
+          // Only handle confirm/edit if user is in this state
+          if (messageText === t(ctx, 'buttons.confirm')) {
+            return userHandlers.handleRequestConfirmation(ctx, bot);
+          }
+          if (messageText === t(ctx, 'buttons.edit')) {
+            return userHandlers.handleEditRequest(ctx);
+          }
+          break;
         case 'selecting_faq_category':
           return userHandlers.handleFAQCategorySelection(ctx);
         case 'selecting_faq':
@@ -215,12 +172,74 @@ bot.on('message', async (ctx, next) => {
       }
     }
 
-    // Student answer submission
+    // Student state management
     const studentState = studentHandlers.studentStates.get(ctx.from.id);
-    if (studentState && studentState.state === 'writing_answer') {
-      return studentHandlers.handleStudentAnswer(ctx);
+    if (studentState) {
+      switch (studentState.state) {
+        case 'writing_answer':
+          return studentHandlers.handleStudentAnswer(ctx);
+        case 'confirming_answer':
+          // Only handle student buttons if in this state
+          if (messageText === t(ctx, 'buttons.confirm_answer')) {
+            return studentHandlers.handleConfirmAnswer(ctx, bot);
+          }
+          if (messageText === t(ctx, 'buttons.edit_answer')) {
+            return studentHandlers.handleEditAnswer(ctx);
+          }
+          if (messageText === t(ctx, 'buttons.reject_assignment')) {
+            return studentHandlers.handleRejectAssignment(ctx, bot);
+          }
+          break;
+      }
     }
 
+    // === PRIORITY 3: MAIN MENU BUTTONS (Only if no active state) ===
+    
+    // Only process main menu buttons if user has no active state
+    if (!userState && !adminState && !studentState) {
+      
+      // Main user buttons
+      if (messageText === t(ctx, 'buttons.ask_question')) {
+        return userHandlers.handleAskQuestion(ctx);
+      }
+
+      if (messageText === t(ctx, 'buttons.faq')) {
+        return userHandlers.handleFAQ(ctx);
+      }
+
+      if (messageText === t(ctx, 'buttons.my_requests')) {
+        return userHandlers.handleMyRequests(ctx);
+      }
+
+      // Student menu buttons
+      if (messageText === t(ctx, 'buttons.my_answers')) {
+        return studentHandlers.handleMyAnswers(ctx);
+      }
+
+      if (messageText === t(ctx, 'buttons.current_assignment')) {
+        return studentHandlers.handleCurrentAssignment(ctx);
+      }
+
+      if (messageText === t(ctx, 'buttons.statistics')) {
+        return studentHandlers.handleStudentStats(ctx);
+      }
+
+      // Student assignment buttons (when no state but has assignment)
+      if (messageText === t(ctx, 'buttons.confirm_answer')) {
+        return studentHandlers.handleConfirmAnswer(ctx, bot);
+      }
+
+      if (messageText === t(ctx, 'buttons.edit_answer')) {
+        return studentHandlers.handleEditAnswer(ctx);
+      }
+
+      if (messageText === t(ctx, 'buttons.reject_assignment')) {
+        return studentHandlers.handleRejectAssignment(ctx, bot);
+      }
+    }
+
+    // === PRIORITY 4: FALLBACK ===
+    
     // If no handlers matched, continue to next middleware
     return next();
 
