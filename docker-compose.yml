@@ -7,7 +7,7 @@ services:
     container_name: buslab_mongodb
     restart: always
     ports:
-      - "${MONGODB_EXPOSE}:${MONGODB_PORT}"
+      - "127.0.0.1:${MONGODB_EXPOSE}:${MONGODB_PORT}"
     volumes:
       - mongodb_data:/data/db
     networks:
