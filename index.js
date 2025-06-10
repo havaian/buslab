@@ -54,7 +54,7 @@ bot.use(async (ctx, next) => {
     const isStudentChat = ctx.chat && ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID;
 
     // If it's a group chat and there's a message with keyboard buttons (not commands or callbacks)
-    if ((isAdminChat || isStudentChat) && ctx.message && ctx.message.text && !ctx.message.text.startsWith('/')) {
+    if ((isAdminChat || isStudentChat) && ctx.message && ctx.message.text && !ctx.message.text.startsWith('/') && !adminState.state) {
       // Add context flag to force keyboard removal
       ctx.shouldRemoveKeyboard = true;
       
