@@ -227,6 +227,11 @@ const handleApproveAnswer = async (ctx, bot) => {
 
     if (request.status !== 'answered') {
       await ctx.answerCbQuery('Это обращение находится в неправильном статусе.');
+      // Update callback message to remove inline keyboard
+      await ctx.editMessageText(
+        request.status === 'closed' ? ctx.callbackQuery.message.text + '\n\n⚠️ Статус обращения: завершено' : '',
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -238,6 +243,12 @@ const handleApproveAnswer = async (ctx, bot) => {
     const student = request.studentId;
     student.currentAssignmentId = null;
     await student.save();
+
+    // Update callback message to remove inline keyboard
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text + '\n\n✅ Одобрено и отправлено пользователю',
+      { reply_markup: { inline_keyboard: [] } }
+    );
 
     // Notify user
     await bot.telegram.sendMessage(
@@ -251,12 +262,6 @@ const handleApproveAnswer = async (ctx, bot) => {
       student.telegramId,
       `✅ Ваш ответ на обращение #${request._id} был одобрен и отправлен пользователю.`,
       getMainMenuKeyboard()
-    );
-
-    // Update callback message to remove inline keyboard
-    await ctx.editMessageText(
-      ctx.callbackQuery.message.text + '\n\n✅ Одобрено и отправлено пользователю',
-      { reply_markup: { inline_keyboard: [] } }
     );
 
     await ctx.answerCbQuery('Ответ одобрен и отправлен пользователю.');
@@ -287,6 +292,11 @@ const handleDeclineAnswer = async (ctx) => {
 
     if (request.status !== 'answered') {
       await ctx.answerCbQuery('Это обращение находится в неправильном статусе.');
+      // Update callback message to remove inline keyboard
+      await ctx.editMessageText(
+        request.status === 'closed' ? ctx.callbackQuery.message.text + '\n\n⚠️ Статус обращения: завершено' : '',
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 

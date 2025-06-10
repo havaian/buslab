@@ -40,10 +40,10 @@ const getOrCreateUser = async (ctx) => {
  * @returns {Boolean} - Is group chat
  */
 const isGroupChat = (ctx) => {
-  return ctx.chat && (
+  return ctx.chat ? ctx.chat && (
     ctx.chat.id.toString() === process.env.ADMIN_CHAT_ID ||
     ctx.chat.id.toString() === process.env.STUDENT_CHAT_ID
-  );
+  ) : '';
 };
 
 /**
