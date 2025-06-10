@@ -776,16 +776,37 @@ const handleDeleteCategorySelection = async (ctx) => {
       return;
     }
 
-    // Check if category is in use
-    const requestsCount = await Request.countDocuments({ categoryId });
+    // Check for active/pending requests (requests that are still being processed)
+    const activeRequestsCount = await Request.countDocuments({ 
+      categoryId, 
+      status: { $in: ['pending', 'approved', 'assigned', 'answered'] } 
+    });
+
+    // Check total requests and FAQs for informational purposes
+    const totalRequestsCount = await Request.countDocuments({ categoryId });
     const faqsCount = await FAQ.countDocuments({ categoryId });
 
-    if (requestsCount > 0 || faqsCount > 0) {
+    // Prevent deletion if there are active requests
+    if (activeRequestsCount > 0) {
       await ctx.answerCbQuery();
       await ctx.reply(
-        `Категория "${category.name}" не может быть удалена, так как она используется в ${requestsCount} обращениях и ${faqsCount} FAQ.`
+        `❌ Категория "${category.name}" не может быть удалена, так как есть ${activeRequestsCount} активных обращений. Завершите или отклоните их сначала.\n\n` +
+        `Всего обращений в категории: ${totalRequestsCount}\n` +
+        `FAQ в категории: ${faqsCount}`
       );
       return;
+    }
+
+    // Show warning about what will be deleted
+    let warningMessage = `Вы уверены, что хотите удалить категорию "${category.name}" (${category.hashtag})?`;
+    
+    if (faqsCount > 0) {
+      warningMessage += `\n\n⚠️ ВНИМАНИЕ: Будет удалено ${faqsCount} вопросов FAQ из этой категории.`;
+    }
+    
+    if (totalRequestsCount > 0) {
+      const closedRequestsCount = totalRequestsCount - activeRequestsCount;
+      warningMessage += `\n\n📄 В категории есть ${closedRequestsCount} завершенных обращений (они останутся в базе данных).`;
     }
 
     const keyboard = [
@@ -796,10 +817,8 @@ const handleDeleteCategorySelection = async (ctx) => {
     ];
 
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `Вы уверены, что хотите удалить категорию "${category.name}" (${category.hashtag})?`,
-      { reply_markup: { inline_keyboard: keyboard } }
-    );
+    await ctx.reply(warningMessage, { reply_markup: { inline_keyboard: keyboard } });
+
   } catch (error) {
     console.error('Error handling delete category selection:', error);
     await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
