@@ -1507,6 +1507,10 @@ const handleDeleteFAQSelection = async (ctx) => {
     ]);
 
     await ctx.answerCbQuery();
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text,
+      { reply_markup: { inline_keyboard: [] } }
+    );
     await ctx.reply(
       'Выберите вопрос для удаления:',
       { reply_markup: { inline_keyboard: keyboard } }
@@ -1539,6 +1543,10 @@ const handleDeleteFAQFromCategory = async (ctx) => {
     ];
 
     await ctx.answerCbQuery();
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text,
+      { reply_markup: { inline_keyboard: [] } }
+    );
     await ctx.reply(
       `Вы уверены, что хотите удалить вопрос "${faq.question.substring(0, 50)}"?`,
       { reply_markup: { inline_keyboard: keyboard } }
