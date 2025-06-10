@@ -786,6 +786,11 @@ const handleDeleteCategorySelection = async (ctx) => {
     const totalRequestsCount = await Request.countDocuments({ categoryId });
     const faqsCount = await FAQ.countDocuments({ categoryId });
 
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text,
+      { reply_markup: { inline_keyboard: [] } }
+    );
+
     // Prevent deletion if there are active requests
     if (activeRequestsCount > 0) {
       await ctx.answerCbQuery();
@@ -848,11 +853,6 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
     if (faqsCount > 0) {
       await FAQ.deleteMany({ categoryId });
     }
-
-    await ctx.editMessageText(
-      ctx.callbackQuery.message.text,
-      { reply_markup: { inline_keyboard: [] } }
-    );
 
     // For requests, you have options:
     // Option 1: Prevent deletion if there are active requests
