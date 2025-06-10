@@ -849,6 +849,11 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
       await FAQ.deleteMany({ categoryId });
     }
 
+    await ctx.editMessageText(
+      ctx.callbackQuery.message.text,
+      { reply_markup: { inline_keyboard: [] } }
+    );
+
     // For requests, you have options:
     // Option 1: Prevent deletion if there are active requests
     if (requestsCount > 0) {
