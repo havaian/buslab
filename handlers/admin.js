@@ -47,11 +47,19 @@ const handleApproveRequest = async (ctx, bot) => {
 
     if (!request) {
       await ctx.answerCbQuery('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
     if (request.status !== 'pending') {
       await ctx.answerCbQuery('Это обращение уже обработано.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -113,11 +121,19 @@ const handleDeclineRequest = async (ctx) => {
 
     if (!request) {
       await ctx.answerCbQuery('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
     if (request.status !== 'pending') {
       await ctx.answerCbQuery('Это обращение уже обработано.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -222,6 +238,10 @@ const handleApproveAnswer = async (ctx, bot) => {
 
     if (!request) {
       await ctx.answerCbQuery('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -287,6 +307,10 @@ const handleDeclineAnswer = async (ctx) => {
 
     if (!request) {
       await ctx.answerCbQuery('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1040,6 +1064,10 @@ const handleFAQCategorySelectionAdmin = async (ctx) => {
 
     if (!adminState || adminState.state !== 'selecting_faq_category') {
       await ctx.answerCbQuery('Что-то пошло не так. Пожалуйста, начните заново.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1131,6 +1159,10 @@ const handleEditFAQCategorySelection = async (ctx) => {
 
     if (faqs.length === 0) {
       await ctx.answerCbQuery('В этой категории нет вопросов.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1156,6 +1188,10 @@ const handleEditFAQSelection = async (ctx) => {
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1184,6 +1220,10 @@ const handleEditFAQQuestion = async (ctx) => {
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1246,6 +1286,10 @@ const handleEditFAQAnswer = async (ctx) => {
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1308,6 +1352,10 @@ const handleEditFAQCategory = async (ctx) => {
 
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1317,6 +1365,10 @@ const handleEditFAQCategory = async (ctx) => {
 
     if (categories.length <= 1) {
       await ctx.answerCbQuery('Недостаточно категорий для изменения.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1353,6 +1405,10 @@ const handleSetFAQCategory = async (ctx) => {
 
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1399,6 +1455,10 @@ const handleDeleteFAQ = async (ctx) => {
 
     if (!isAdmin(user)) {
       await ctx.reply('Эта команда доступна только администраторам.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1406,6 +1466,10 @@ const handleDeleteFAQ = async (ctx) => {
 
     if (categories.length === 0) {
       await ctx.reply('В базе данных нет категорий.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1431,6 +1495,10 @@ const handleDeleteFAQSelection = async (ctx) => {
 
     if (faqs.length === 0) {
       await ctx.answerCbQuery('В этой категории нет вопросов.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1456,6 +1524,10 @@ const handleDeleteFAQFromCategory = async (ctx) => {
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1484,6 +1556,10 @@ const handleConfirmDeleteFAQ = async (ctx) => {
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1497,6 +1573,10 @@ const handleConfirmDeleteFAQ = async (ctx) => {
     if (deleteResult.deletedCount === 0) {
       console.error('FAQ deletion failed - no documents were deleted', { faqId });
       await ctx.answerCbQuery('Ошибка при удалении вопроса.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 

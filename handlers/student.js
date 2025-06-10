@@ -16,6 +16,10 @@ const handleTakeRequest = async (ctx, bot) => {
     // Check if user is in student chat
     if (!canTakeRequests(ctx)) {
       await ctx.answerCbQuery('Эта функция доступна только в студенческом чате.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -27,11 +31,19 @@ const handleTakeRequest = async (ctx, bot) => {
 
     if (!request) {
       await ctx.answerCbQuery('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
     if (request.status !== 'approved') {
       await ctx.answerCbQuery('Это обращение уже взято в работу или находится в другом статусе.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -47,6 +59,10 @@ const handleTakeRequest = async (ctx, bot) => {
     // Check if user already has an active assignment
     if (user.currentAssignmentId) {
       await ctx.answerCbQuery(t(ctx, 'errors.already_has_assignment'));
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -448,6 +464,10 @@ const handleEditAnswerCallback = async (ctx) => {
 
     if (!request) {
       await ctx.answerCbQuery('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -455,6 +475,10 @@ const handleEditAnswerCallback = async (ctx) => {
 
     if (request.studentId.toString() !== user._id.toString()) {
       await ctx.answerCbQuery('Это обращение назначено другому исполнителю.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -487,6 +511,10 @@ const handleRejectAssignment = async (ctx, bot) => {
     if (!user.currentAssignmentId) {
       if (ctx.callbackQuery) {
         await ctx.answerCbQuery(t(ctx, 'errors.no_active_assignment'));
+        await ctx.editMessageText(
+          ctx.callbackQuery.message.text,
+          { reply_markup: { inline_keyboard: [] } }
+        );
       } else {
         await ctx.reply(t(ctx, 'errors.no_active_assignment'));
       }
@@ -508,6 +536,10 @@ const handleRejectAssignment = async (ctx, bot) => {
 
     if (!request) {
       await ctx.reply('Обращение не найдено.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
