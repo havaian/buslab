@@ -823,11 +823,11 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
     // For requests, you have options:
     // Option 1: Prevent deletion if there are active requests
     if (requestsCount > 0) {
-      const activeRequestsCount = await Request.countDocuments({ 
-        categoryId, 
-        status: { $in: ['pending', 'approved', 'assigned', 'answered'] } 
+      const activeRequestsCount = await Request.countDocuments({
+        categoryId,
+        status: { $in: ['pending', 'approved', 'assigned', 'answered'] }
       });
-      
+
       if (activeRequestsCount > 0) {
         await ctx.answerCbQuery();
         await ctx.editMessageText(
@@ -838,13 +838,22 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
       }
     }
 
-    const user = await getOrCreateUser(ctx);
-    logAction('admin_deleted_category', {
-      adminId: user._id,
-      categoryName,
-      deletedFAQs: faqsCount,
-      existingRequests: requestsCount
-    });
+    const categoryDeleted = await Category.findByIdAndDelete(categoryId);
+    if (categoryDeleted) {
+      const user = await getOrCreateUser(ctx);
+      await ctx.answerCbQuery();
+      await ctx.editMessageText(
+        `✅ Категория "${categoryName}" успешно удалена.`,
+        { reply_markup: { inline_keyboard: [] } }
+      );
+      logAction('admin_deleted_category', {
+        adminId: user._id,
+        categoryName,
+        deletedFAQs: faqsCount,
+        existingRequests: requestsCount
+      });
+      return;
+    }
   } catch (error) {
     console.error('Error handling delete category confirmation:', error);
     await ctx.answerCbQuery('Произошла ошибка. Пожалуйста, попробуйте еще раз позже.');
@@ -1401,7 +1410,7 @@ const handleDeleteFAQFromCategory = async (ctx) => {
 const handleConfirmDeleteFAQ = async (ctx) => {
   try {
     const faqId = ctx.callbackQuery.data.split(':')[1];
-    
+
     const faq = await FAQ.findById(faqId);
     if (!faq) {
       await ctx.answerCbQuery('Вопрос не найден.');
@@ -1413,7 +1422,7 @@ const handleConfirmDeleteFAQ = async (ctx) => {
 
     // Delete the FAQ
     const deleteResult = await FAQ.deleteOne({ _id: faqId });
-    
+
     // Check if deletion was successful
     if (deleteResult.deletedCount === 0) {
       console.error('FAQ deletion failed - no documents were deleted', { faqId });
