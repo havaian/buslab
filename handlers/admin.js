@@ -543,6 +543,10 @@ const handleEditCategorySelection = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -581,6 +585,10 @@ const handleEditCategoryName = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -625,6 +633,10 @@ const handleNewCategoryName = async (ctx) => {
     const category = await Category.findById(adminState.categoryId);
     if (!category) {
       await ctx.reply('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       adminStates.delete(user.telegramId);
       return;
     }
@@ -658,6 +670,10 @@ const handleEditCategoryHashtag = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -707,6 +723,10 @@ const handleNewCategoryHashtag = async (ctx) => {
     const category = await Category.findById(adminState.categoryId);
     if (!category) {
       await ctx.reply('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       adminStates.delete(user.telegramId);
       return;
     }
@@ -773,6 +793,10 @@ const handleDeleteCategorySelection = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -840,6 +864,10 @@ const handleDeleteCategoryConfirmation = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1000,6 +1028,10 @@ const handleFAQCategorySelectionAdmin = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
@@ -1327,6 +1359,10 @@ const handleSetFAQCategory = async (ctx) => {
     const category = await Category.findById(categoryId);
     if (!category) {
       await ctx.answerCbQuery('Категория не найдена.');
+      await ctx.editMessageText(
+        ctx.callbackQuery.message.text,
+        { reply_markup: { inline_keyboard: [] } }
+      );
       return;
     }
 
