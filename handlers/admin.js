@@ -776,18 +776,6 @@ const handleDeleteCategorySelection = async (ctx) => {
       return;
     }
 
-    // Check if category is in use
-    const requestsCount = await Request.countDocuments({ categoryId });
-    const faqsCount = await FAQ.countDocuments({ categoryId });
-
-    if (requestsCount > 0 || faqsCount > 0) {
-      await ctx.answerCbQuery();
-      await ctx.reply(
-        `Категория "${category.name}" не может быть удалена, так как она используется в ${requestsCount} обращениях и ${faqsCount} FAQ.`
-      );
-      return;
-    }
-
     const keyboard = [
       [
         { text: 'Да, удалить', callback_data: `confirm_delete_category:${categoryId}` },
