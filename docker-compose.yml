@@ -21,8 +21,6 @@ services:
       dockerfile: Dockerfile
     container_name: buslab_backend
     restart: always
-    depends_on:
-      - mongodb
     environment:
       - MONGO_URI=${MONGO_URL}
     env_file:
