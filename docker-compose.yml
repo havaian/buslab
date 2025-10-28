@@ -1,19 +1,6 @@
 version: '3.8'
 
 services:
-  # MongoDB service
-  mongodb:
-    image: mongo:latest
-    container_name: buslab_mongodb
-    restart: always
-    ports:
-      - "127.0.0.1:${MONGODB_EXPOSE}:${MONGODB_PORT}"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - buslab_net
-    command: mongod --port ${MONGODB_PORT}
-
   # Backend API service
   backend:
     build:
