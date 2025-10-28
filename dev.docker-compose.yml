@@ -24,7 +24,7 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGO_URI=${MONGO_URL}
+      - MONGO_URI=mongodb://mongodb:${MONGODB_PORT}/${MONGO_DATABASE}
     env_file:
       - ./.env
     volumes:
