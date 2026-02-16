@@ -8,7 +8,7 @@ const userHandlers = require('./handlers/user');
 const adminHandlers = require('./handlers/admin');
 const studentHandlers = require('./handlers/student');
 const categoryHandlers = require('./handlers/category');
-const faqHandlers = require('./handlers/faq');
+// const faqHandlers = require('./handlers/faq');
 const requestHandlers = require('./handlers/request');
 const helpHandlers = require('./handlers/help');
 
@@ -255,9 +255,9 @@ bot.on('message', async (ctx, next) => {
         return userHandlers.handleAskQuestion(ctx);
       }
 
-      if (messageText === t(ctx, 'buttons.faq')) {
-        return userHandlers.handleFAQ(ctx);
-      }
+      // if (messageText === t(ctx, 'buttons.faq')) {
+      //   return userHandlers.handleFAQ(ctx);
+      // }
 
       if (messageText === t(ctx, 'buttons.my_requests')) {
         return userHandlers.handleMyRequests(ctx);

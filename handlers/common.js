@@ -58,7 +58,7 @@ const getMainMenuKeyboard = (ctx) => {
 
   return Markup.keyboard([
     [t(ctx, 'buttons.ask_question')],
-    [t(ctx, 'buttons.faq')],
+    // [t(ctx, 'buttons.faq')],
     [t(ctx, 'buttons.my_requests')],
     [t(ctx, 'buttons.help'), '🌐 Language']
   ]).resize();
