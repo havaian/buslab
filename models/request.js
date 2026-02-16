@@ -15,7 +15,7 @@ const requestSchema = new mongoose.Schema({
     type: String,
     required: true,
     minLength: 150,
-    maxLength: 1000
+    maxLength: 3500
   },
   status: {
     type: String,
