@@ -245,6 +245,7 @@ bot.on('message', async (ctx, next) => {
       }
     }
 
+    
     // === PRIORITY 3: MAIN MENU BUTTONS (Only if no active state) ===
 
     // Only process main menu buttons if user has no active state
