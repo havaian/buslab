@@ -232,10 +232,10 @@ bot.on('message', async (ctx, next) => {
           return studentHandlers.handleStudentAnswer(ctx);
         case 'confirming_answer':
           // Handle Russian student buttons (hardcoded for consistency)
-          if (messageText === 'Подтвердить отправку ответа') {
+          if (messageText === 'Подтвердить отправку ответа' || 'Javob yuborishni tasdiqlash') {
             return studentHandlers.handleConfirmAnswer(ctx, bot);
           }
-          if (messageText === 'Изменить ответ') {
+          if (messageText === 'Изменить ответ' || "Javobni o'zgartirish") {
             return studentHandlers.handleEditAnswer(ctx);
           }
           if (messageText === 'Отказаться от обращения') {
@@ -312,6 +312,7 @@ bot.command('delete_faq', adminHandlers.handleDeleteFAQ);
 bot.command('categories', categoryHandlers.handleListCategories);
 // bot.command('faqs', faqHandlers.handleListFAQs);
 bot.command('requests', requestHandlers.handleListRequests);
+bot.command('reopen', (ctx) => adminHandlers.handleReopenRequest(ctx, bot));
 bot.command('stats', requestHandlers.handleStats);
 
 // Admin callback handlers
