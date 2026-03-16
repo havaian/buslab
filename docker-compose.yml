@@ -6,7 +6,7 @@ services:
     build:
       context: ./bot
       dockerfile: Dockerfile
-    container_name: buslab_backend
+    container_name: legal_clinic_bot
     restart: always
     environment:
       - MONGO_URI=${MONGO_URL}
