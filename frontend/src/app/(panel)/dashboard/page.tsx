@@ -1,0 +1,307 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
+import { FileText, Clock, CheckCircle, AlertCircle, Users } from "lucide-react";
+import { statsApi, type DashboardStats, type StudentSummary } from "@/lib/api";
+import { useAuth } from "@/contexts/auth-context";
+import { PageShell } from "@/components/layout/page-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatDate } from "@/lib/utils";
+
+const PIE_COLORS = [
+  "#6366f1",
+  "#f59e0b",
+  "#a855f7",
+  "#22c55e",
+  "#ef4444",
+  "#06b6d4",
+];
+
+const STATUS_RU: Record<string, string> = {
+  pending: "Ожидает",
+  approved: "Одобрено",
+  in_progress: "В работе",
+  answer_review: "На проверке",
+  closed: "Закрыто",
+  rejected: "Отклонено",
+};
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: React.ElementType;
+  color: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 pt-6">
+        <div className={`rounded-lg p-2.5 ${color}`}>
+          <Icon size={18} className="text-white" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.role !== "admin") {
+      router.push("/tasks");
+      return;
+    }
+    Promise.all([statsApi.dashboard(), statsApi.students()])
+      .then(([d, s]) => {
+        setStats(d);
+        setStudents(s);
+      })
+      .finally(() => setLoading(false));
+  }, [user, router]);
+
+  if (loading || !stats) {
+    return (
+      <PageShell title="Дашборд">
+        <p className="text-sm text-muted-foreground">Загрузка...</p>
+      </PageShell>
+    );
+  }
+
+  const pieData = stats.charts.byStatus.map((s) => ({
+    name: STATUS_RU[s._id] || s._id,
+    value: s.count,
+  }));
+
+  return (
+    <PageShell title="Дашборд">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 mb-6">
+        <StatCard
+          label="Всего обращений"
+          value={stats.totals.total}
+          icon={FileText}
+          color="bg-blue-500"
+        />
+        <StatCard
+          label="Ожидают проверки"
+          value={stats.totals.pending}
+          icon={Clock}
+          color="bg-yellow-500"
+        />
+        <StatCard
+          label="В работе"
+          value={stats.totals.inProgress}
+          icon={AlertCircle}
+          color="bg-purple-500"
+        />
+        <StatCard
+          label="Закрыто"
+          value={stats.totals.closed}
+          icon={CheckCircle}
+          color="bg-green-500"
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground mb-1">За сегодня</p>
+            <p className="text-2xl font-bold">{stats.periods.today}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground mb-1">За неделю</p>
+            <p className="text-2xl font-bold">{stats.periods.week}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 flex items-center gap-3">
+            <Users size={16} className="text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">
+                Активных студентов
+              </p>
+              <p className="text-2xl font-bold">{stats.activeStudents}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">
+              Обращения по дням (30 дней)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                data={stats.charts.byDay}
+                margin={{ top: 0, right: 0, bottom: 0, left: -20 }}
+              >
+                <XAxis
+                  dataKey="_id"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(v) => v.slice(5)}
+                />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                <Tooltip labelFormatter={(l) => `Дата: ${l}`} />
+                <Bar
+                  dataKey="count"
+                  fill="#6366f1"
+                  radius={[2, 2, 0, 0]}
+                  name="Обращений"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">По статусам</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={70}
+                  dataKey="value"
+                  nameKey="name"
+                >
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Students summary table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Сводка по студентам</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left font-medium">Студент</th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Ответов
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Одобрено
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Отклонено
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">%</th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Ср. время
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((s) => (
+                  <tr
+                    key={s.id}
+                    onClick={() => router.push(`/students/${s.id}`)}
+                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                  >
+                    <td className="px-4 py-2.5 font-medium">
+                      {s.firstName} {s.lastName}
+                      {s.username && (
+                        <span className="text-muted-foreground text-xs ml-1">
+                          @{s.username}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">{s.submitted}</td>
+                    <td className="px-4 py-2.5 text-right text-green-600">
+                      {s.approved}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-red-500">
+                      {s.rejected}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-medium">
+                      {s.approvalRate}%
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-muted-foreground">
+                      {s.avgTime ? `${s.avgTime} мин` : "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          s.currentStatus === "free"
+                            ? "bg-green-100 text-green-700"
+                            : s.currentStatus === "overdue"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-purple-100 text-purple-700"
+                        }`}
+                      >
+                        {s.currentStatus === "free"
+                          ? "Свободен"
+                          : s.currentStatus === "overdue"
+                          ? "Просрочен"
+                          : "В работе"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {students.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-6 text-center text-muted-foreground text-sm"
+                    >
+                      Нет студентов
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </PageShell>
+  );
+}

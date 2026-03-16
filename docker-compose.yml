@@ -1,28 +1,36 @@
 version: '3.8'
 
 services:
-  # Backend API service
   backend:
     build:
-      context: ./bot
+      context: ./backend
       dockerfile: Dockerfile
-    container_name: buslab_backend
+    container_name: legal_clinic_backend
     restart: always
-    environment:
-      - MONGO_URI=${MONGO_URL}
     env_file:
       - ./.env
+    ports:
+      - "127.0.0.1:10161:10161"
     volumes:
-      # Mount logs directory to host machine for persistent log storage
-      - ./bot/logs:/app/logs
-      # Mount i18n directory to host machine for persistent i18n storage
-      - ./bot/i18n:/app/i18n:z
+      - ./backend/uploads:/app/uploads
     networks:
-      - buslab_net
+      - legal_net
 
-volumes:
-  mongodb_data:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: legal_clinic_frontend
+    restart: always
+    depends_on:
+      - backend
+    env_file:
+      - ./.env
+    ports:
+      - "127.0.0.1:10162:10162"
+    networks:
+      - legal_net
 
 networks:
-  buslab_net:
+  legal_net:
     driver: bridge
