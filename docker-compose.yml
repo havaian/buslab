@@ -1,6 +1,25 @@
 version: '3.8'
 
 services:
+  # Backend API service
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: buslab_backend
+    restart: always
+    environment:
+      - MONGO_URI=${MONGO_URL}
+    env_file:
+      - ./.env
+    volumes:
+      # Mount logs directory to host machine for persistent log storage
+      - ./bot/logs:/app/logs
+      # Mount i18n directory to host machine for persistent i18n storage
+      - ./bot/i18n:/app/i18n:z
+    networks:
+      - buslab_net
+
   backend:
     build:
       context: ./backend
