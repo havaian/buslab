@@ -9,19 +9,19 @@ export function cn(...inputs: ClassValue[]) {
 export const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Ожидает проверки",
   approved: "Одобрено",
-  in_progress: "В работе",
-  answer_review: "Ответ на проверке",
+  declined: "Отклонено",
+  assigned: "В работе",
+  answered: "Ответ на проверке",
   closed: "Закрыто",
-  rejected: "Отклонено",
 };
 
 export const STATUS_COLORS: Record<RequestStatus, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   approved: "bg-blue-100 text-blue-800",
-  in_progress: "bg-purple-100 text-purple-800",
-  answer_review: "bg-orange-100 text-orange-800",
+  declined: "bg-red-100 text-red-800",
+  assigned: "bg-purple-100 text-purple-800",
+  answered: "bg-orange-100 text-orange-800",
   closed: "bg-green-100 text-green-800",
-  rejected: "bg-red-100 text-red-800",
 };
 
 export function formatDate(iso: string): string {
@@ -42,7 +42,6 @@ export function formatDateShort(iso: string): string {
   });
 }
 
-// Returns remaining ms; negative = expired
 export function getTimerMs(deadline: string | null): number {
   if (!deadline) return 0;
   return new Date(deadline).getTime() - Date.now();
@@ -72,4 +71,15 @@ export function getCategoryName(categoryId: unknown): string {
     return (categoryId as { name: string }).name || "—";
   }
   return String(categoryId);
+}
+
+export function getUserDisplayName(
+  user:
+    | { firstName?: string; lastName?: string; username?: string }
+    | null
+    | undefined
+): string {
+  if (!user) return "—";
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  return name || user.username || "—";
 }

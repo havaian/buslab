@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 import {
   requestsApi,
   categoriesApi,
@@ -22,17 +22,19 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timer } from "@/components/shared/timer";
-import { formatDate, getCategoryName } from "@/lib/utils";
+import { formatDate, getCategoryName, getUserDisplayName } from "@/lib/utils";
 
 const STATUSES = [
-  { value: "", label: "Все статусы" },
+  { value: "_all", label: "Все статусы" },
   { value: "pending", label: "Ожидает проверки" },
   { value: "approved", label: "Одобрено" },
-  { value: "in_progress", label: "В работе" },
-  { value: "answer_review", label: "Ответ на проверке" },
+  { value: "assigned", label: "В работе" },
+  { value: "answered", label: "Ответ на проверке" },
   { value: "closed", label: "Закрыто" },
-  { value: "rejected", label: "Отклонено" },
+  { value: "declined", label: "Отклонено" },
 ];
+
+const LIMITS = [10, 25, 50, 100];
 
 export default function RequestsPage() {
   const router = useRouter();
@@ -40,20 +42,19 @@ export default function RequestsPage() {
   const [total, setTotal] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [status, setStatus] = useState("_all");
+  const [categoryId, setCategoryId] = useState("_all");
   const [page, setPage] = useState(1);
-  const limit = 25;
+  const [limit, setLimit] = useState(25);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await requestsApi.list({
         search,
-        status,
-        categoryId,
+        status: status === "_all" ? "" : status,
+        categoryId: categoryId === "_all" ? "" : categoryId,
         page,
         limit,
       });
@@ -62,7 +63,7 @@ export default function RequestsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, categoryId, page]);
+  }, [search, status, categoryId, page, limit]);
 
   useEffect(() => {
     categoriesApi.list().then(setCategories);
@@ -70,37 +71,34 @@ export default function RequestsPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  // Reset page on filter change
   useEffect(() => {
     setPage(1);
-  }, [search, status, categoryId]);
+  }, [search, status, categoryId, limit]);
 
   const totalPages = Math.ceil(total / limit);
 
   return (
     <PageShell title="Обращения" description={`Всего: ${total}`}>
-      {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-4">
-        <div className="relative flex-1 min-w-48">
+        <div className="relative flex-1 min-w-64">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Поиск по тексту..."
+            placeholder="Поиск по ID, тексту, пользователю, студенту..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
           />
         </div>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-48">
             <SelectValue placeholder="Статус" />
           </SelectTrigger>
           <SelectContent>
             {STATUSES.map((s) => (
-              <SelectItem key={s.value} value={s.value || "_all"}>
+              <SelectItem key={s.value} value={s.value}>
                 {s.label}
               </SelectItem>
             ))}
@@ -119,19 +117,30 @@ export default function RequestsPage() {
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="icon" onClick={load}>
-          <SlidersHorizontal size={14} />
-        </Button>
+        <Select
+          value={String(limit)}
+          onValueChange={(v) => setLimit(Number(v))}
+        >
+          <SelectTrigger className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LIMITS.map((l) => (
+              <SelectItem key={l} value={String(l)}>
+                {l} / стр
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 text-left font-medium w-24">ID</th>
+                  <th className="px-4 py-2.5 text-left font-medium w-20">ID</th>
                   <th className="px-4 py-2.5 text-left font-medium">
                     Пользователь
                   </th>
@@ -169,54 +178,59 @@ export default function RequestsPage() {
                     </td>
                   </tr>
                 ) : (
-                  requests.map((r) => {
-                    const student = r.studentId as any;
-                    return (
-                      <tr
-                        key={r._id}
-                        onClick={() => router.push(`/requests/${r._id}`)}
-                        className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                      >
-                        <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                          {r._id.slice(-6)}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className="font-medium">{r.userFirstName}</span>
-                          {r.userUsername && (
-                            <span className="text-muted-foreground text-xs ml-1">
-                              @{r.userUsername}
+                  requests.map((r) => (
+                    <tr
+                      key={r._id}
+                      onClick={() => router.push(`/requests/${r._id}`)}
+                      className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                    >
+                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                        {r._id.slice(-6)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {r.userId && typeof r.userId === "object" ? (
+                          <>
+                            <span className="font-medium">
+                              {getUserDisplayName(r.userId)}
                             </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground">
-                          {getCategoryName(r.categoryId)}
-                        </td>
-                        <td className="px-4 py-2.5 max-w-64">
-                          <span className="line-clamp-1">{r.text}</span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <StatusBadge status={r.status} />
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {r.status === "in_progress" ? (
-                            <Timer deadline={r.timerDeadline} />
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                          {formatDate(r.createdAt)}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm">
-                          {student ? (
-                            `${student.firstName} ${student.lastName}`.trim()
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
+                            {r.userId.username && (
+                              <span className="text-muted-foreground text-xs ml-1">
+                                @{r.userId.username}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                        {getCategoryName(r.categoryId)}
+                      </td>
+                      <td className="px-4 py-2.5 max-w-64">
+                        <span className="line-clamp-1">{r.text}</span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {r.status === "assigned" ? (
+                          <Timer deadline={r.timerDeadline} />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDate(r.createdAt)}
+                      </td>
+                      <td className="px-4 py-2.5 text-sm">
+                        {r.studentId && typeof r.studentId === "object" ? (
+                          getUserDisplayName(r.studentId)
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -224,11 +238,10 @@ export default function RequestsPage() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 text-sm">
           <span className="text-muted-foreground">
-            Страница {page} из {totalPages}
+            Страница {page} из {totalPages} · {total} записей
           </span>
           <div className="flex gap-2">
             <Button

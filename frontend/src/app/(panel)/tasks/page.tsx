@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { CheckCircle, XCircle, ClipboardList, CheckCheck } from "lucide-react";
+import { ClipboardList, CheckCircle, XCircle, CheckCheck } from "lucide-react";
 import {
   requestsApi,
   adminUsersApi,
@@ -14,17 +13,14 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Timer } from "@/components/shared/timer";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { FileList } from "@/components/shared/file-list";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { formatDate, getCategoryName } from "@/lib/utils";
 
 export default function TasksPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const { toast } = useToast();
 
   const [activeRequest, setActiveRequest] = useState<Request | null>(null);
@@ -32,9 +28,7 @@ export default function TasksPage() {
   const [myStats, setMyStats] = useState<StudentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-
   const [answer, setAnswer] = useState("");
-  const answerFilesRef = useRef<HTMLInputElement>(null);
   const [declineConfirm, setDeclineConfirm] = useState(false);
 
   const load = useCallback(async () => {
@@ -45,10 +39,10 @@ export default function TasksPage() {
         requestsApi.available(),
         adminUsersApi.studentStats(user.id),
       ]);
-      // Active = IN_PROGRESS or ANSWER_REVIEW assigned to this student
+      // Active = assigned or answered
       const active =
         history.find(
-          (r) => r.status === "in_progress" || r.status === "answer_review"
+          (r) => r.status === "assigned" || r.status === "answered"
         ) || null;
       setActiveRequest(active);
       setAvailable(avail);
@@ -78,12 +72,7 @@ export default function TasksPage() {
   const submitAnswer = () => {
     if (!activeRequest || !answer.trim()) return;
     run(
-      () =>
-        requestsApi.submitAnswer(
-          activeRequest._id,
-          answer,
-          answerFilesRef.current?.files ?? undefined
-        ),
+      () => requestsApi.submitAnswer(activeRequest._id, answer),
       "Ответ отправлен на проверку"
     );
   };
@@ -101,28 +90,18 @@ export default function TasksPage() {
       {/* Personal mini-stats */}
       {myStats && (
         <div className="grid grid-cols-4 gap-3 mb-5">
-          {[
-            {
-              label: "Одобрено",
-              value: myStats.approved,
-              color: "text-green-600",
-            },
-            {
-              label: "Отклонено",
-              value: myStats.rejected,
-              color: "text-red-500",
-            },
-            {
-              label: "Всего ответов",
-              value: myStats.submitted,
-              color: "text-blue-600",
-            },
-            {
-              label: "Рейтинг",
-              value: myStats.rating !== null ? `${myStats.rating}%` : "—",
-              color: "text-primary",
-            },
-          ].map(({ label, value, color }) => (
+          {(
+            [
+              ["Одобрено", myStats.approved, "text-green-600"],
+              ["Отклонено", myStats.rejected, "text-red-500"],
+              ["Всего ответов", myStats.submitted, "text-blue-600"],
+              [
+                "Рейтинг",
+                myStats.rating !== null ? `${myStats.rating}%` : "—",
+                "text-primary",
+              ],
+            ] as [string, string | number, string][]
+          ).map(([label, value, color]) => (
             <Card key={label}>
               <CardContent className="pt-4 pb-4">
                 <p className={`text-xl font-bold ${color}`}>{value}</p>
@@ -162,7 +141,7 @@ export default function TasksPage() {
                       {getCategoryName(activeRequest.categoryId)}
                     </span>
                   </div>
-                  {activeRequest.status === "in_progress" && (
+                  {activeRequest.status === "assigned" && (
                     <div className="flex items-center gap-2 mt-2">
                       <span className="text-xs text-muted-foreground">
                         Осталось:
@@ -175,11 +154,9 @@ export default function TasksPage() {
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">
                     {activeRequest.text}
                   </p>
-                  <FileList files={activeRequest.files} />
                 </CardContent>
               </Card>
 
-              {/* Admin comment on rejected answer */}
               {activeRequest.adminComment && (
                 <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
                   <span className="font-medium">
@@ -189,7 +166,7 @@ export default function TasksPage() {
                 </div>
               )}
 
-              {activeRequest.status === "answer_review" ? (
+              {activeRequest.status === "answered" ? (
                 <Card>
                   <CardContent className="pt-4 py-4 text-center">
                     <CheckCheck
@@ -210,7 +187,6 @@ export default function TasksPage() {
                     <CardTitle className="text-sm">Ваш ответ</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {/* Pre-fill previous answer on revisions */}
                     <Textarea
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
@@ -218,17 +194,6 @@ export default function TasksPage() {
                       rows={10}
                       className="text-sm"
                     />
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Прикрепить файлы
-                      </Label>
-                      <input
-                        ref={answerFilesRef}
-                        type="file"
-                        multiple
-                        className="text-xs"
-                      />
-                    </div>
                     <div className="flex gap-2">
                       <Button
                         className="flex-1"

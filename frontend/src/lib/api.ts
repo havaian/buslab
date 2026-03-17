@@ -23,7 +23,6 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    // Token expired / invalid — clear and redirect
     localStorage.removeItem("token");
     window.location.href = "/login";
     throw new Error("Unauthorized");
@@ -50,15 +49,15 @@ const patchForm = <T>(path: string, form: FormData) =>
 
 export const authApi = {
   telegramLogin: (data: Record<string, unknown>) =>
-    post<{ access_token: string; user: AdminUser }>("/auth/telegram", data),
-  me: () => get<AdminUser>("/auth/me"),
+    post<{ access_token: string; user: PanelUser }>("/auth/telegram", data),
+  me: () => get<PanelUser>("/auth/me"),
 };
 
 // ── Requests ──────────────────────────────────────────────────────────────
 
 export const requestsApi = {
   list: (params: RequestListParams) =>
-    get<PaginatedResponse<Request>>(`/requests?${toQuery(params)}`),
+    get<PaginatedRequests>(`/requests?${toQuery(params)}`),
   findById: (id: string) => get<Request>(`/requests/${id}`),
   approve: (id: string) => patch<Request>(`/requests/${id}/approve`),
   reject: (id: string, reason: string) =>
@@ -68,12 +67,8 @@ export const requestsApi = {
   unassign: (id: string) => patch<Request>(`/requests/${id}/unassign`),
   returnToQueue: (id: string) =>
     patch<Request>(`/requests/${id}/return-to-queue`),
-  approveAnswer: (id: string, finalAnswer: string, files?: FileList) => {
-    const form = new FormData();
-    form.append("finalAnswer", finalAnswer);
-    if (files) Array.from(files).forEach((f) => form.append("files", f));
-    return patchForm<Request>(`/requests/${id}/approve-answer`, form);
-  },
+  approveAnswer: (id: string, finalAnswer: string) =>
+    patch<Request>(`/requests/${id}/approve-answer`, { finalAnswer }),
   rejectAnswer: (id: string, comment: string) =>
     patch<Request>(`/requests/${id}/reject-answer`, { comment }),
   sendMessage: (id: string, text: string) =>
@@ -94,21 +89,26 @@ export const requestsApi = {
 // ── Admin users / Students ────────────────────────────────────────────────
 
 export const adminUsersApi = {
-  students: () => get<AdminUser[]>("/admin-users/students"),
-  freeStudents: () => get<AdminUser[]>("/admin-users/students/free"),
+  students: () => get<PanelUser[]>("/admin-users/students"),
+  freeStudents: () => get<PanelUser[]>("/admin-users/students/free"),
   studentStats: (id: string) =>
     get<StudentStats>(`/admin-users/students/${id}/stats`),
   studentLogs: (id: string) =>
     get<StudentLogEntry[]>(`/admin-users/students/${id}/logs`),
-  block: (id: string) => patch<AdminUser>(`/admin-users/${id}/block`),
-  unblock: (id: string) => patch<AdminUser>(`/admin-users/${id}/unblock`),
+  block: (id: string) => patch<PanelUser>(`/admin-users/${id}/block`),
+  unblock: (id: string) => patch<PanelUser>(`/admin-users/${id}/unblock`),
 };
 
 // ── Citizens ──────────────────────────────────────────────────────────────
 
 export const usersApi = {
-  list: (params?: { search?: string; page?: number; limit?: number }) =>
-    get<PaginatedResponse<CitizenUser>>(`/users?${toQuery(params || {})}`),
+  list: (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+    language?: string;
+    status?: string;
+  }) => get<PaginatedUsers>(`/users?${toQuery(params || {})}`),
   findById: (id: string) => get<CitizenUser>(`/users/${id}`),
   stats: (id: string) => get<CitizenUserStats>(`/users/${id}/stats`),
   block: (id: string) => patch<CitizenUser>(`/users/${id}/block`),
@@ -119,10 +119,10 @@ export const usersApi = {
 
 export const categoriesApi = {
   list: () => get<Category[]>("/categories"),
-  create: (name: string, description?: string) =>
-    post<Category>("/categories", { name, description }),
-  update: (id: string, name?: string, description?: string) =>
-    patch<Category>(`/categories/${id}`, { name, description }),
+  create: (name: string, hashtag: string) =>
+    post<Category>("/categories", { name, hashtag }),
+  update: (id: string, name?: string, hashtag?: string) =>
+    patch<Category>(`/categories/${id}`, { name, hashtag }),
   remove: (id: string) => del<{ deleted: boolean }>(`/categories/${id}`),
 };
 
@@ -161,46 +161,55 @@ function toQuery(params: object): string {
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-export interface AdminUser {
+// User in the panel (admin or student)
+export interface PanelUser {
   id: string;
-  telegramId: string;
+  telegramId: number;
   firstName: string;
   lastName: string;
   username: string;
   role: "admin" | "student";
-  photoUrl: string;
-  isBlocked?: boolean;
+  isBanned?: boolean;
 }
 
-export interface AttachedFile {
-  filename: string;
-  originalName: string;
-  mimetype: string;
-  size: number;
-  ref: string;
-  source: "telegram" | "web";
+// Citizen user (role: 'user')
+export interface CitizenUser {
+  _id: string;
+  telegramId: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  language: string;
+  isBanned: boolean;
+  createdAt: string;
+}
+
+// Populated user ref inside a request
+export interface PopulatedUser {
+  _id: string;
+  telegramId: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  language?: string;
 }
 
 export interface Request {
   _id: string;
-  telegramUserId: string;
-  userFirstName: string;
-  userLastName: string;
-  userUsername: string;
-  userLanguage: string;
-  categoryId: { _id: string; name: string } | string;
+  // userId is populated
+  userId: PopulatedUser | null;
+  categoryId: { _id: string; name: string; hashtag: string } | string;
   text: string;
-  files: AttachedFile[];
   status: RequestStatus;
-  declineReason: string;
-  studentId: AdminUser | null;
-  studentAnswer: string;
-  studentAnswerFiles: AttachedFile[];
-  finalAnswer: string;
-  finalAnswerFiles: AttachedFile[];
-  adminComment: string;
-  timerStart: string | null;
+  studentId: PopulatedUser | null;
+  assignedAt: string | null;
+  answerText: string | null;
+  adminComment: string | null;
+  declineReason: string | null;
+  finalAnswerText: string | null;
   timerDeadline: string | null;
+  timerWarningSent: boolean;
+  timerExpiredNotified: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -208,14 +217,20 @@ export interface Request {
 export type RequestStatus =
   | "pending"
   | "approved"
-  | "in_progress"
-  | "answer_review"
-  | "closed"
-  | "rejected";
+  | "declined"
+  | "assigned"
+  | "answered"
+  | "closed";
 
-export interface PaginatedResponse<T> {
-  requests?: T[];
-  users?: T[];
+export interface PaginatedRequests {
+  requests: Request[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface PaginatedUsers {
+  users: CitizenUser[];
   total: number;
   page: number;
   limit: number;
@@ -234,8 +249,7 @@ export interface RequestListParams {
 export interface Category {
   _id: string;
   name: string;
-  description: string;
-  isActive: boolean;
+  hashtag: string;
 }
 
 export interface FaqItem {
@@ -243,17 +257,6 @@ export interface FaqItem {
   categoryId: string;
   question: string;
   answer: string;
-}
-
-export interface CitizenUser {
-  _id: string;
-  telegramId: string;
-  firstName: string;
-  lastName: string;
-  username: string;
-  language: string;
-  isBlocked: boolean;
-  createdAt: string;
 }
 
 export interface CitizenUserStats {

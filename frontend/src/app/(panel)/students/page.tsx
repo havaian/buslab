@@ -2,20 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { adminUsersApi, type AdminUser } from "@/lib/api";
+import { adminUsersApi, type PanelUser } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { formatDateShort } from "@/lib/utils";
+import { getUserDisplayName } from "@/lib/utils";
 
 export default function StudentsPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [students, setStudents] = useState<AdminUser[]>([]);
+  const [students, setStudents] = useState<PanelUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [blockTarget, setBlockTarget] = useState<AdminUser | null>(null);
+  const [blockTarget, setBlockTarget] = useState<PanelUser | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -31,13 +31,13 @@ export default function StudentsPage() {
     load();
   }, []);
 
-  const toggleBlock = async (s: AdminUser) => {
+  const toggleBlock = async (s: PanelUser) => {
     setBusy(true);
     try {
-      s.isBlocked
+      s.isBanned
         ? await adminUsersApi.unblock(s.id)
         : await adminUsersApi.block(s.id);
-      toast(s.isBlocked ? "Разблокирован" : "Заблокирован", "success");
+      toast(s.isBanned ? "Разблокирован" : "Заблокирован", "success");
       await load();
       setBlockTarget(null);
     } catch (e: unknown) {
@@ -87,7 +87,7 @@ export default function StudentsPage() {
                     onClick={() => router.push(`/students/${s.id}`)}
                   >
                     <td className="px-4 py-2.5 font-medium">
-                      {s.firstName} {s.lastName}
+                      {getUserDisplayName(s)}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground">
                       {s.username ? `@${s.username}` : "—"}
@@ -95,12 +95,12 @@ export default function StudentsPage() {
                     <td className="px-4 py-2.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          s.isBlocked
+                          s.isBanned
                             ? "bg-red-100 text-red-700"
                             : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {s.isBlocked ? "Заблокирован" : "Активен"}
+                        {s.isBanned ? "Заблокирован" : "Активен"}
                       </span>
                     </td>
                     <td
@@ -119,11 +119,11 @@ export default function StudentsPage() {
                           size="sm"
                           variant="outline"
                           className={
-                            s.isBlocked ? "text-green-600" : "text-red-600"
+                            s.isBanned ? "text-green-600" : "text-red-600"
                           }
                           onClick={() => setBlockTarget(s)}
                         >
-                          {s.isBlocked ? "Разблокировать" : "Заблокировать"}
+                          {s.isBanned ? "Разблокировать" : "Заблокировать"}
                         </Button>
                       </div>
                     </td>
@@ -139,12 +139,12 @@ export default function StudentsPage() {
         open={!!blockTarget}
         onOpenChange={(v) => !v && setBlockTarget(null)}
         title={
-          blockTarget?.isBlocked
+          blockTarget?.isBanned
             ? "Разблокировать студента?"
             : "Заблокировать студента?"
         }
-        description={`${blockTarget?.firstName} ${blockTarget?.lastName}`}
-        variant={blockTarget?.isBlocked ? "default" : "destructive"}
+        description={blockTarget ? getUserDisplayName(blockTarget) : ""}
+        variant={blockTarget?.isBanned ? "default" : "destructive"}
         loading={busy}
         onConfirm={() => blockTarget && toggleBlock(blockTarget)}
       />

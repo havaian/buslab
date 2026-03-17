@@ -21,12 +21,16 @@ export class UsersController {
   findAll(
     @Query("search") search?: string,
     @Query("page") page?: string,
-    @Query("limit") limit?: string
+    @Query("limit") limit?: string,
+    @Query("language") language?: string,
+    @Query("status") status?: string
   ) {
     return this.usersService.findAll(
       search,
       Number(page) || 1,
-      Number(limit) || 20
+      Number(limit) || 20,
+      language,
+      status
     );
   }
 

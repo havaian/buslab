@@ -7,7 +7,6 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -27,7 +26,7 @@ export default function CategoriesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Category | null>(null);
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [hashtag, setHashtag] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
   const load = async () => {
@@ -46,25 +45,25 @@ export default function CategoriesPage() {
   const openCreate = () => {
     setEditTarget(null);
     setName("");
-    setDescription("");
+    setHashtag("");
     setFormOpen(true);
   };
   const openEdit = (c: Category) => {
     setEditTarget(c);
     setName(c.name);
-    setDescription(c.description);
+    setHashtag(c.hashtag);
     setFormOpen(true);
   };
 
   const save = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || !hashtag.trim()) return;
     setBusy(true);
     try {
       if (editTarget) {
-        await categoriesApi.update(editTarget._id, name, description);
+        await categoriesApi.update(editTarget._id, name, hashtag);
         toast("Категория обновлена", "success");
       } else {
-        await categoriesApi.create(name, description);
+        await categoriesApi.create(name, hashtag);
         toast("Категория создана", "success");
       }
       setFormOpen(false);
@@ -107,7 +106,7 @@ export default function CategoriesPage() {
             <thead>
               <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                 <th className="px-4 py-2.5 text-left font-medium">Название</th>
-                <th className="px-4 py-2.5 text-left font-medium">Описание</th>
+                <th className="px-4 py-2.5 text-left font-medium">Хэштег</th>
                 <th className="px-4 py-2.5 text-left font-medium"></th>
               </tr>
             </thead>
@@ -135,7 +134,7 @@ export default function CategoriesPage() {
                   <tr key={c._id} className="border-b last:border-0">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className="px-4 py-3 text-muted-foreground text-sm">
-                      {c.description || "—"}
+                      #{c.hashtag}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
@@ -164,7 +163,6 @@ export default function CategoriesPage() {
         </CardContent>
       </Card>
 
-      {/* Form dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -182,12 +180,11 @@ export default function CategoriesPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Описание</Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Необязательно"
-                rows={3}
+              <Label>Хэштег</Label>
+              <Input
+                value={hashtag}
+                onChange={(e) => setHashtag(e.target.value)}
+                placeholder="например: grazhdanskoe_pravo"
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -198,7 +195,10 @@ export default function CategoriesPage() {
               >
                 Отмена
               </Button>
-              <Button onClick={save} disabled={!name.trim() || busy}>
+              <Button
+                onClick={save}
+                disabled={!name.trim() || !hashtag.trim() || busy}
+              >
                 {busy ? "Сохранение..." : "Сохранить"}
               </Button>
             </div>
@@ -210,7 +210,7 @@ export default function CategoriesPage() {
         open={!!deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
         title="Удалить категорию?"
-        description={`«${deleteTarget?.name}» — действие необратимо. Нельзя удалить, если категория используется в активных обращениях.`}
+        description={`«${deleteTarget?.name}» — нельзя удалить если используется в активных обращениях.`}
         variant="destructive"
         confirmLabel="Удалить"
         loading={busy}

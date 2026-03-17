@@ -8,6 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -15,8 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
-import { formatDate, formatDateShort } from "@/lib/utils";
+import { formatDate, formatDateShort, getUserDisplayName } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+
+const LIMITS = [10, 25, 50, 100];
 
 export default function UsersPage() {
   const { toast } = useToast();
@@ -25,8 +34,10 @@ export default function UsersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [language, setLanguage] = useState("_all");
+  const [status, setStatus] = useState("_all");
   const [page, setPage] = useState(1);
-  const limit = 25;
+  const [limit, setLimit] = useState(25);
 
   const [selectedUser, setSelectedUser] = useState<CitizenUser | null>(null);
   const [userStats, setUserStats] = useState<CitizenUserStats | null>(null);
@@ -37,20 +48,26 @@ export default function UsersPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await usersApi.list({ search, page, limit });
+      const res = await usersApi.list({
+        search,
+        page,
+        limit,
+        language: language === "_all" ? "" : language,
+        status: status === "_all" ? "" : status,
+      });
       setUsers(res.users ?? []);
       setTotal(res.total);
     } finally {
       setLoading(false);
     }
-  }, [search, page]);
+  }, [search, page, limit, language, status]);
 
   useEffect(() => {
     load();
   }, [load]);
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, language, status, limit]);
 
   const openUser = async (u: CitizenUser) => {
     setSelectedUser(u);
@@ -66,7 +83,7 @@ export default function UsersPage() {
   const toggleBlock = async (u: CitizenUser) => {
     setBusy(true);
     try {
-      if (u.isBlocked) {
+      if (u.isBanned) {
         await usersApi.unblock(u._id);
         toast("Пользователь разблокирован", "success");
       } else {
@@ -76,7 +93,7 @@ export default function UsersPage() {
       await load();
       setBlockConfirm(null);
       if (selectedUser?._id === u._id) {
-        setSelectedUser((p) => (p ? { ...p, isBlocked: !p.isBlocked } : p));
+        setSelectedUser((p) => (p ? { ...p, isBanned: !p.isBanned } : p));
       }
     } catch (e: unknown) {
       toast((e as Error).message, "error");
@@ -89,19 +106,56 @@ export default function UsersPage() {
 
   return (
     <PageShell title="Пользователи" description={`Всего: ${total}`}>
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap gap-3 mb-4">
+        <div className="relative flex-1 min-w-64">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Поиск..."
+            placeholder="Поиск по имени, username, Telegram ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
           />
         </div>
+        <Select value={language} onValueChange={setLanguage}>
+          <SelectTrigger className="w-36">
+            <SelectValue placeholder="Язык" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Все языки</SelectItem>
+            <SelectItem value="ru">Русский</SelectItem>
+            <SelectItem value="uz">Узбекский</SelectItem>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="kk">Казахский</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Статус" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Все статусы</SelectItem>
+            <SelectItem value="active">Активные</SelectItem>
+            <SelectItem value="banned">Заблокированные</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={String(limit)}
+          onValueChange={(v) => setLimit(Number(v))}
+        >
+          <SelectTrigger className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LIMITS.map((l) => (
+              <SelectItem key={l} value={String(l)}>
+                {l} / стр
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -149,7 +203,7 @@ export default function UsersPage() {
                     onClick={() => openUser(u)}
                   >
                     <td className="px-4 py-2.5 font-medium">
-                      {u.firstName} {u.lastName}
+                      {getUserDisplayName(u)}
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground">
                       {u.username ? `@${u.username}` : "—"}
@@ -163,12 +217,12 @@ export default function UsersPage() {
                     <td className="px-4 py-2.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          u.isBlocked
+                          u.isBanned
                             ? "bg-red-100 text-red-700"
                             : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {u.isBlocked ? "Заблокирован" : "Активен"}
+                        {u.isBanned ? "Заблокирован" : "Активен"}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">
@@ -182,13 +236,13 @@ export default function UsersPage() {
                         size="sm"
                         variant="outline"
                         className={
-                          u.isBlocked
+                          u.isBanned
                             ? "text-green-600 border-green-200 hover:bg-green-50"
                             : "text-red-600 border-red-200 hover:bg-red-50"
                         }
                         onClick={() => setBlockConfirm(u)}
                       >
-                        {u.isBlocked ? "Разблокировать" : "Заблокировать"}
+                        {u.isBanned ? "Разблокировать" : "Заблокировать"}
                       </Button>
                     </td>
                   </tr>
@@ -202,7 +256,7 @@ export default function UsersPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 text-sm">
           <span className="text-muted-foreground">
-            Страница {page} из {totalPages}
+            Страница {page} из {totalPages} · {total} записей
           </span>
           <div className="flex gap-2">
             <Button
@@ -233,7 +287,7 @@ export default function UsersPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {selectedUser?.firstName} {selectedUser?.lastName}
+              {selectedUser && getUserDisplayName(selectedUser)}
             </DialogTitle>
           </DialogHeader>
           {statsLoading ? (
@@ -260,19 +314,18 @@ export default function UsersPage() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Статус:</span>{" "}
-                    {userStats.user.isBlocked ? "Заблокирован" : "Активен"}
+                    {userStats.user.isBanned ? "Заблокирован" : "Активен"}
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
-                  {[
-                    ["Всего", userStats.stats.total],
-                    ["Закрыто", userStats.stats.closed],
-                    ["Отклонено", userStats.stats.rejected],
-                  ].map(([l, v]) => (
-                    <div
-                      key={String(l)}
-                      className="rounded-lg border p-3 text-center"
-                    >
+                  {(
+                    [
+                      ["Всего", userStats.stats.total],
+                      ["Закрыто", userStats.stats.closed],
+                      ["Отклонено", userStats.stats.rejected],
+                    ] as [string, number][]
+                  ).map(([l, v]) => (
+                    <div key={l} className="rounded-lg border p-3 text-center">
                       <p className="text-xl font-bold">{v}</p>
                       <p className="text-xs text-muted-foreground">{l}</p>
                     </div>
@@ -310,12 +363,12 @@ export default function UsersPage() {
                   <Button
                     size="sm"
                     variant={
-                      userStats.user.isBlocked ? "default" : "destructive"
+                      userStats.user.isBanned ? "default" : "destructive"
                     }
                     disabled={busy}
                     onClick={() => toggleBlock(userStats.user)}
                   >
-                    {userStats.user.isBlocked
+                    {userStats.user.isBanned
                       ? "Разблокировать"
                       : "Заблокировать"}
                   </Button>
@@ -330,12 +383,12 @@ export default function UsersPage() {
         open={!!blockConfirm}
         onOpenChange={(v) => !v && setBlockConfirm(null)}
         title={
-          blockConfirm?.isBlocked
+          blockConfirm?.isBanned
             ? "Разблокировать пользователя?"
             : "Заблокировать пользователя?"
         }
-        description={`${blockConfirm?.firstName} ${blockConfirm?.lastName}`}
-        variant={blockConfirm?.isBlocked ? "default" : "destructive"}
+        description={blockConfirm ? getUserDisplayName(blockConfirm) : ""}
+        variant={blockConfirm?.isBanned ? "default" : "destructive"}
         loading={busy}
         onConfirm={() => blockConfirm && toggleBlock(blockConfirm)}
       />

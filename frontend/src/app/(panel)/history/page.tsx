@@ -6,7 +6,6 @@ import { requestsApi, type Request } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { FileList } from "@/components/shared/file-list";
 import { formatDate, getCategoryName } from "@/lib/utils";
 
 export default function HistoryPage() {
@@ -34,9 +33,7 @@ export default function HistoryPage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Загрузка...</p>
       ) : requests.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Нет завершённых обращений
-        </p>
+        <p className="text-sm text-muted-foreground">Нет обращений</p>
       ) : (
         <div className="space-y-2">
           {requests.map((r) => (
@@ -64,7 +61,6 @@ export default function HistoryPage() {
 
               {expanded.has(r._id) && (
                 <CardContent className="pt-0 pb-4 space-y-4 border-t">
-                  {/* Question */}
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-1 mt-3">
                       Вопрос
@@ -72,42 +68,45 @@ export default function HistoryPage() {
                     <p className="text-sm whitespace-pre-wrap leading-relaxed">
                       {r.text}
                     </p>
-                    <FileList files={r.files} />
                   </div>
 
-                  {/* My answer */}
-                  {r.studentAnswer && (
+                  {r.answerText && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">
                         Мой ответ
                       </p>
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                        {r.studentAnswer}
+                        {r.answerText}
                       </p>
-                      <FileList files={r.studentAnswerFiles} />
                     </div>
                   )}
 
-                  {/* Final answer (if admin edited) */}
                   {r.status === "closed" &&
-                    r.finalAnswer &&
-                    r.finalAnswer !== r.studentAnswer && (
+                    r.finalAnswerText &&
+                    r.finalAnswerText !== r.answerText && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1">
-                          Финальный ответ (отредактирован)
+                          Финальный ответ (отредактирован администратором)
                         </p>
                         <p className="text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground">
-                          {r.finalAnswer}
+                          {r.finalAnswerText}
                         </p>
-                        <FileList files={r.finalAnswerFiles} />
                       </div>
                     )}
 
-                  {/* Admin comment */}
                   {r.adminComment && (
                     <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
-                      <span className="font-medium">Комментарий: </span>
+                      <span className="font-medium">
+                        Комментарий администратора:{" "}
+                      </span>
                       {r.adminComment}
+                    </div>
+                  )}
+
+                  {r.status === "declined" && r.declineReason && (
+                    <div className="rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-800">
+                      <span className="font-medium">Причина отклонения: </span>
+                      {r.declineReason}
                     </div>
                   )}
                 </CardContent>

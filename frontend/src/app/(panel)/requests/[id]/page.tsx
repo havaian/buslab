@@ -15,13 +15,12 @@ import {
   requestsApi,
   adminUsersApi,
   type Request,
-  type AdminUser,
+  type PanelUser,
 } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,10 +31,9 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timer } from "@/components/shared/timer";
-import { FileList } from "@/components/shared/file-list";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
-import { formatDate, getCategoryName } from "@/lib/utils";
+import { formatDate, getCategoryName, getUserDisplayName } from "@/lib/utils";
 
 export default function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -43,11 +41,10 @@ export default function RequestDetailPage() {
   const { toast } = useToast();
 
   const [request, setRequest] = useState<Request | null>(null);
-  const [freeStudents, setFreeStudents] = useState<AdminUser[]>([]);
+  const [freeStudents, setFreeStudents] = useState<PanelUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  // Action states
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectAnswerComment, setRejectAnswerComment] = useState("");
@@ -62,17 +59,12 @@ export default function RequestDetailPage() {
     title: string;
     desc?: string;
     variant?: "default" | "destructive";
-  }>({
-    open: false,
-    action: () => {},
-    title: "",
-  });
-  const answerFilesRef = useRef<HTMLInputElement>(null);
+  }>({ open: false, action: () => {}, title: "" });
 
   const reload = async () => {
     const r = await requestsApi.findById(id);
     setRequest(r);
-    setFinalAnswer(r.studentAnswer || "");
+    setFinalAnswer(r.answerText || "");
   };
 
   useEffect(() => {
@@ -80,7 +72,7 @@ export default function RequestDetailPage() {
       .then(([r, s]) => {
         setRequest(r);
         setFreeStudents(s);
-        setFinalAnswer(r.studentAnswer || "");
+        setFinalAnswer(r.answerText || "");
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -115,7 +107,14 @@ export default function RequestDetailPage() {
     );
   }
 
-  const student = request.studentId as AdminUser | null;
+  const citizen =
+    request.userId && typeof request.userId === "object"
+      ? request.userId
+      : null;
+  const student =
+    request.studentId && typeof request.studentId === "object"
+      ? request.studentId
+      : null;
 
   return (
     <PageShell
@@ -128,12 +127,11 @@ export default function RequestDetailPage() {
       }
     >
       <div className="grid grid-cols-3 gap-5">
-        {/* Left: main info */}
+        {/* Left: main content */}
         <div className="col-span-2 space-y-4">
-          {/* Request text */}
           <Card>
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <StatusBadge status={request.status} />
                 <span className="text-sm text-muted-foreground">
                   {getCategoryName(request.categoryId)}
@@ -147,50 +145,31 @@ export default function RequestDetailPage() {
               <p className="text-sm whitespace-pre-wrap leading-relaxed">
                 {request.text}
               </p>
-              <FileList files={request.files} />
             </CardContent>
           </Card>
 
-          {/* Student answer */}
-          {(request.status === "answer_review" ||
-            request.status === "closed") && (
+          {/* Answer */}
+          {(request.status === "answered" || request.status === "closed") && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">
                   {request.status === "closed"
                     ? "Финальный ответ"
-                    : "Ответ студента"}
+                    : "Ответ студента (на проверке)"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Admin can edit before approving */}
-                {request.status === "answer_review" ? (
-                  <>
-                    <Textarea
-                      value={finalAnswer}
-                      onChange={(e) => setFinalAnswer(e.target.value)}
-                      rows={8}
-                      className="text-sm"
-                    />
-                    <div>
-                      <Label className="text-xs text-muted-foreground mb-1 block">
-                        Прикрепить файлы к ответу
-                      </Label>
-                      <input
-                        ref={answerFilesRef}
-                        type="file"
-                        multiple
-                        className="text-xs"
-                      />
-                    </div>
-                  </>
+                {request.status === "answered" ? (
+                  <Textarea
+                    value={finalAnswer}
+                    onChange={(e) => setFinalAnswer(e.target.value)}
+                    rows={8}
+                    className="text-sm"
+                  />
                 ) : (
-                  <>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {request.finalAnswer}
-                    </p>
-                    <FileList files={request.finalAnswerFiles} />
-                  </>
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                    {request.finalAnswerText || request.answerText || "—"}
+                  </p>
                 )}
                 {request.adminComment && (
                   <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
@@ -198,27 +177,34 @@ export default function RequestDetailPage() {
                     {request.adminComment}
                   </div>
                 )}
+                {request.status === "closed" &&
+                  request.finalAnswerText &&
+                  request.answerText &&
+                  request.finalAnswerText !== request.answerText && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Оригинал ответа студента:
+                      </p>
+                      <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                        {request.answerText}
+                      </p>
+                    </div>
+                  )}
               </CardContent>
             </Card>
           )}
 
-          {/* Student's original (for closed, show separately) */}
-          {request.status === "closed" &&
-            request.studentAnswer !== request.finalAnswer && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm text-muted-foreground">
-                    Оригинал ответа студента
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground">
-                    {request.studentAnswer}
-                  </p>
-                  <FileList files={request.studentAnswerFiles} />
-                </CardContent>
-              </Card>
-            )}
+          {/* Decline reason */}
+          {request.status === "declined" && request.declineReason && (
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Причина отклонения
+                </p>
+                <p className="text-sm">{request.declineReason}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Direct message */}
           {showMsgInput && (
@@ -266,24 +252,30 @@ export default function RequestDetailPage() {
 
         {/* Right: sidebar */}
         <div className="space-y-4">
-          {/* User info */}
+          {/* Citizen info */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Пользователь</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1.5 text-sm">
-              <p className="font-medium">
-                {request.userFirstName} {request.userLastName}
-              </p>
-              {request.userUsername && (
-                <p className="text-muted-foreground">@{request.userUsername}</p>
+              {citizen ? (
+                <>
+                  <p className="font-medium">{getUserDisplayName(citizen)}</p>
+                  {citizen.username && (
+                    <p className="text-muted-foreground">@{citizen.username}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    TG ID: {citizen.telegramId}
+                  </p>
+                  {citizen.language && (
+                    <p className="text-xs text-muted-foreground">
+                      Язык: {citizen.language}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground text-xs">Нет данных</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                TG ID: {request.telegramUserId}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Язык: {request.userLanguage}
-              </p>
               <Button
                 size="sm"
                 variant="outline"
@@ -296,7 +288,7 @@ export default function RequestDetailPage() {
           </Card>
 
           {/* Timer */}
-          {request.status === "in_progress" && (
+          {request.status === "assigned" && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Таймер</CardTitle>
@@ -319,9 +311,7 @@ export default function RequestDetailPage() {
                 <CardTitle className="text-sm">Исполнитель</CardTitle>
               </CardHeader>
               <CardContent className="text-sm space-y-1">
-                <p className="font-medium">
-                  {student.firstName} {student.lastName}
-                </p>
+                <p className="font-medium">{getUserDisplayName(student)}</p>
                 {student.username && (
                   <p className="text-muted-foreground">@{student.username}</p>
                 )}
@@ -335,7 +325,6 @@ export default function RequestDetailPage() {
               <CardTitle className="text-sm">Действия</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {/* PENDING */}
               {request.status === "pending" && (
                 <>
                   <Button
@@ -395,7 +384,6 @@ export default function RequestDetailPage() {
                 </>
               )}
 
-              {/* APPROVED */}
               {request.status === "approved" && (
                 <>
                   <div className="space-y-1.5">
@@ -450,8 +438,7 @@ export default function RequestDetailPage() {
                 </>
               )}
 
-              {/* IN_PROGRESS */}
-              {request.status === "in_progress" && (
+              {request.status === "assigned" && (
                 <>
                   <Button
                     variant="destructive"
@@ -489,8 +476,7 @@ export default function RequestDetailPage() {
                 </>
               )}
 
-              {/* ANSWER_REVIEW */}
-              {request.status === "answer_review" && (
+              {request.status === "answered" && (
                 <>
                   <Button
                     className="w-full"
@@ -499,12 +485,7 @@ export default function RequestDetailPage() {
                     onClick={() =>
                       confirm("Одобрить и отправить ответ пользователю?", () =>
                         run(
-                          () =>
-                            requestsApi.approveAnswer(
-                              id,
-                              finalAnswer,
-                              answerFilesRef.current?.files ?? undefined
-                            ),
+                          () => requestsApi.approveAnswer(id, finalAnswer),
                           "Ответ одобрен и отправлен"
                         )
                       )
@@ -558,9 +539,8 @@ export default function RequestDetailPage() {
                 </>
               )}
 
-              {/* CLOSED / REJECTED */}
               {(request.status === "closed" ||
-                request.status === "rejected") && (
+                request.status === "declined") && (
                 <Button
                   variant="outline"
                   size="sm"

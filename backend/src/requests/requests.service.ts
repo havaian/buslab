@@ -48,13 +48,38 @@ export class RequestsService {
       limit = 20,
     } = filters;
     const query: any = {};
+
     if (status) query.status = status;
     if (categoryId) query.categoryId = new Types.ObjectId(categoryId);
-    if (search) query.text = { $regex: search, $options: "i" };
     if (dateFrom || dateTo) {
       query.createdAt = {};
       if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
       if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    // Search: text, or by user/student name/username (requires lookup)
+    if (search) {
+      const isObjectId = /^[a-f\d]{24}$/i.test(search);
+      if (isObjectId) {
+        query._id = new Types.ObjectId(search);
+      } else {
+        // Find matching users first
+        const matchingUsers = await this.userModel
+          .find({
+            $or: [
+              { firstName: { $regex: search, $options: "i" } },
+              { lastName: { $regex: search, $options: "i" } },
+              { username: { $regex: search, $options: "i" } },
+            ],
+          })
+          .distinct("_id");
+
+        query.$or = [
+          { text: { $regex: search, $options: "i" } },
+          { userId: { $in: matchingUsers } },
+          { studentId: { $in: matchingUsers } },
+        ];
+      }
     }
 
     const [requests, total] = await Promise.all([
@@ -96,6 +121,7 @@ export class RequestsService {
       .find({ studentId: new Types.ObjectId(studentId) })
       .sort({ createdAt: -1 })
       .populate("categoryId", "name hashtag")
+      .populate("userId", "firstName lastName username")
       .lean();
   }
 
@@ -176,7 +202,6 @@ export class RequestsService {
     req.timerExpiredNotified = false;
     await req.save();
 
-    // Update student's currentAssignmentId
     student.currentAssignmentId = req._id as any;
     await student.save();
 
@@ -269,11 +294,7 @@ export class RequestsService {
     return req;
   }
 
-  async approveAnswer(
-    requestId: string,
-    finalAnswer?: string,
-    finalAnswerFiles?: any[]
-  ) {
+  async approveAnswer(requestId: string, finalAnswer?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("studentId")

@@ -8,10 +8,10 @@ import {
   useCallback,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { authApi, type AdminUser } from "@/lib/api";
+import { authApi, type PanelUser } from "@/lib/api";
 
 interface AuthContextValue {
-  user: AdminUser | null;
+  user: PanelUser | null;
   loading: boolean;
   login: (telegramData: Record<string, unknown>) => Promise<void>;
   logout: () => void;
@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const PUBLIC_PATHS = ["/login"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AdminUser | null>(null);
+  const [user, setUser] = useState<PanelUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();

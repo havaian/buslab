@@ -1,28 +1,36 @@
-import { FileText, Image as ImageIcon, Download } from "lucide-react";
-import type { AttachedFile } from "@/lib/api";
+import { FileText, ImageIcon, Download } from "lucide-react";
+
+interface FileEntry {
+  filename?: string;
+  originalName?: string;
+  mimetype?: string;
+  size?: number;
+  ref?: string;
+  source?: "telegram" | "web";
+}
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
-function fileUrl(file: AttachedFile): string {
-  if (file.source === "web") return `/api/files/${file.ref}`;
-  // Telegram files are fetched through bot — show placeholder or skip download
+function fileUrl(file: FileEntry): string {
+  if (file.source === "web" && file.ref) return `/api/files/${file.ref}`;
   return "#";
 }
 
-export function FileList({ files }: { files: AttachedFile[] }) {
+export function FileList({ files }: { files?: FileEntry[] | null }) {
   if (!files?.length) return null;
   return (
     <div className="flex flex-wrap gap-2 mt-2">
       {files.map((f, i) => {
-        const isImage = IMAGE_TYPES.includes(f.mimetype);
+        const isImage = IMAGE_TYPES.includes(f.mimetype || "");
         const url = fileUrl(f);
+        const name = f.originalName || f.filename || "файл";
         return (
           <a
             key={i}
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            download={f.originalName}
+            download={name}
             className="flex items-center gap-2 rounded-md border px-3 py-2 text-xs hover:bg-accent max-w-56 truncate"
           >
             {isImage ? (
@@ -30,7 +38,7 @@ export function FileList({ files }: { files: AttachedFile[] }) {
             ) : (
               <FileText size={14} className="shrink-0" />
             )}
-            <span className="truncate">{f.originalName}</span>
+            <span className="truncate">{name}</span>
             <Download
               size={12}
               className="shrink-0 text-muted-foreground ml-auto"

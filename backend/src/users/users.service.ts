@@ -11,15 +11,33 @@ export class UsersService {
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>
   ) {}
 
-  async findAll(search?: string, page = 1, limit = 20) {
+  async findAll(
+    search?: string,
+    page = 1,
+    limit = 20,
+    language?: string,
+    status?: string
+  ) {
     const query: any = { role: "user" };
+
     if (search) {
-      query.$or = [
-        { firstName: { $regex: search, $options: "i" } },
-        { lastName: { $regex: search, $options: "i" } },
-        { username: { $regex: search, $options: "i" } },
-      ];
+      // Check if search is a telegramId (numeric)
+      const numericSearch = Number(search);
+      if (!isNaN(numericSearch) && String(numericSearch) === search) {
+        query.telegramId = numericSearch;
+      } else {
+        query.$or = [
+          { firstName: { $regex: search, $options: "i" } },
+          { lastName: { $regex: search, $options: "i" } },
+          { username: { $regex: search, $options: "i" } },
+        ];
+      }
     }
+
+    if (language) query.language = language;
+    if (status === "banned") query.isBanned = true;
+    if (status === "active") query.isBanned = false;
+
     const [users, total] = await Promise.all([
       this.userModel
         .find(query)

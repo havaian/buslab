@@ -28,18 +28,6 @@ const uploadStorage = diskStorage({
   },
 });
 
-function mapUploadedFiles(files: Express.Multer.File[]) {
-  if (!files?.length) return [];
-  return files.map((f) => ({
-    filename: f.filename,
-    originalName: f.originalname,
-    mimetype: f.mimetype,
-    size: f.size,
-    ref: f.filename,
-    source: "web" as const,
-  }));
-}
-
 @UseGuards(JwtAuthGuard)
 @Controller("requests")
 export class RequestsController {
@@ -114,18 +102,12 @@ export class RequestsController {
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  @UseInterceptors(FilesInterceptor("files", 10, { storage: uploadStorage }))
   @Patch(":id/approve-answer")
   approveAnswer(
     @Param("id") id: string,
-    @Body("finalAnswer") finalAnswer?: string,
-    @UploadedFiles() files?: Express.Multer.File[]
+    @Body("finalAnswer") finalAnswer?: string
   ) {
-    return this.requestsService.approveAnswer(
-      id,
-      finalAnswer,
-      mapUploadedFiles(files)
-    );
+    return this.requestsService.approveAnswer(id, finalAnswer);
   }
 
   @UseGuards(RolesGuard)
@@ -144,6 +126,8 @@ export class RequestsController {
 
   // ── Student ──────────────────────────────────────────────────────────────
 
+  // NOTE: these static sub-routes must come BEFORE :id to avoid Express
+  // matching "student" as a request id
   @UseGuards(RolesGuard)
   @Roles(UserRole.STUDENT)
   @Get("student/available")
@@ -175,12 +159,7 @@ export class RequestsController {
     @Body("answer") answer: string,
     @UploadedFiles() files?: Express.Multer.File[]
   ) {
-    return this.requestsService.submitAnswer(
-      id,
-      user.sub,
-      answer,
-      mapUploadedFiles(files)
-    );
+    return this.requestsService.submitAnswer(id, user.sub, answer);
   }
 
   @UseGuards(RolesGuard)
