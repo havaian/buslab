@@ -54,9 +54,10 @@ export default function LoginPage() {
   }, [login, dialog]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center items-center">
+          <img src="/logo.svg" alt="Логотип" className="h-12 w-12 mb-2" />
           <CardTitle>Юридическая клиника</CardTitle>
           <CardDescription>
             Войдите через Telegram для доступа к панели управления

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,7 +13,6 @@ import {
   History,
   BarChart2,
   LogOut,
-  Menu,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,28 +33,23 @@ const studentNav = [
   { href: "/my-stats", label: "Статистика", icon: BarChart2 },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const nav = user?.role === "admin" ? adminNav : studentNav;
-  const [open, setOpen] = useState(false);
 
   return (
     <>
-      {/* Mobile hamburger — fixed top-left, only on small screens */}
-      <button
-        className="fixed left-0 top-0 z-50 flex h-14 w-14 items-center justify-center text-muted-foreground hover:text-foreground lg:hidden"
-        onClick={() => setOpen(true)}
-        aria-label="Открыть меню"
-      >
-        <Menu size={20} />
-      </button>
-
       {/* Mobile overlay */}
-      {open && (
+      {isOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
         />
       )}
 
@@ -64,14 +57,12 @@ export function Sidebar() {
       <aside
         className={cn(
           "flex h-screen w-56 shrink-0 flex-col border-r bg-card",
-          // Desktop: always in flow
           "lg:static lg:translate-x-0 lg:z-auto",
-          // Mobile: fixed overlay, slide in/out
           "fixed left-0 top-0 z-40 transition-transform duration-200 lg:transition-none",
-          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        {/* Logo + close button (mobile) */}
+        {/* Logo + close button */}
         <div className="flex h-14 items-center justify-between border-b px-4">
           <div className="flex items-center gap-2 min-w-0">
             <img src="/logo.svg" alt="Логотип" className="h-7 w-7 shrink-0" />
@@ -81,20 +72,20 @@ export function Sidebar() {
           </div>
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground p-1 shrink-0"
-            onClick={() => setOpen(false)}
+            onClick={onClose}
             aria-label="Закрыть меню"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Nav links */}
+        {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3">
           {nav.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
-              onClick={() => setOpen(false)}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-accent",
                 pathname === href || pathname.startsWith(href + "/")
@@ -108,7 +99,7 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* User info + logout */}
+        {/* User + logout */}
         <div className="border-t p-4">
           {user && (
             <div className="mb-3">

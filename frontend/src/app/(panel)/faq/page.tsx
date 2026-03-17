@@ -131,7 +131,6 @@ export default function FaqPage() {
     });
   };
 
-  // Group by category
   const catMap = new Map(categories.map((c) => [c._id, c.name]));
   const grouped = faqs.reduce<Record<string, FaqItem[]>>((acc, f) => {
     const key = f.categoryId || "unknown";
@@ -146,18 +145,18 @@ export default function FaqPage() {
       description={`${faqs.length} вопросов`}
       actions={
         <Button size="sm" onClick={openCreate}>
-          <Plus size={14} />
-          Добавить
+          <Plus size={14} /> Добавить
         </Button>
       }
     >
-      <div className="relative max-w-xs mb-4">
+      {/* Full-width search */}
+      <div className="relative mb-4">
         <Search
           size={14}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
         />
         <Input
-          placeholder="Поиск..."
+          placeholder="Поиск по вопросу..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-8"
@@ -167,19 +166,24 @@ export default function FaqPage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Загрузка...</p>
       ) : faqs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Нет вопросов</p>
+        <p className="text-sm text-muted-foreground">Ничего не найдено</p>
       ) : (
         <div className="space-y-4">
           {Object.entries(grouped).map(([catId, items]) => (
             <Card key={catId}>
-              <div className="px-4 py-2.5 border-b bg-muted/40 text-xs font-medium text-muted-foreground">
-                {catMap.get(catId) ?? "Без категории"}
+              <div className="px-4 py-3 border-b bg-muted/30 flex items-center gap-2">
+                <span className="text-sm font-semibold">
+                  {catMap.get(catId) ?? "Без категории"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {items.length}
+                </span>
               </div>
-              <CardContent className="p-0">
+              <CardContent className="p-0 divide-y">
                 {items.map((f) => (
-                  <div key={f._id} className="border-b last:border-0">
+                  <div key={f._id}>
                     <div
-                      className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/20"
+                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/20"
                       onClick={() => toggleExpand(f._id)}
                     >
                       <span className="text-muted-foreground shrink-0">
@@ -189,7 +193,9 @@ export default function FaqPage() {
                           <ChevronRight size={14} />
                         )}
                       </span>
-                      <span className="flex-1 text-sm">{f.question}</span>
+                      <span className="flex-1 text-sm font-medium">
+                        {f.question}
+                      </span>
                       <div
                         className="flex gap-1 shrink-0"
                         onClick={(e) => e.stopPropagation()}
@@ -212,7 +218,7 @@ export default function FaqPage() {
                       </div>
                     </div>
                     {expanded.has(f._id) && (
-                      <div className="px-10 pb-3 text-sm text-muted-foreground whitespace-pre-wrap">
+                      <div className="px-10 pb-3 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                         {f.answer}
                       </div>
                     )}

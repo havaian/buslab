@@ -50,11 +50,11 @@ export default function HistoryPage() {
                   )}
                 </span>
                 <StatusBadge status={r.status} />
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap">
                   {getCategoryName(r.categoryId)}
                 </span>
                 <span className="flex-1 text-sm truncate">{r.text}</span>
-                <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 hidden sm:inline">
                   {formatDate(r.createdAt)}
                 </span>
               </div>

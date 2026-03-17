@@ -39,7 +39,6 @@ export default function TasksPage() {
         requestsApi.available(),
         adminUsersApi.studentStats(user.id),
       ]);
-      // Active = assigned or answered
       const active =
         history.find(
           (r) => r.status === "assigned" || r.status === "answered"
@@ -112,46 +111,41 @@ export default function TasksPage() {
 
   return (
     <PageShell title="Задания">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left: active task */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Stats row */}
-          {myStats && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(
-                [
-                  [CheckCircle, "text-green-500", myStats.approved, "Одобрено"],
-                  [XCircle, "text-red-500", myStats.rejected, "Отклонено"],
-                  [
-                    ClipboardList,
-                    "text-blue-500",
-                    myStats.submitted,
-                    "Ответов",
-                  ],
-                  [
-                    CheckCheck,
-                    myStats.approvalRate >= 80
-                      ? "text-green-500"
-                      : "text-amber-500",
-                    `${myStats.approvalRate}%`,
-                    "Одобрение",
-                  ],
-                ] as [React.ElementType, string, number | string, string][]
-              ).map(([Icon, color, value, label]) => (
-                <Card key={label}>
-                  <CardContent className="flex items-center gap-3 pt-4 pb-4">
-                    <Icon size={16} className={`shrink-0 ${color}`} />
-                    <div>
-                      <p className="font-bold leading-tight">{value}</p>
-                      <p className="text-xs text-muted-foreground">{label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+      {/* Stats mini-row */}
+      {myStats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          {(
+            [
+              [CheckCircle, "text-green-500", myStats.approved, "Одобрено"],
+              [XCircle, "text-red-500", myStats.rejected, "Отклонено"],
+              [ClipboardList, "text-blue-500", myStats.submitted, "Ответов"],
+              [
+                CheckCheck,
+                myStats.approvalRate >= 80
+                  ? "text-green-500"
+                  : "text-amber-500",
+                `${myStats.approvalRate}%`,
+                "Одобрение",
+              ],
+            ] as [React.ElementType, string, number | string, string][]
+          ).map(([Icon, color, value, label]) => (
+            <Card key={label}>
+              <CardContent className="flex items-center gap-3 pt-4 pb-4">
+                <Icon size={16} className={`shrink-0 ${color}`} />
+                <div>
+                  <p className="font-bold leading-tight">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-          {/* Active task */}
+      {/* Main layout: stacks on mobile, side-by-side on lg */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Active task — takes 2/3 on desktop */}
+        <div className="lg:col-span-2">
           {activeRequest ? (
             <Card>
               <CardHeader className="pb-3">
@@ -237,21 +231,21 @@ export default function TasksPage() {
           )}
         </div>
 
-        {/* Right: available */}
+        {/* Available requests — 1/3 on desktop, full width on mobile */}
         <div className="space-y-3">
           <h2 className="text-sm font-medium">
-            Доступные обращения ({available.length})
+            Доступные ({available.length})
           </h2>
           {available.length === 0 ? (
             <Card>
-              <CardContent className="py-10 text-center">
+              <CardContent className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">
                   Нет доступных обращений
                 </p>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-0.5">
               {available.map((r) => (
                 <Card
                   key={r._id}

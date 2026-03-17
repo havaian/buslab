@@ -45,17 +45,15 @@ export default function UsersPage() {
         language: language === "_all" ? "" : language,
         status: status === "_all" ? "" : status,
       });
-      const fetchedUsers = res.users ?? [];
-      setUsers(fetchedUsers);
+      const fetched = res.users ?? [];
+      setUsers(fetched);
       setTotal(res.total);
-
-      // If search looks like a telegramId (pure numeric) and returned exactly 1 result — open that user directly
       if (
         /^\d+$/.test(search.trim()) &&
         res.total === 1 &&
-        fetchedUsers.length === 1
+        fetched.length === 1
       ) {
-        router.push(`/users/${fetchedUsers[0]._id}`);
+        router.push(`/users/${fetched[0]._id}`);
       }
     } finally {
       setLoading(false);
@@ -74,11 +72,7 @@ export default function UsersPage() {
     const ok = await dialog.confirm(
       `${
         u.isBanned ? "Разблокировать" : "Заблокировать"
-      } пользователя ${getUserDisplayName(u)}? ${
-        u.isBanned
-          ? "Он снова сможет использовать бота."
-          : "Он не сможет использовать бота."
-      }`,
+      } пользователя ${getUserDisplayName(u)}?`,
       {
         title: u.isBanned ? "Разблокировать?" : "Заблокировать?",
         variant: u.isBanned ? "default" : "destructive",
@@ -107,14 +101,14 @@ export default function UsersPage() {
 
   return (
     <PageShell title="Пользователи" description={`Всего: ${total}`}>
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="relative flex-1 min-w-48">
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-40">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Поиск по имени, username, Telegram ID..."
+            placeholder="Имя, username, Telegram ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
@@ -133,7 +127,7 @@ export default function UsersPage() {
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-36">
             <SelectValue placeholder="Статус" />
           </SelectTrigger>
           <SelectContent>
@@ -162,19 +156,21 @@ export default function UsersPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="px-4 py-2.5 text-left font-medium">Имя</th>
-                  <th className="px-4 py-2.5 text-left font-medium">
+                  <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">
                     Username
                   </th>
-                  <th className="px-4 py-2.5 text-left font-medium">
+                  <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
                     Telegram ID
                   </th>
-                  <th className="px-4 py-2.5 text-left font-medium">Язык</th>
+                  <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">
+                    Язык
+                  </th>
                   <th className="px-4 py-2.5 text-left font-medium">Статус</th>
-                  <th className="px-4 py-2.5 text-left font-medium">
+                  <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
                     Регистрация
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium"></th>
@@ -207,29 +203,31 @@ export default function UsersPage() {
                       className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
                     >
                       <td className="px-4 py-2.5 font-medium">
-                        {getUserDisplayName(u)}
+                        <span className="block truncate max-w-[140px]">
+                          {getUserDisplayName(u)}
+                        </span>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">
                         {u.username ? `@${u.username}` : "—"}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell whitespace-nowrap">
                         {u.telegramId}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground hidden lg:table-cell">
                         {u.language.toUpperCase()}
                       </td>
                       <td className="px-4 py-2.5">
                         <span
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
                             u.isBanned
                               ? "bg-red-100 text-red-700"
                               : "bg-green-100 text-green-700"
                           }`}
                         >
-                          {u.isBanned ? "Заблокирован" : "Активен"}
+                          {u.isBanned ? "Заблок." : "Активен"}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">
                         {formatDateShort(u.createdAt)}
                       </td>
                       <td
@@ -242,12 +240,12 @@ export default function UsersPage() {
                           disabled={busy}
                           className={
                             u.isBanned
-                              ? "text-green-600 border-green-200 hover:bg-green-50"
-                              : "text-red-600 border-red-200 hover:bg-red-50"
+                              ? "text-green-600 border-green-200 hover:bg-green-50 text-xs"
+                              : "text-red-600 border-red-200 hover:bg-red-50 text-xs"
                           }
                           onClick={() => toggleBlock(u)}
                         >
-                          {u.isBanned ? "Разблокировать" : "Заблокировать"}
+                          {u.isBanned ? "Разблок." : "Заблок."}
                         </Button>
                       </td>
                     </tr>

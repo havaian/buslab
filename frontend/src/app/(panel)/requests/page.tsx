@@ -68,9 +68,11 @@ export default function RequestsPage() {
   useEffect(() => {
     categoriesApi.list().then(setCategories);
   }, []);
+
   useEffect(() => {
     load();
   }, [load]);
+
   useEffect(() => {
     setPage(1);
   }, [search, status, categoryId, limit]);
@@ -79,22 +81,23 @@ export default function RequestsPage() {
 
   return (
     <PageShell title="Обращения" description={`Всего: ${total}`}>
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="relative flex-1 min-w-64">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-40">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Поиск по ID, тексту, пользователю, студенту..."
+            placeholder="Поиск по ID, тексту, пользователю..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
           />
         </div>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Статус" />
+          <SelectTrigger className="w-44">
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {STATUSES.map((s) => (
@@ -106,7 +109,7 @@ export default function RequestsPage() {
         </Select>
         <Select value={categoryId} onValueChange={setCategoryId}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Категория" />
+            <SelectValue placeholder="Все категории" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="_all">Все категории</SelectItem>
@@ -127,7 +130,7 @@ export default function RequestsPage() {
           <SelectContent>
             {LIMITS.map((l) => (
               <SelectItem key={l} value={String(l)}>
-                {l} / стр
+                {l} / стр.
               </SelectItem>
             ))}
           </SelectContent>
@@ -137,23 +140,27 @@ export default function RequestsPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 text-left font-medium w-20">ID</th>
+                  <th className="px-4 py-2.5 text-left font-medium w-16">ID</th>
                   <th className="px-4 py-2.5 text-left font-medium">
                     Пользователь
                   </th>
-                  <th className="px-4 py-2.5 text-left font-medium">
+                  <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
                     Категория
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">
                     Обращение
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">Статус</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Таймер</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Дата</th>
-                  <th className="px-4 py-2.5 text-left font-medium">
+                  <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">
+                    Таймер
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">
+                    Дата
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium hidden xl:table-cell">
                     Исполнитель
                   </th>
                 </tr>
@@ -184,45 +191,45 @@ export default function RequestsPage() {
                       onClick={() => router.push(`/requests/${r._id}`)}
                       className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
                     >
-                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
                         {r._id.slice(-6)}
                       </td>
                       <td className="px-4 py-2.5">
                         {r.userId && typeof r.userId === "object" ? (
-                          <>
+                          <div>
                             <span className="font-medium">
                               {getUserDisplayName(r.userId)}
                             </span>
                             {r.userId.username && (
-                              <span className="text-muted-foreground text-xs ml-1">
+                              <span className="text-muted-foreground text-xs block">
                                 @{r.userId.username}
                               </span>
                             )}
-                          </>
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
                         {getCategoryName(r.categoryId)}
                       </td>
-                      <td className="px-4 py-2.5 max-w-64">
-                        <span className="line-clamp-1">{r.text}</span>
+                      <td className="px-4 py-2.5 max-w-[180px]">
+                        <span className="line-clamp-1 text-sm">{r.text}</span>
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5 whitespace-nowrap">
                         <StatusBadge status={r.status} />
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5 hidden lg:table-cell">
                         {r.status === "assigned" ? (
                           <Timer deadline={r.timerDeadline} />
                         ) : (
                           "—"
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap hidden lg:table-cell">
                         {formatDate(r.createdAt)}
                       </td>
-                      <td className="px-4 py-2.5 text-sm">
+                      <td className="px-4 py-2.5 text-sm hidden xl:table-cell">
                         {r.studentId && typeof r.studentId === "object" ? (
                           getUserDisplayName(r.studentId)
                         ) : (

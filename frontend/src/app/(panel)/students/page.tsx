@@ -1,27 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { adminUsersApi, type PanelUser } from "@/lib/api";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import { categoriesApi, type Category } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { useDialog } from "@/components/ui/dialog-provider";
-import { getUserDisplayName } from "@/lib/utils";
 
-export default function StudentsPage() {
-  const router = useRouter();
+export default function CategoriesPage() {
   const { toast } = useToast();
   const dialog = useDialog();
-  const [students, setStudents] = useState<PanelUser[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Category | null>(null);
+  const [name, setName] = useState("");
+  const [hashtag, setHashtag] = useState("");
 
   const load = async () => {
     setLoading(true);
     try {
-      setStudents(await adminUsersApi.students());
+      setCategories(await categoriesApi.list());
     } finally {
       setLoading(false);
     }
@@ -31,27 +42,54 @@ export default function StudentsPage() {
     load();
   }, []);
 
-  const toggleBlock = async (s: PanelUser) => {
-    const action = s.isBanned ? "разблокировать" : "заблокировать";
+  const openCreate = () => {
+    setEditTarget(null);
+    setName("");
+    setHashtag("");
+    setFormOpen(true);
+  };
+
+  const openEdit = (c: Category) => {
+    setEditTarget(c);
+    setName(c.name);
+    setHashtag(c.hashtag);
+    setFormOpen(true);
+  };
+
+  const save = async () => {
+    if (!name.trim() || !hashtag.trim()) return;
+    setBusy(true);
+    try {
+      if (editTarget) {
+        await categoriesApi.update(editTarget._id, name, hashtag);
+        toast("Категория обновлена", "success");
+      } else {
+        await categoriesApi.create(name, hashtag);
+        toast("Категория создана", "success");
+      }
+      setFormOpen(false);
+      await load();
+    } catch (e: unknown) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (c: Category) => {
     const ok = await dialog.confirm(
-      `${
-        s.isBanned ? "Разблокировать" : "Заблокировать"
-      } студента ${getUserDisplayName(s)}?`,
+      `Удалить категорию «${c.name}»? Нельзя удалить если используется в активных обращениях.`,
       {
-        title: s.isBanned
-          ? "Разблокировать студента?"
-          : "Заблокировать студента?",
-        variant: s.isBanned ? "default" : "destructive",
-        confirmLabel: action.charAt(0).toUpperCase() + action.slice(1),
+        title: "Удалить категорию?",
+        variant: "destructive",
+        confirmLabel: "Удалить",
       }
     );
     if (!ok) return;
     setBusy(true);
     try {
-      s.isBanned
-        ? await adminUsersApi.unblock(s.id)
-        : await adminUsersApi.block(s.id);
-      toast(s.isBanned ? "Разблокирован" : "Заблокирован", "success");
+      await categoriesApi.remove(c._id);
+      toast("Категория удалена", "success");
       await load();
     } catch (e: unknown) {
       toast((e as Error).message, "error");
@@ -61,93 +99,125 @@ export default function StudentsPage() {
   };
 
   return (
-    <PageShell title="Студенты" description={`${students.length} студентов`}>
+    <PageShell
+      title="Категории"
+      actions={
+        <Button size="sm" onClick={openCreate}>
+          <Plus size={14} />
+          Добавить
+        </Button>
+      }
+    >
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 text-left font-medium">Студент</th>
-                <th className="px-4 py-2.5 text-left font-medium">Username</th>
-                <th className="px-4 py-2.5 text-left font-medium">Статус</th>
-                <th className="px-4 py-2.5 text-left font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    Загрузка...
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[340px]">
+              <thead>
+                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Название
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">Хэштег</th>
+                  <th className="px-4 py-2.5 text-left font-medium"></th>
                 </tr>
-              ) : students.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    Нет студентов
-                  </td>
-                </tr>
-              ) : (
-                students.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                    onClick={() => router.push(`/students/${s.id}`)}
-                  >
-                    <td className="px-4 py-2.5 font-medium">
-                      {getUserDisplayName(s)}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {s.username ? `@${s.username}` : "—"}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          s.isBanned
-                            ? "bg-red-100 text-red-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {s.isBanned ? "Заблокирован" : "Активен"}
-                      </span>
-                    </td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
                     <td
-                      className="px-4 py-2.5"
-                      onClick={(e) => e.stopPropagation()}
+                      colSpan={3}
+                      className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => router.push(`/students/${s.id}`)}
-                        >
-                          Статистика
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          className={
-                            s.isBanned ? "text-green-600" : "text-red-600"
-                          }
-                          onClick={() => toggleBlock(s)}
-                        >
-                          {s.isBanned ? "Разблокировать" : "Заблокировать"}
-                        </Button>
-                      </div>
+                      Загрузка...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : categories.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-4 py-8 text-center text-muted-foreground"
+                    >
+                      Нет категорий
+                    </td>
+                  </tr>
+                ) : (
+                  categories.map((c) => (
+                    <tr key={c._id} className="border-b last:border-0">
+                      <td className="px-4 py-3 font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-sm whitespace-nowrap">
+                        #{c.hashtag}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openEdit(c)}
+                          >
+                            <Pencil size={14} />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-red-500 hover:text-red-600"
+                            onClick={() => remove(c)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
+
+      {/* max-w-sm gets capped to (100vw - 2rem) by DialogContent on mobile */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {editTarget ? "Редактировать категорию" : "Новая категория"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1.5">
+              <Label>Название</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Название категории"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Хэштег</Label>
+              <Input
+                value={hashtag}
+                onChange={(e) => setHashtag(e.target.value)}
+                placeholder="например: grazhdanskoe_pravo"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setFormOpen(false)}
+                disabled={busy}
+              >
+                Отмена
+              </Button>
+              <Button
+                onClick={save}
+                disabled={!name.trim() || !hashtag.trim() || busy}
+              >
+                {busy ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

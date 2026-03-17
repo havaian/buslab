@@ -52,13 +52,13 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 pt-6">
-        <div className={`rounded-lg p-2.5 ${color}`}>
-          <Icon size={18} className="text-white" />
+      <CardContent className="flex items-center gap-3 pt-5 pb-5">
+        <div className={`rounded-lg p-2.5 shrink-0 ${color}`}>
+          <Icon size={16} className="text-white" />
         </div>
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
+        <div className="min-w-0">
+          <p className="text-xl font-bold">{value}</p>
+          <p className="text-xs text-muted-foreground leading-tight">{label}</p>
         </div>
       </CardContent>
     </Card>
@@ -100,8 +100,8 @@ export default function DashboardPage() {
 
   return (
     <PageShell title="Дашборд">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 mb-6">
+      {/* Main stat cards — 1 col on mobile, 2 on sm, 4 on lg */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard
           label="Всего обращений"
           value={stats.totals.total}
@@ -128,24 +128,25 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      {/* Period / active students — 3 cols always, small cards */}
+      <div className="grid grid-cols-3 gap-3 mb-5">
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground mb-1">За сегодня</p>
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground mb-0.5">За сегодня</p>
             <p className="text-2xl font-bold">{stats.periods.today}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground mb-1">За неделю</p>
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs text-muted-foreground mb-0.5">За неделю</p>
             <p className="text-2xl font-bold">{stats.periods.week}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6 flex items-center gap-3">
-            <Users size={16} className="text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">
+          <CardContent className="flex items-center gap-2 pt-4 pb-4">
+            <Users size={14} className="text-muted-foreground shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground leading-tight">
                 Активных студентов
               </p>
               <p className="text-2xl font-bold">{stats.activeStudents}</p>
@@ -154,16 +155,16 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* Charts — stacked on mobile, side-by-side on lg */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm">
               Обращения по дням (30 дней)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={180}>
               <BarChart
                 data={stats.charts.byDay}
                 margin={{ top: 0, right: 0, bottom: 0, left: -20 }}
@@ -187,17 +188,17 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm">По статусам</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie
                   data={pieData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={70}
+                  outerRadius={65}
                   dataKey="value"
                   nameKey="name"
                 >
@@ -213,14 +214,14 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Students summary table */}
+      {/* Students table */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="text-sm">Сводка по студентам</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="px-4 py-2.5 text-left font-medium">Студент</th>
@@ -230,9 +231,7 @@ export default function DashboardPage() {
                   <th className="px-4 py-2.5 text-right font-medium">
                     Одобрено
                   </th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    Отклонено
-                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">Откл.</th>
                   <th className="px-4 py-2.5 text-right font-medium">%</th>
                   <th className="px-4 py-2.5 text-right font-medium">
                     Ср. время
@@ -241,61 +240,64 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {students.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => router.push(`/students/${s.id}`)}
-                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                  >
-                    <td className="px-4 py-2.5 font-medium">
-                      {s.firstName} {s.lastName}
-                      {s.username && (
-                        <span className="text-muted-foreground text-xs ml-1">
-                          @{s.username}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">{s.submitted}</td>
-                    <td className="px-4 py-2.5 text-right text-green-600">
-                      {s.approved}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-red-500">
-                      {s.rejected}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-medium">
-                      {s.approvalRate}%
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground">
-                      {s.avgTime ? `${s.avgTime} мин` : "—"}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          s.currentStatus === "free"
-                            ? "bg-green-100 text-green-700"
-                            : s.currentStatus === "overdue"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-purple-100 text-purple-700"
-                        }`}
-                      >
-                        {s.currentStatus === "free"
-                          ? "Свободен"
-                          : s.currentStatus === "overdue"
-                          ? "Просрочен"
-                          : "В работе"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {students.length === 0 && (
+                {students.length === 0 ? (
                   <tr>
                     <td
                       colSpan={7}
-                      className="px-4 py-6 text-center text-muted-foreground text-sm"
+                      className="px-4 py-6 text-center text-muted-foreground"
                     >
-                      Нет студентов
+                      Нет данных
                     </td>
                   </tr>
+                ) : (
+                  students.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"
+                      onClick={() => router.push(`/students/${s.id}`)}
+                    >
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium text-sm">
+                          {s.firstName} {s.lastName}
+                        </p>
+                        {s.username && (
+                          <p className="text-xs text-muted-foreground">
+                            @{s.username}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">{s.submitted}</td>
+                      <td className="px-4 py-2.5 text-right text-green-600">
+                        {s.approved}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-red-500">
+                        {s.rejected}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        {s.approvalRate}%
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-muted-foreground">
+                        {s.avgTime ? `${s.avgTime} мин` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            s.currentStatus === "free"
+                              ? "bg-green-100 text-green-700"
+                              : s.currentStatus === "overdue"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {s.currentStatus === "free"
+                            ? "Свободен"
+                            : s.currentStatus === "overdue"
+                            ? "Просрочен"
+                            : "Занят"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

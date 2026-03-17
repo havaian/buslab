@@ -76,15 +76,13 @@ export default function StudentDetailPage() {
       title={getUserDisplayName(student)}
       actions={
         <Button variant="outline" size="sm" onClick={() => router.back()}>
-          <ArrowLeft size={14} />
-          Назад
+          <ArrowLeft size={14} /> Назад
         </Button>
       }
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Left column */}
+        {/* Left */}
         <div className="space-y-4">
-          {/* Student info */}
           {student && (
             <Card>
               <CardHeader className="pb-3">
@@ -133,7 +131,6 @@ export default function StudentDetailPage() {
             </Card>
           )}
 
-          {/* Rating */}
           {stats.rating !== null && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="flex items-center gap-4 pt-5 pb-5">
@@ -152,7 +149,6 @@ export default function StudentDetailPage() {
             </Card>
           )}
 
-          {/* Stats grid */}
           <div className="grid grid-cols-2 gap-3">
             {(
               [
@@ -198,7 +194,7 @@ export default function StudentDetailPage() {
           </div>
         </div>
 
-        {/* Right: action log */}
+        {/* Right: log */}
         <div>
           <Card>
             <CardHeader className="pb-3">

@@ -8,24 +8,23 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDate, getUserDisplayName } from "@/lib/utils";
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
+  const dialog = useDialog();
 
   const [data, setData] = useState<CitizenUserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [confirmBlock, setConfirmBlock] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const s = await usersApi.stats(id);
-      setData(s);
+      setData(await usersApi.stats(id));
     } finally {
       setLoading(false);
     }
@@ -37,9 +36,21 @@ export default function UserDetailPage() {
 
   const toggleBlock = async () => {
     if (!data) return;
+    const { user } = data;
+    const ok = await dialog.confirm(
+      `${
+        user.isBanned ? "Разблокировать" : "Заблокировать"
+      } пользователя ${getUserDisplayName(user)}?`,
+      {
+        title: user.isBanned ? "Разблокировать?" : "Заблокировать?",
+        variant: user.isBanned ? "default" : "destructive",
+        confirmLabel: user.isBanned ? "Разблокировать" : "Заблокировать",
+      }
+    );
+    if (!ok) return;
     setBusy(true);
     try {
-      if (data.user.isBanned) {
+      if (user.isBanned) {
         await usersApi.unblock(id);
         toast("Пользователь разблокирован", "success");
       } else {
@@ -51,7 +62,6 @@ export default function UserDetailPage() {
       toast((e as Error).message, "error");
     } finally {
       setBusy(false);
-      setConfirmBlock(false);
     }
   };
 
@@ -70,8 +80,7 @@ export default function UserDetailPage() {
       title={getUserDisplayName(user)}
       actions={
         <Button variant="outline" size="sm" onClick={() => router.back()}>
-          <ArrowLeft size={14} />
-          Назад
+          <ArrowLeft size={14} /> Назад
         </Button>
       }
     >
@@ -150,13 +159,13 @@ export default function UserDetailPage() {
             size="sm"
             className="w-full"
             disabled={busy}
-            onClick={() => setConfirmBlock(true)}
+            onClick={toggleBlock}
           >
             {user.isBanned ? "Разблокировать" : "Заблокировать"}
           </Button>
         </div>
 
-        {/* Right: request history */}
+        {/* Right: history */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader className="pb-3">
@@ -182,7 +191,7 @@ export default function UserDetailPage() {
                       </span>
                       <StatusBadge status={r.status} />
                       <span className="flex-1 truncate text-sm">{r.text}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 hidden sm:inline">
                         {formatDate(r.createdAt)}
                       </span>
                     </div>
@@ -193,25 +202,6 @@ export default function UserDetailPage() {
           </Card>
         </div>
       </div>
-
-      <ConfirmDialog
-        open={confirmBlock}
-        onOpenChange={setConfirmBlock}
-        title={
-          user.isBanned
-            ? "Разблокировать пользователя?"
-            : "Заблокировать пользователя?"
-        }
-        description={`${getUserDisplayName(user)} ${
-          user.isBanned
-            ? "снова сможет использовать бота"
-            : "будет заблокирован и не сможет использовать бота"
-        }`}
-        confirmLabel={user.isBanned ? "Разблокировать" : "Заблокировать"}
-        variant={user.isBanned ? "default" : "destructive"}
-        onConfirm={toggleBlock}
-        loading={busy}
-      />
     </PageShell>
   );
 }

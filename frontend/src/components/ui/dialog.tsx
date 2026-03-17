@@ -31,7 +31,12 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-xl",
+        // Base positioning
+        "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
+        // Width: full viewport minus 2rem margins on mobile, capped at max-w-lg on larger screens
+        "w-[calc(100vw-2rem)] max-w-lg",
+        // Appearance
+        "rounded-lg border bg-background p-6 shadow-xl",
         className
       )}
       {...props}
