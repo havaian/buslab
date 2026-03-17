@@ -12,14 +12,17 @@ export class AdminUsersController {
 
   @Roles(UserRole.ADMIN)
   @Get("students")
-  findStudents() {
-    return this.adminUsersService.findStudents();
+  async findStudents() {
+    const students = await this.adminUsersService.findStudents();
+    // Normalize _id -> id so frontend PanelUser.id is always populated
+    return students.map((s: any) => ({ ...s, id: String(s._id) }));
   }
 
   @Roles(UserRole.ADMIN)
   @Get("students/free")
-  findFreeStudents() {
-    return this.adminUsersService.findFreeStudents();
+  async findFreeStudents() {
+    const students = await this.adminUsersService.findFreeStudents();
+    return students.map((s: any) => ({ ...s, id: String(s._id) }));
   }
 
   @Roles(UserRole.ADMIN)

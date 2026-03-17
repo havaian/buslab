@@ -57,6 +57,19 @@ export class AdminUsersService {
   }
 
   async getStudentStats(studentId: string) {
+    if (!Types.ObjectId.isValid(studentId))
+      return {
+        total: 0,
+        submitted: 0,
+        approved: 0,
+        rejected: 0,
+        declines: 0,
+        unassigned: 0,
+        expired: 0,
+        avgTime: 0,
+        approvalRate: 0,
+        rating: null,
+      };
     const sid = new Types.ObjectId(studentId);
     const logs = await this.studentLogModel.find({ studentId: sid }).lean();
 
@@ -102,6 +115,7 @@ export class AdminUsersService {
   }
 
   async getStudentLogs(studentId: string) {
+    if (!Types.ObjectId.isValid(studentId)) return [];
     const sid = new Types.ObjectId(studentId);
     return this.studentLogModel
       .find({ studentId: sid })
@@ -109,4 +123,3 @@ export class AdminUsersService {
       .lean();
   }
 }
-    
