@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/auth-context";
+import { useDialog } from "@/components/ui/dialog-provider";
 import {
   Card,
   CardContent,
@@ -18,6 +19,7 @@ declare global {
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const dialog = useDialog();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,7 +27,10 @@ export default function LoginPage() {
       try {
         await login(userData);
       } catch (e: unknown) {
-        alert((e as Error).message || "Ошибка входа");
+        dialog.alert((e as Error).message || "Ошибка входа", {
+          title: "Ошибка",
+          variant: "destructive",
+        });
       }
     };
 
@@ -46,7 +51,7 @@ export default function LoginPage() {
     return () => {
       delete window.onTelegramAuth;
     };
-  }, [login]);
+  }, [login, dialog]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30">

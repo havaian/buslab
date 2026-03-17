@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   CheckCheck,
   XCircle,
   UserCheck,
+  ExternalLink,
 } from "lucide-react";
 import {
   requestsApi,
@@ -31,35 +32,23 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timer } from "@/components/shared/timer";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDate, getCategoryName, getUserDisplayName } from "@/lib/utils";
 
 export default function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
+  const dialog = useDialog();
 
   const [request, setRequest] = useState<Request | null>(null);
   const [freeStudents, setFreeStudents] = useState<PanelUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [rejectReason, setRejectReason] = useState("");
-  const [showRejectInput, setShowRejectInput] = useState(false);
-  const [rejectAnswerComment, setRejectAnswerComment] = useState("");
-  const [showRejectAnswerInput, setShowRejectAnswerInput] = useState(false);
   const [finalAnswer, setFinalAnswer] = useState("");
   const [assignStudentId, setAssignStudentId] = useState("");
-  const [directMessage, setDirectMessage] = useState("");
-  const [showMsgInput, setShowMsgInput] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    action: () => void;
-    title: string;
-    desc?: string;
-    variant?: "default" | "destructive";
-  }>({ open: false, action: () => {}, title: "" });
 
   const reload = async () => {
     const r = await requestsApi.findById(id);
@@ -90,15 +79,6 @@ export default function RequestDetailPage() {
     }
   };
 
-  const confirm = (
-    title: string,
-    action: () => void,
-    desc?: string,
-    variant?: "default" | "destructive"
-  ) => {
-    setConfirmDialog({ open: true, title, action, desc, variant });
-  };
-
   if (loading || !request) {
     return (
       <PageShell title="Обращение">
@@ -126,9 +106,9 @@ export default function RequestDetailPage() {
         </Button>
       }
     >
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: main content */}
-        <div className="col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3 flex-wrap">
@@ -160,91 +140,24 @@ export default function RequestDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {request.status === "answered" ? (
-                  <Textarea
-                    value={finalAnswer}
-                    onChange={(e) => setFinalAnswer(e.target.value)}
-                    rows={8}
-                    className="text-sm"
-                  />
+                  <>
+                    <Textarea
+                      value={finalAnswer}
+                      onChange={(e) => setFinalAnswer(e.target.value)}
+                      rows={8}
+                      className="text-sm"
+                    />
+                    {request.adminComment && (
+                      <p className="text-xs text-muted-foreground border-l-2 pl-3">
+                        Комментарий: {request.adminComment}
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {request.finalAnswerText || request.answerText || "—"}
+                    {request.finalAnswerText || request.answerText}
                   </p>
                 )}
-                {request.adminComment && (
-                  <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
-                    <span className="font-medium">Комментарий: </span>
-                    {request.adminComment}
-                  </div>
-                )}
-                {request.status === "closed" &&
-                  request.finalAnswerText &&
-                  request.answerText &&
-                  request.finalAnswerText !== request.answerText && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Оригинал ответа студента:
-                      </p>
-                      <p className="text-xs text-muted-foreground whitespace-pre-wrap">
-                        {request.answerText}
-                      </p>
-                    </div>
-                  )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Decline reason */}
-          {request.status === "declined" && request.declineReason && (
-            <Card>
-              <CardContent className="pt-4">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Причина отклонения
-                </p>
-                <p className="text-sm">{request.declineReason}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Direct message */}
-          {showMsgInput && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">
-                  Сообщение пользователю
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Textarea
-                  placeholder="Текст сообщения..."
-                  value={directMessage}
-                  onChange={(e) => setDirectMessage(e.target.value)}
-                  rows={3}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    disabled={!directMessage.trim() || busy}
-                    onClick={() =>
-                      run(
-                        () =>
-                          requestsApi
-                            .sendMessage(id, directMessage)
-                            .then(() => setDirectMessage("")),
-                        "Сообщение отправлено"
-                      )
-                    }
-                  >
-                    <Send size={13} /> Отправить
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setShowMsgInput(false)}
-                  >
-                    Отмена
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -252,54 +165,76 @@ export default function RequestDetailPage() {
 
         {/* Right: sidebar */}
         <div className="space-y-4">
-          {/* Citizen info */}
+          {/* Citizen */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Пользователь</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1.5 text-sm">
+            <CardContent className="space-y-2 text-sm">
               {citizen ? (
                 <>
-                  <p className="font-medium">{getUserDisplayName(citizen)}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium truncate">
+                      {getUserDisplayName(citizen)}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 shrink-0"
+                      title="Открыть профиль"
+                      onClick={() => router.push(`/users/${citizen._id}`)}
+                    >
+                      <ExternalLink size={13} />
+                    </Button>
+                  </div>
                   {citizen.username && (
                     <p className="text-muted-foreground">@{citizen.username}</p>
                   )}
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     TG ID: {citizen.telegramId}
                   </p>
                   {citizen.language && (
-                    <p className="text-xs text-muted-foreground">
-                      Язык: {citizen.language}
+                    <p className="text-muted-foreground text-xs">
+                      Язык: {citizen.language.toUpperCase()}
                     </p>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full mt-1"
+                    onClick={async () => {
+                      const text = await dialog.prompt(
+                        "Введите сообщение для пользователя:",
+                        {
+                          title: "Написать пользователю",
+                          placeholder: "Текст сообщения...",
+                          confirmLabel: "Отправить",
+                        }
+                      );
+                      if (!text) return;
+                      run(
+                        () => requestsApi.sendMessage(id, text),
+                        "Сообщение отправлено"
+                      );
+                    }}
+                  >
+                    <Send size={13} /> Написать
+                  </Button>
                 </>
               ) : (
-                <p className="text-muted-foreground text-xs">Нет данных</p>
+                <p className="text-muted-foreground">—</p>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full mt-2"
-                onClick={() => setShowMsgInput(true)}
-              >
-                <Send size={13} /> Написать
-              </Button>
             </CardContent>
           </Card>
 
           {/* Timer */}
-          {request.status === "assigned" && (
+          {request.status === "assigned" && request.timerDeadline && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Таймер</CardTitle>
               </CardHeader>
               <CardContent>
                 <Timer deadline={request.timerDeadline} />
-                {request.timerDeadline && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Дедлайн: {formatDate(request.timerDeadline)}
-                  </p>
-                )}
               </CardContent>
             </Card>
           )}
@@ -310,8 +245,21 @@ export default function RequestDetailPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Исполнитель</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm space-y-1">
-                <p className="font-medium">{getUserDisplayName(student)}</p>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium truncate">
+                    {getUserDisplayName(student)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 shrink-0"
+                    title="Открыть профиль студента"
+                    onClick={() => router.push(`/students/${student._id}`)}
+                  >
+                    <ExternalLink size={13} />
+                  </Button>
+                </div>
                 {student.username && (
                   <p className="text-muted-foreground">@{student.username}</p>
                 )}
@@ -325,80 +273,68 @@ export default function RequestDetailPage() {
               <CardTitle className="text-sm">Действия</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/* pending */}
               {request.status === "pending" && (
                 <>
                   <Button
-                    className="w-full"
                     size="sm"
+                    className="w-full"
                     disabled={busy}
-                    onClick={() =>
-                      confirm("Одобрить обращение?", () =>
-                        run(() => requestsApi.approve(id), "Одобрено")
-                      )
-                    }
+                    onClick={async () => {
+                      const ok = await dialog.confirm("Одобрить обращение?", {
+                        confirmLabel: "Одобрить",
+                      });
+                      if (ok) run(() => requestsApi.approve(id), "Одобрено");
+                    }}
                   >
                     <CheckCheck size={13} /> Одобрить
                   </Button>
-                  {!showRejectInput ? (
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      size="sm"
-                      onClick={() => setShowRejectInput(true)}
-                    >
-                      <XCircle size={13} /> Отклонить
-                    </Button>
-                  ) : (
-                    <div className="space-y-2">
-                      <Textarea
-                        placeholder="Причина отклонения..."
-                        value={rejectReason}
-                        onChange={(e) => setRejectReason(e.target.value)}
-                        rows={3}
-                        className="text-sm"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full"
-                        disabled={!rejectReason.trim() || busy}
-                        onClick={() =>
-                          run(
-                            () => requestsApi.reject(id, rejectReason),
-                            "Отклонено"
-                          )
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                    disabled={busy}
+                    onClick={async () => {
+                      const reason = await dialog.prompt(
+                        "Укажите причину отклонения:",
+                        {
+                          title: "Отклонить обращение?",
+                          placeholder: "Причина...",
+                          variant: "destructive",
+                          confirmLabel: "Отклонить",
                         }
-                      >
-                        Подтвердить
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setShowRejectInput(false)}
-                      >
-                        Отмена
-                      </Button>
-                    </div>
-                  )}
+                      );
+                      if (!reason) return;
+                      run(
+                        () => requestsApi.reject(id, reason),
+                        "Обращение отклонено"
+                      );
+                    }}
+                  >
+                    <XCircle size={13} /> Отклонить
+                  </Button>
                 </>
               )}
 
+              {/* approved */}
               {request.status === "approved" && (
                 <>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Назначить студента</Label>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Назначить студента
+                    </Label>
                     <Select
                       value={assignStudentId}
                       onValueChange={setAssignStudentId}
                     >
-                      <SelectTrigger className="text-xs h-8">
-                        <SelectValue placeholder="Выбрать студента..." />
+                      <SelectTrigger className="w-full text-sm">
+                        <SelectValue placeholder="Выбрать студента" />
                       </SelectTrigger>
                       <SelectContent>
                         {freeStudents.map((s) => (
                           <SelectItem key={s.id} value={s.id}>
-                            {s.firstName} {s.lastName}
+                            {getUserDisplayName(s)}
+                            {s.username ? ` (@${s.username})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -406,151 +342,144 @@ export default function RequestDetailPage() {
                     <Button
                       size="sm"
                       className="w-full"
-                      disabled={!assignStudentId || busy}
-                      onClick={() =>
-                        confirm("Назначить студента?", () =>
+                      disabled={busy || !assignStudentId}
+                      onClick={async () => {
+                        const ok = await dialog.confirm("Назначить студента?", {
+                          confirmLabel: "Назначить",
+                        });
+                        if (ok)
                           run(
                             () => requestsApi.assign(id, assignStudentId),
                             "Студент назначен"
-                          )
-                        )
-                      }
+                          );
+                      }}
                     >
                       <UserCheck size={13} /> Назначить
                     </Button>
                   </div>
                   <Button
-                    variant="outline"
                     size="sm"
+                    variant="outline"
                     className="w-full"
                     disabled={busy}
-                    onClick={() =>
-                      confirm("Вернуть в очередь?", () =>
+                    onClick={async () => {
+                      const ok = await dialog.confirm("Вернуть в очередь?");
+                      if (ok)
                         run(
                           () => requestsApi.returnToQueue(id),
                           "Возвращено в очередь"
-                        )
-                      )
-                    }
+                        );
+                    }}
                   >
                     <RotateCcw size={13} /> Вернуть в очередь
                   </Button>
                 </>
               )}
 
+              {/* assigned */}
               {request.status === "assigned" && (
                 <>
                   <Button
-                    variant="destructive"
                     size="sm"
+                    variant="destructive"
                     className="w-full"
                     disabled={busy}
-                    onClick={() =>
-                      confirm(
-                        "Снять со студента?",
-                        () =>
-                          run(() => requestsApi.unassign(id), "Задание снято"),
-                        undefined,
-                        "destructive"
-                      )
-                    }
+                    onClick={async () => {
+                      const ok = await dialog.confirm("Снять со студента?", {
+                        variant: "destructive",
+                        confirmLabel: "Снять",
+                      });
+                      if (ok)
+                        run(
+                          () => requestsApi.unassign(id),
+                          "Снято со студента"
+                        );
+                    }}
                   >
                     <UserX size={13} /> Снять со студента
                   </Button>
                   <Button
-                    variant="outline"
                     size="sm"
+                    variant="outline"
                     className="w-full"
                     disabled={busy}
-                    onClick={() =>
-                      confirm("Вернуть в очередь?", () =>
+                    onClick={async () => {
+                      const ok = await dialog.confirm("Вернуть в очередь?");
+                      if (ok)
                         run(
                           () => requestsApi.returnToQueue(id),
                           "Возвращено в очередь"
-                        )
-                      )
-                    }
+                        );
+                    }}
                   >
                     <RotateCcw size={13} /> Вернуть в очередь
                   </Button>
                 </>
               )}
 
+              {/* answered */}
               {request.status === "answered" && (
                 <>
                   <Button
-                    className="w-full"
                     size="sm"
+                    className="w-full"
                     disabled={busy}
-                    onClick={() =>
-                      confirm("Одобрить и отправить ответ пользователю?", () =>
+                    onClick={async () => {
+                      const ok = await dialog.confirm(
+                        "Подтвердить и отправить ответ пользователю?",
+                        { confirmLabel: "Подтвердить" }
+                      );
+                      if (ok)
                         run(
                           () => requestsApi.approveAnswer(id, finalAnswer),
                           "Ответ одобрен и отправлен"
-                        )
-                      )
-                    }
+                        );
+                    }}
                   >
-                    <CheckCheck size={13} /> Одобрить ответ
+                    <CheckCheck size={13} /> Подтвердить ответ
                   </Button>
-                  {!showRejectAnswerInput ? (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setShowRejectAnswerInput(true)}
-                    >
-                      <XCircle size={13} /> Вернуть на правку
-                    </Button>
-                  ) : (
-                    <div className="space-y-2">
-                      <Textarea
-                        placeholder="Комментарий студенту..."
-                        value={rejectAnswerComment}
-                        onChange={(e) => setRejectAnswerComment(e.target.value)}
-                        rows={3}
-                        className="text-sm"
-                      />
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full"
-                        disabled={!rejectAnswerComment.trim() || busy}
-                        onClick={() =>
-                          run(
-                            () =>
-                              requestsApi.rejectAnswer(id, rejectAnswerComment),
-                            "Возвращено на правку"
-                          )
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                    disabled={busy}
+                    onClick={async () => {
+                      const comment = await dialog.prompt(
+                        "Укажите комментарий для студента:",
+                        {
+                          title: "Вернуть на доработку?",
+                          placeholder: "Комментарий...",
+                          variant: "destructive",
+                          confirmLabel: "Вернуть",
                         }
-                      >
-                        Подтвердить
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setShowRejectAnswerInput(false)}
-                      >
-                        Отмена
-                      </Button>
-                    </div>
-                  )}
+                      );
+                      if (!comment) return;
+                      run(
+                        () => requestsApi.rejectAnswer(id, comment),
+                        "Возвращено на доработку"
+                      );
+                    }}
+                  >
+                    <XCircle size={13} /> Вернуть на доработку
+                  </Button>
                 </>
               )}
 
+              {/* closed / declined */}
               {(request.status === "closed" ||
                 request.status === "declined") && (
                 <Button
-                  variant="outline"
                   size="sm"
+                  variant="outline"
                   className="w-full"
                   disabled={busy}
-                  onClick={() =>
-                    confirm("Вернуть в очередь (переоткрыть)?", () =>
-                      run(() => requestsApi.returnToQueue(id), "Переоткрыто")
-                    )
-                  }
+                  onClick={async () => {
+                    const ok = await dialog.confirm("Переоткрыть обращение?", {
+                      confirmLabel: "Переоткрыть",
+                    });
+                    if (ok)
+                      run(() => requestsApi.returnToQueue(id), "Переоткрыто");
+                  }}
                 >
                   <RotateCcw size={13} /> Переоткрыть
                 </Button>
@@ -559,19 +488,6 @@ export default function RequestDetailPage() {
           </Card>
         </div>
       </div>
-
-      <ConfirmDialog
-        open={confirmDialog.open}
-        onOpenChange={(v) => setConfirmDialog((p) => ({ ...p, open: v }))}
-        title={confirmDialog.title}
-        description={confirmDialog.desc}
-        variant={confirmDialog.variant}
-        loading={busy}
-        onConfirm={() => {
-          setConfirmDialog((p) => ({ ...p, open: false }));
-          confirmDialog.action();
-        }}
-      />
     </PageShell>
   );
 }

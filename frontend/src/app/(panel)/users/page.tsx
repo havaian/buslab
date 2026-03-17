@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { usersApi, type CitizenUser, type CitizenUserStats } from "@/lib/api";
+import { usersApi, type CitizenUser } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,21 +15,15 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
-import { formatDate, formatDateShort, getUserDisplayName } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useDialog } from "@/components/ui/dialog-provider";
+import { formatDateShort, getUserDisplayName } from "@/lib/utils";
 
 const LIMITS = [10, 25, 50, 100];
 
 export default function UsersPage() {
   const { toast } = useToast();
+  const dialog = useDialog();
   const router = useRouter();
   const [users, setUsers] = useState<CitizenUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -38,11 +33,6 @@ export default function UsersPage() {
   const [status, setStatus] = useState("_all");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
-
-  const [selectedUser, setSelectedUser] = useState<CitizenUser | null>(null);
-  const [userStats, setUserStats] = useState<CitizenUserStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [blockConfirm, setBlockConfirm] = useState<CitizenUser | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -55,32 +45,47 @@ export default function UsersPage() {
         language: language === "_all" ? "" : language,
         status: status === "_all" ? "" : status,
       });
-      setUsers(res.users ?? []);
+      const fetchedUsers = res.users ?? [];
+      setUsers(fetchedUsers);
       setTotal(res.total);
+
+      // If search looks like a telegramId (pure numeric) and returned exactly 1 result — open that user directly
+      if (
+        /^\d+$/.test(search.trim()) &&
+        res.total === 1 &&
+        fetchedUsers.length === 1
+      ) {
+        router.push(`/users/${fetchedUsers[0]._id}`);
+      }
     } finally {
       setLoading(false);
     }
-  }, [search, page, limit, language, status]);
+  }, [search, page, limit, language, status, router]);
 
   useEffect(() => {
     load();
   }, [load]);
+
   useEffect(() => {
     setPage(1);
   }, [search, language, status, limit]);
 
-  const openUser = async (u: CitizenUser) => {
-    setSelectedUser(u);
-    setStatsLoading(true);
-    try {
-      const s = await usersApi.stats(u._id);
-      setUserStats(s);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
   const toggleBlock = async (u: CitizenUser) => {
+    const ok = await dialog.confirm(
+      `${
+        u.isBanned ? "Разблокировать" : "Заблокировать"
+      } пользователя ${getUserDisplayName(u)}? ${
+        u.isBanned
+          ? "Он снова сможет использовать бота."
+          : "Он не сможет использовать бота."
+      }`,
+      {
+        title: u.isBanned ? "Разблокировать?" : "Заблокировать?",
+        variant: u.isBanned ? "default" : "destructive",
+        confirmLabel: u.isBanned ? "Разблокировать" : "Заблокировать",
+      }
+    );
+    if (!ok) return;
     setBusy(true);
     try {
       if (u.isBanned) {
@@ -91,10 +96,6 @@ export default function UsersPage() {
         toast("Пользователь заблокирован", "success");
       }
       await load();
-      setBlockConfirm(null);
-      if (selectedUser?._id === u._id) {
-        setSelectedUser((p) => (p ? { ...p, isBanned: !p.isBanned } : p));
-      }
     } catch (e: unknown) {
       toast((e as Error).message, "error");
     } finally {
@@ -107,7 +108,7 @@ export default function UsersPage() {
   return (
     <PageShell title="Пользователи" description={`Всего: ${total}`}>
       <div className="flex flex-wrap gap-3 mb-4">
-        <div className="relative flex-1 min-w-64">
+        <div className="relative flex-1 min-w-48">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -151,7 +152,7 @@ export default function UsersPage() {
           <SelectContent>
             {LIMITS.map((l) => (
               <SelectItem key={l} value={String(l)}>
-                {l} / стр
+                {l} / стр.
               </SelectItem>
             ))}
           </SelectContent>
@@ -160,96 +161,101 @@ export default function UsersPage() {
 
       <Card>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                <th className="px-4 py-2.5 text-left font-medium">Имя</th>
-                <th className="px-4 py-2.5 text-left font-medium">Username</th>
-                <th className="px-4 py-2.5 text-left font-medium">
-                  Telegram ID
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium">Язык</th>
-                <th className="px-4 py-2.5 text-left font-medium">Статус</th>
-                <th className="px-4 py-2.5 text-left font-medium">
-                  Регистрация
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    Загрузка...
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left font-medium">Имя</th>
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Username
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Telegram ID
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">Язык</th>
+                  <th className="px-4 py-2.5 text-left font-medium">Статус</th>
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Регистрация
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium"></th>
                 </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    Нет пользователей
-                  </td>
-                </tr>
-              ) : (
-                users.map((u) => (
-                  <tr
-                    key={u._id}
-                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                    onClick={() => openUser(u)}
-                  >
-                    <td className="px-4 py-2.5 font-medium">
-                      {getUserDisplayName(u)}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
-                      {u.username ? `@${u.username}` : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                      {u.telegramId}
-                    </td>
-                    <td className="px-4 py-2.5 uppercase text-xs">
-                      {u.language}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          u.isBanned
-                            ? "bg-red-100 text-red-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {u.isBanned ? "Заблокирован" : "Активен"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {formatDateShort(u.createdAt)}
-                    </td>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
                     <td
-                      className="px-4 py-2.5"
-                      onClick={(e) => e.stopPropagation()}
+                      colSpan={7}
+                      className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={
-                          u.isBanned
-                            ? "text-green-600 border-green-200 hover:bg-green-50"
-                            : "text-red-600 border-red-200 hover:bg-red-50"
-                        }
-                        onClick={() => setBlockConfirm(u)}
-                      >
-                        {u.isBanned ? "Разблокировать" : "Заблокировать"}
-                      </Button>
+                      Загрузка...
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-8 text-center text-muted-foreground"
+                    >
+                      Пользователей не найдено
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u) => (
+                    <tr
+                      key={u._id}
+                      onClick={() => router.push(`/users/${u._id}`)}
+                      className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                    >
+                      <td className="px-4 py-2.5 font-medium">
+                        {getUserDisplayName(u)}
+                      </td>
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                        {u.username ? `@${u.username}` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
+                        {u.telegramId}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                        {u.language.toUpperCase()}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            u.isBanned
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }`}
+                        >
+                          {u.isBanned ? "Заблокирован" : "Активен"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                        {formatDateShort(u.createdAt)}
+                      </td>
+                      <td
+                        className="px-4 py-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          className={
+                            u.isBanned
+                              ? "text-green-600 border-green-200 hover:bg-green-50"
+                              : "text-red-600 border-red-200 hover:bg-red-50"
+                          }
+                          onClick={() => toggleBlock(u)}
+                        >
+                          {u.isBanned ? "Разблокировать" : "Заблокировать"}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -278,120 +284,6 @@ export default function UsersPage() {
           </div>
         </div>
       )}
-
-      {/* User detail modal */}
-      <Dialog
-        open={!!selectedUser}
-        onOpenChange={(v) => !v && setSelectedUser(null)}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedUser && getUserDisplayName(selectedUser)}
-            </DialogTitle>
-          </DialogHeader>
-          {statsLoading ? (
-            <p className="text-sm text-muted-foreground py-4">Загрузка...</p>
-          ) : (
-            userStats && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Username:</span>{" "}
-                    {userStats.user.username
-                      ? `@${userStats.user.username}`
-                      : "—"}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Язык:</span>{" "}
-                    {userStats.user.language.toUpperCase()}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">TG ID:</span>{" "}
-                    <span className="font-mono text-xs">
-                      {userStats.user.telegramId}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Статус:</span>{" "}
-                    {userStats.user.isBanned ? "Заблокирован" : "Активен"}
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {(
-                    [
-                      ["Всего", userStats.stats.total],
-                      ["Закрыто", userStats.stats.closed],
-                      ["Отклонено", userStats.stats.rejected],
-                    ] as [string, number][]
-                  ).map(([l, v]) => (
-                    <div key={l} className="rounded-lg border p-3 text-center">
-                      <p className="text-xl font-bold">{v}</p>
-                      <p className="text-xs text-muted-foreground">{l}</p>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-2">
-                    История обращений
-                  </p>
-                  <div className="space-y-1 max-h-52 overflow-y-auto">
-                    {userStats.history.map((r) => (
-                      <div
-                        key={r._id}
-                        className="flex items-center gap-3 rounded-md border px-3 py-2 text-xs cursor-pointer hover:bg-accent"
-                        onClick={() => {
-                          setSelectedUser(null);
-                          router.push(`/requests/${r._id}`);
-                        }}
-                      >
-                        <span className="font-mono text-muted-foreground">
-                          #{r._id.slice(-6)}
-                        </span>
-                        <span className="flex-1 truncate">{r.text}</span>
-                        <span className="text-muted-foreground whitespace-nowrap">
-                          {formatDateShort(r.createdAt)}
-                        </span>
-                      </div>
-                    ))}
-                    {userStats.history.length === 0 && (
-                      <p className="text-muted-foreground">Нет обращений</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    variant={
-                      userStats.user.isBanned ? "default" : "destructive"
-                    }
-                    disabled={busy}
-                    onClick={() => toggleBlock(userStats.user)}
-                  >
-                    {userStats.user.isBanned
-                      ? "Разблокировать"
-                      : "Заблокировать"}
-                  </Button>
-                </div>
-              </div>
-            )
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmDialog
-        open={!!blockConfirm}
-        onOpenChange={(v) => !v && setBlockConfirm(null)}
-        title={
-          blockConfirm?.isBanned
-            ? "Разблокировать пользователя?"
-            : "Заблокировать пользователя?"
-        }
-        description={blockConfirm ? getUserDisplayName(blockConfirm) : ""}
-        variant={blockConfirm?.isBanned ? "default" : "destructive"}
-        loading={busy}
-        onConfirm={() => blockConfirm && toggleBlock(blockConfirm)}
-      />
     </PageShell>
   );
 }

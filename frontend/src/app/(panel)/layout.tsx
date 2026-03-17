@@ -1,36 +1,31 @@
-"use client";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ToastProvider } from "@/components/ui/toast-provider";
+import { DialogProvider } from "@/components/ui/dialog-provider";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/auth-context";
-import { Sidebar } from "@/components/layout/sidebar";
+const inter = Inter({ subsets: ["latin", "cyrillic"] });
 
-export default function PanelLayout({
+export const metadata: Metadata = {
+  title: "Юридическая клиника",
+  description: "Платформа управления юридической клиникой",
+};
+
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && !user) router.push("/login");
-  }, [user, loading, router]);
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Загрузка...
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-1 flex-col min-w-0">{children}</div>
-    </div>
+    <html lang="ru">
+      <body className={inter.className}>
+        <AuthProvider>
+          <ToastProvider>
+            <DialogProvider>{children}</DialogProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </body>
+    </html>
   );
 }

@@ -14,11 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import { useDialog } from "@/components/ui/dialog-provider";
 
 export default function CategoriesPage() {
   const { toast } = useToast();
+  const dialog = useDialog();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -27,7 +28,6 @@ export default function CategoriesPage() {
   const [editTarget, setEditTarget] = useState<Category | null>(null);
   const [name, setName] = useState("");
   const [hashtag, setHashtag] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -48,6 +48,7 @@ export default function CategoriesPage() {
     setHashtag("");
     setFormOpen(true);
   };
+
   const openEdit = (c: Category) => {
     setEditTarget(c);
     setName(c.name);
@@ -75,13 +76,20 @@ export default function CategoriesPage() {
     }
   };
 
-  const remove = async () => {
-    if (!deleteTarget) return;
+  const remove = async (c: Category) => {
+    const ok = await dialog.confirm(
+      `Удалить категорию «${c.name}»? Нельзя удалить если используется в активных обращениях.`,
+      {
+        title: "Удалить категорию?",
+        variant: "destructive",
+        confirmLabel: "Удалить",
+      }
+    );
+    if (!ok) return;
     setBusy(true);
     try {
-      await categoriesApi.remove(deleteTarget._id);
+      await categoriesApi.remove(c._id);
       toast("Категория удалена", "success");
-      setDeleteTarget(null);
       await load();
     } catch (e: unknown) {
       toast((e as Error).message, "error");
@@ -149,7 +157,7 @@ export default function CategoriesPage() {
                           size="icon"
                           variant="ghost"
                           className="text-red-500 hover:text-red-600"
-                          onClick={() => setDeleteTarget(c)}
+                          onClick={() => remove(c)}
                         >
                           <Trash2 size={14} />
                         </Button>
@@ -205,17 +213,6 @@ export default function CategoriesPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(v) => !v && setDeleteTarget(null)}
-        title="Удалить категорию?"
-        description={`«${deleteTarget?.name}» — нельзя удалить если используется в активных обращениях.`}
-        variant="destructive"
-        confirmLabel="Удалить"
-        loading={busy}
-        onConfirm={remove}
-      />
     </PageShell>
   );
 }

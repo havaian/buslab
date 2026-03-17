@@ -7,15 +7,15 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useDialog } from "@/components/ui/dialog-provider";
 import { getUserDisplayName } from "@/lib/utils";
 
 export default function StudentsPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const dialog = useDialog();
   const [students, setStudents] = useState<PanelUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [blockTarget, setBlockTarget] = useState<PanelUser | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -32,6 +32,20 @@ export default function StudentsPage() {
   }, []);
 
   const toggleBlock = async (s: PanelUser) => {
+    const action = s.isBanned ? "разблокировать" : "заблокировать";
+    const ok = await dialog.confirm(
+      `${
+        s.isBanned ? "Разблокировать" : "Заблокировать"
+      } студента ${getUserDisplayName(s)}?`,
+      {
+        title: s.isBanned
+          ? "Разблокировать студента?"
+          : "Заблокировать студента?",
+        variant: s.isBanned ? "default" : "destructive",
+        confirmLabel: action.charAt(0).toUpperCase() + action.slice(1),
+      }
+    );
+    if (!ok) return;
     setBusy(true);
     try {
       s.isBanned
@@ -39,7 +53,6 @@ export default function StudentsPage() {
         : await adminUsersApi.block(s.id);
       toast(s.isBanned ? "Разблокирован" : "Заблокирован", "success");
       await load();
-      setBlockTarget(null);
     } catch (e: unknown) {
       toast((e as Error).message, "error");
     } finally {
@@ -118,10 +131,11 @@ export default function StudentsPage() {
                         <Button
                           size="sm"
                           variant="outline"
+                          disabled={busy}
                           className={
                             s.isBanned ? "text-green-600" : "text-red-600"
                           }
-                          onClick={() => setBlockTarget(s)}
+                          onClick={() => toggleBlock(s)}
                         >
                           {s.isBanned ? "Разблокировать" : "Заблокировать"}
                         </Button>
@@ -134,20 +148,6 @@ export default function StudentsPage() {
           </table>
         </CardContent>
       </Card>
-
-      <ConfirmDialog
-        open={!!blockTarget}
-        onOpenChange={(v) => !v && setBlockTarget(null)}
-        title={
-          blockTarget?.isBanned
-            ? "Разблокировать студента?"
-            : "Заблокировать студента?"
-        }
-        description={blockTarget ? getUserDisplayName(blockTarget) : ""}
-        variant={blockTarget?.isBanned ? "default" : "destructive"}
-        loading={busy}
-        onConfirm={() => blockTarget && toggleBlock(blockTarget)}
-      />
     </PageShell>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ClipboardList, CheckCircle, XCircle, CheckCheck } from "lucide-react";
 import {
   requestsApi,
@@ -15,13 +15,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Timer } from "@/components/shared/timer";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDate, getCategoryName } from "@/lib/utils";
 
 export default function TasksPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const dialog = useDialog();
 
   const [activeRequest, setActiveRequest] = useState<Request | null>(null);
   const [available, setAvailable] = useState<Request[]>([]);
@@ -29,7 +30,6 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState("");
-  const [declineConfirm, setDeclineConfirm] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -63,14 +63,39 @@ export default function TasksPage() {
       toast(successMsg, "success");
       await load();
     } catch (e: unknown) {
-      toast((e as Error).message, "error");
+      toast((e as Error).message || "Ошибка", "error");
     } finally {
       setBusy(false);
     }
   };
 
-  const submitAnswer = () => {
+  const handleDecline = async () => {
+    if (!activeRequest) return;
+    const ok = await dialog.confirm(
+      "Обращение вернётся в очередь. Это действие будет записано в ваш журнал.",
+      {
+        title: "Отказаться от обращения?",
+        variant: "destructive",
+        confirmLabel: "Отказаться",
+      }
+    );
+    if (!ok) return;
+    run(
+      () => requestsApi.decline(activeRequest._id),
+      "Отказались от обращения"
+    );
+  };
+
+  const handleSubmit = async () => {
     if (!activeRequest || !answer.trim()) return;
+    const ok = await dialog.confirm(
+      "Отправить ответ на проверку администратору?",
+      {
+        title: "Отправить ответ?",
+        confirmLabel: "Отправить",
+      }
+    );
+    if (!ok) return;
     run(
       () => requestsApi.submitAnswer(activeRequest._id, answer),
       "Ответ отправлен на проверку"
@@ -87,141 +112,134 @@ export default function TasksPage() {
 
   return (
     <PageShell title="Задания">
-      {/* Personal mini-stats */}
-      {myStats && (
-        <div className="grid grid-cols-4 gap-3 mb-5">
-          {(
-            [
-              ["Одобрено", myStats.approved, "text-green-600"],
-              ["Отклонено", myStats.rejected, "text-red-500"],
-              ["Всего ответов", myStats.submitted, "text-blue-600"],
-              [
-                "Рейтинг",
-                myStats.rating !== null ? `${myStats.rating}%` : "—",
-                "text-primary",
-              ],
-            ] as [string, string | number, string][]
-          ).map(([label, value, color]) => (
-            <Card key={label}>
-              <CardContent className="pt-4 pb-4">
-                <p className={`text-xl font-bold ${color}`}>{value}</p>
-                <p className="text-xs text-muted-foreground">{label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Left: active task */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Stats row */}
+          {myStats && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(
+                [
+                  [CheckCircle, "text-green-500", myStats.approved, "Одобрено"],
+                  [XCircle, "text-red-500", myStats.rejected, "Отклонено"],
+                  [
+                    ClipboardList,
+                    "text-blue-500",
+                    myStats.submitted,
+                    "Ответов",
+                  ],
+                  [
+                    CheckCheck,
+                    myStats.approvalRate >= 80
+                      ? "text-green-500"
+                      : "text-amber-500",
+                    `${myStats.approvalRate}%`,
+                    "Одобрение",
+                  ],
+                ] as [React.ElementType, string, number | string, string][]
+              ).map(([Icon, color, value, label]) => (
+                <Card key={label}>
+                  <CardContent className="flex items-center gap-3 pt-4 pb-4">
+                    <Icon size={16} className={`shrink-0 ${color}`} />
+                    <div>
+                      <p className="font-bold leading-tight">{value}</p>
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-      <div className="grid grid-cols-2 gap-5">
-        {/* Current task */}
-        <div>
-          <h2 className="text-sm font-semibold mb-3">Текущее задание</h2>
-          {!activeRequest ? (
+          {/* Active task */}
+          {activeRequest ? (
             <Card>
-              <CardContent className="py-10 text-center">
-                <ClipboardList
-                  size={32}
-                  className="text-muted-foreground mx-auto mb-3"
-                />
-                <p className="text-sm text-muted-foreground">
-                  У вас нет активного задания
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Выберите обращение из списка справа
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              <Card>
-                <CardHeader className="pb-3">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <CardTitle className="text-sm">Текущее задание</CardTitle>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={activeRequest.status} />
-                    <span className="text-sm text-muted-foreground">
-                      {getCategoryName(activeRequest.categoryId)}
-                    </span>
+                    {activeRequest.status === "assigned" &&
+                      activeRequest.timerDeadline && (
+                        <Timer deadline={activeRequest.timerDeadline} />
+                      )}
                   </div>
-                  {activeRequest.status === "assigned" && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs text-muted-foreground">
-                        Осталось:
-                      </span>
-                      <Timer deadline={activeRequest.timerDeadline} />
-                    </div>
-                  )}
-                </CardHeader>
-                <CardContent>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {getCategoryName(activeRequest.categoryId)} ·{" "}
+                    {formatDate(activeRequest.createdAt)}
+                  </p>
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">
                     {activeRequest.text}
                   </p>
-                </CardContent>
-              </Card>
-
-              {activeRequest.adminComment && (
-                <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
-                  <span className="font-medium">
-                    Комментарий администратора:{" "}
-                  </span>
-                  {activeRequest.adminComment}
                 </div>
-              )}
 
-              {activeRequest.status === "answered" ? (
-                <Card>
-                  <CardContent className="pt-4 py-4 text-center">
-                    <CheckCheck
-                      size={24}
-                      className="text-purple-500 mx-auto mb-2"
-                    />
-                    <p className="text-sm font-medium">
-                      Ответ отправлен на проверку
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Ожидайте решения администратора
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Ваш ответ</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
+                {activeRequest.adminComment && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <span className="font-medium">Комментарий: </span>
+                    {activeRequest.adminComment}
+                  </div>
+                )}
+
+                {activeRequest.status === "assigned" && (
+                  <div className="space-y-2">
                     <Textarea
+                      placeholder="Введите ответ на обращение..."
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
-                      placeholder="Напишите юридический ответ..."
-                      rows={10}
+                      rows={6}
                       className="text-sm"
                     />
                     <div className="flex gap-2">
                       <Button
-                        className="flex-1"
                         size="sm"
+                        className="flex-1"
                         disabled={!answer.trim() || busy}
-                        onClick={submitAnswer}
+                        onClick={handleSubmit}
                       >
-                        <CheckCircle size={13} /> Отправить ответ
+                        <CheckCheck size={13} /> Отправить ответ
                       </Button>
                       <Button
-                        variant="destructive"
                         size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
                         disabled={busy}
-                        onClick={() => setDeclineConfirm(true)}
+                        onClick={handleDecline}
                       >
                         <XCircle size={13} /> Отказаться
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                  </div>
+                )}
+
+                {activeRequest.status === "answered" && (
+                  <p className="text-sm text-muted-foreground italic">
+                    Ответ отправлен на проверку администратору.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <ClipboardList
+                  size={32}
+                  className="mx-auto mb-3 text-muted-foreground/40"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Нет активного задания. Возьмите обращение из списка.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </div>
 
-        {/* Available requests */}
-        <div>
-          <h2 className="text-sm font-semibold mb-3">
+        {/* Right: available */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium">
             Доступные обращения ({available.length})
           </h2>
           {available.length === 0 ? (
@@ -271,24 +289,6 @@ export default function TasksPage() {
           )}
         </div>
       </div>
-
-      <ConfirmDialog
-        open={declineConfirm}
-        onOpenChange={setDeclineConfirm}
-        title="Отказаться от обращения?"
-        description="Обращение вернётся в очередь. Это действие будет записано в ваш журнал."
-        variant="destructive"
-        confirmLabel="Отказаться"
-        loading={busy}
-        onConfirm={() => {
-          setDeclineConfirm(false);
-          if (activeRequest)
-            run(
-              () => requestsApi.decline(activeRequest._id),
-              "Отказались от обращения"
-            );
-        }}
-      />
     </PageShell>
   );
 }

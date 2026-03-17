@@ -13,6 +13,7 @@ import {
   adminUsersApi,
   type StudentStats,
   type StudentLogEntry,
+  type PanelUser,
 } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,13 +45,20 @@ export default function StudentDetailPage() {
   const router = useRouter();
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [logs, setLogs] = useState<StudentLogEntry[]>([]);
+  const [student, setStudent] = useState<PanelUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([adminUsersApi.studentStats(id), adminUsersApi.studentLogs(id)])
-      .then(([s, l]) => {
+    Promise.all([
+      adminUsersApi.studentStats(id),
+      adminUsersApi.studentLogs(id),
+      adminUsersApi.students(),
+    ])
+      .then(([s, l, all]) => {
         setStats(s);
         setLogs(l);
+        const found = all.find((u) => u.id === id) ?? null;
+        setStudent(found);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -63,9 +71,15 @@ export default function StudentDetailPage() {
     );
   }
 
+  const displayName = student
+    ? `${student.firstName} ${student.lastName}`.trim() ||
+      student.username ||
+      "Студент"
+    : "Статистика студента";
+
   return (
     <PageShell
-      title="Статистика студента"
+      title={displayName}
       actions={
         <Button variant="outline" size="sm" onClick={() => router.back()}>
           <ArrowLeft size={14} />
@@ -73,77 +87,54 @@ export default function StudentDetailPage() {
         </Button>
       }
     >
-      <div className="grid grid-cols-2 gap-5">
-        {/* Stats cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Left column */}
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              {
-                label: "Всего взято",
-                value: stats.total,
-                icon: Clock,
-                color: "text-blue-600",
-              },
-              {
-                label: "Отправлено ответов",
-                value: stats.submitted,
-                icon: CheckCircle,
-                color: "text-purple-600",
-              },
-              {
-                label: "Одобрено",
-                value: stats.approved,
-                icon: CheckCircle,
-                color: "text-green-600",
-              },
-              {
-                label: "Отклонено",
-                value: stats.rejected,
-                icon: XCircle,
-                color: "text-red-500",
-              },
-              {
-                label: "Процент одобрения",
-                value: `${stats.approvalRate}%`,
-                icon: CheckCircle,
-                color: "text-green-600",
-              },
-              {
-                label: "Ср. время ответа",
-                value: stats.avgTime ? `${stats.avgTime} мин` : "—",
-                icon: Clock,
-                color: "text-muted-foreground",
-              },
-              {
-                label: "Просрочек",
-                value: stats.expired,
-                icon: AlertTriangle,
-                color: "text-red-500",
-              },
-              {
-                label: "Отказов",
-                value: stats.declines,
-                icon: XCircle,
-                color: "text-orange-500",
-              },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <Card key={label}>
-                <CardContent className="flex items-center gap-3 pt-4 pb-4">
-                  <Icon size={16} className={color} />
-                  <div>
-                    <p className="text-lg font-bold">{value}</p>
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {stats.rating !== null && (
+          {/* Student info */}
+          {student && (
             <Card>
-              <CardContent className="flex items-center gap-4 pt-4 pb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                  <span className="text-xl font-bold text-primary">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Информация</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2.5 text-sm">
+                {student.username && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">
+                      Username
+                    </span>
+                    <span>@{student.username}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">
+                    Telegram ID
+                  </span>
+                  <span className="font-mono text-xs">
+                    {student.telegramId}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Статус</span>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      student.isBanned
+                        ? "bg-red-100 text-red-700"
+                        : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {student.isBanned ? "Заблокирован" : "Активен"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rating */}
+          {stats.rating !== null && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="flex items-center gap-4 pt-5 pb-5">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <span className="text-2xl font-bold text-primary">
                     {stats.rating}
                   </span>
                 </div>
@@ -156,58 +147,112 @@ export default function StudentDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Stats grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                [CheckCircle, "text-blue-500", stats.total, "Всего взято"],
+                [CheckCircle, "text-green-500", stats.approved, "Одобрено"],
+                [
+                  CheckCircle,
+                  "text-purple-500",
+                  stats.submitted,
+                  "Отправлено ответов",
+                ],
+                [XCircle, "text-red-500", stats.rejected, "Отклонено"],
+                [
+                  Clock,
+                  "text-amber-500",
+                  `${stats.avgTime} мин`,
+                  "Ср. время ответа",
+                ],
+                [AlertTriangle, "text-red-500", stats.expired, "Просрочек"],
+                [XCircle, "text-orange-500", stats.declines, "Отказов"],
+                [
+                  CheckCircle,
+                  stats.approvalRate >= 80
+                    ? "text-green-500"
+                    : stats.approvalRate >= 50
+                    ? "text-amber-500"
+                    : "text-red-500",
+                  `${stats.approvalRate}%`,
+                  "Процент одобрения",
+                ],
+              ] as [React.ElementType, string, number | string, string][]
+            ).map(([Icon, color, value, label]) => (
+              <Card key={label}>
+                <CardContent className="flex items-center gap-3 pt-4 pb-4">
+                  <Icon size={18} className={`shrink-0 ${color}`} />
+                  <div>
+                    <p className="text-lg font-bold leading-tight">{value}</p>
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
-        {/* Action log */}
-        <Card className="flex flex-col min-h-0">
-          <CardHeader className="pb-3 shrink-0">
-            <CardTitle className="text-sm">Журнал действий</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-0">
-            {logs.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted-foreground">
-                Нет записей
-              </p>
-            ) : (
-              <div className="divide-y">
-                {logs.map((l) => (
-                  <div key={l._id} className="flex items-start gap-3 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-sm font-medium ${
-                          ACTION_COLORS[l.action] || ""
-                        }`}
-                      >
-                        {ACTION_LABELS[l.action] || l.action}
-                      </p>
-                      {l.details && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {l.details}
+        {/* Right: action log */}
+        <div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">
+                Журнал действий ({logs.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {logs.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-4 py-4">
+                  Действий нет
+                </p>
+              ) : (
+                <div className="divide-y max-h-[600px] overflow-y-auto">
+                  {logs.map((entry) => (
+                    <div
+                      key={entry._id}
+                      className="flex items-start justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p
+                          className={`text-sm font-medium ${
+                            ACTION_COLORS[entry.action] ?? "text-foreground"
+                          }`}
+                        >
+                          {ACTION_LABELS[entry.action] ?? entry.action}
                         </p>
-                      )}
-                      {l.timeSpentMinutes && (
-                        <p className="text-xs text-muted-foreground">
-                          Время: {l.timeSpentMinutes} мин
-                        </p>
-                      )}
+                        {entry.timeSpentMinutes != null && (
+                          <p className="text-xs text-muted-foreground">
+                            Время: {entry.timeSpentMinutes} мин
+                          </p>
+                        )}
+                        {entry.details && (
+                          <p className="text-xs text-muted-foreground truncate max-w-48">
+                            {entry.details}
+                          </p>
+                        )}
+                        {entry.requestId && (
+                          <button
+                            className="text-xs text-primary hover:underline font-mono mt-0.5"
+                            onClick={() =>
+                              router.push(`/requests/${entry.requestId}`)
+                            }
+                          >
+                            #{entry.requestId.slice(-6)}
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                        {formatDate(entry.createdAt)}
+                      </span>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDate(l.createdAt)}
-                      </p>
-                      <button
-                        onClick={() => router.push(`/requests/${l.requestId}`)}
-                        className="text-xs text-primary hover:underline mt-0.5"
-                      >
-                        #{String(l.requestId).slice(-6)}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </PageShell>
   );

@@ -29,11 +29,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
+import { useDialog } from "@/components/ui/dialog-provider";
 
 export default function FaqPage() {
   const { toast } = useToast();
+  const dialog = useDialog();
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,6 @@ export default function FaqPage() {
   const [fQuestion, setFQuestion] = useState("");
   const [fAnswer, setFAnswer] = useState("");
   const [fCategory, setFCategory] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<FaqItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,6 +71,7 @@ export default function FaqPage() {
     setFCategory("");
     setFormOpen(true);
   };
+
   const openEdit = (f: FaqItem) => {
     setEditTarget(f);
     setFQuestion(f.question);
@@ -103,13 +104,17 @@ export default function FaqPage() {
     }
   };
 
-  const remove = async () => {
-    if (!deleteTarget) return;
+  const remove = async (f: FaqItem) => {
+    const ok = await dialog.confirm(`Удалить вопрос: «${f.question}»?`, {
+      title: "Удалить FAQ?",
+      variant: "destructive",
+      confirmLabel: "Удалить",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
-      await faqApi.remove(deleteTarget._id);
+      await faqApi.remove(f._id);
       toast("FAQ удалён", "success");
-      setDeleteTarget(null);
       await load();
     } catch (e: unknown) {
       toast((e as Error).message, "error");
@@ -162,24 +167,19 @@ export default function FaqPage() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Загрузка...</p>
       ) : faqs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Ничего не найдено</p>
+        <p className="text-sm text-muted-foreground">Нет вопросов</p>
       ) : (
         <div className="space-y-4">
           {Object.entries(grouped).map(([catId, items]) => (
             <Card key={catId}>
-              <div className="px-4 py-3 border-b bg-muted/30">
-                <span className="text-sm font-semibold">
-                  {catMap.get(catId) || "Без категории"}
-                </span>
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {items.length}
-                </span>
+              <div className="px-4 py-2.5 border-b bg-muted/40 text-xs font-medium text-muted-foreground">
+                {catMap.get(catId) ?? "Без категории"}
               </div>
-              <CardContent className="p-0 divide-y">
+              <CardContent className="p-0">
                 {items.map((f) => (
-                  <div key={f._id}>
+                  <div key={f._id} className="border-b last:border-0">
                     <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/20"
+                      className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/20"
                       onClick={() => toggleExpand(f._id)}
                     >
                       <span className="text-muted-foreground shrink-0">
@@ -189,11 +189,9 @@ export default function FaqPage() {
                           <ChevronRight size={14} />
                         )}
                       </span>
-                      <span className="flex-1 text-sm font-medium">
-                        {f.question}
-                      </span>
+                      <span className="flex-1 text-sm">{f.question}</span>
                       <div
-                        className="flex gap-1"
+                        className="flex gap-1 shrink-0"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <Button
@@ -207,14 +205,14 @@ export default function FaqPage() {
                           size="icon"
                           variant="ghost"
                           className="text-red-500 hover:text-red-600"
-                          onClick={() => setDeleteTarget(f)}
+                          onClick={() => remove(f)}
                         >
                           <Trash2 size={13} />
                         </Button>
                       </div>
                     </div>
                     {expanded.has(f._id) && (
-                      <div className="px-10 pb-3 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      <div className="px-10 pb-3 text-sm text-muted-foreground whitespace-pre-wrap">
                         {f.answer}
                       </div>
                     )}
@@ -226,7 +224,6 @@ export default function FaqPage() {
         </div>
       )}
 
-      {/* Form dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -287,17 +284,6 @@ export default function FaqPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(v) => !v && setDeleteTarget(null)}
-        title="Удалить FAQ?"
-        description={deleteTarget?.question}
-        variant="destructive"
-        confirmLabel="Удалить"
-        loading={busy}
-        onConfirm={remove}
-      />
     </PageShell>
   );
 }
