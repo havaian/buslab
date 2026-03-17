@@ -24,6 +24,11 @@ export class AuthService {
   // Verifies Telegram Login Widget data hash
   verifyTelegramHash(data: TelegramAuthDto): boolean {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    console.log(
+      "BOT TOKEN:",
+      botToken ? `${botToken.slice(0, 10)}...` : "UNDEFINED"
+    );
+
     const secret = crypto.createHash("sha256").update(botToken).digest();
 
     const { hash, ...rest } = data;
@@ -32,10 +37,16 @@ export class AuthService {
       .map((k) => `${k}=${rest[k]}`)
       .join("\n");
 
+    console.log("CHECK STRING:", checkString);
+    console.log("EXPECTED HASH:", hash);
+
     const computedHash = crypto
       .createHmac("sha256", secret)
       .update(checkString)
       .digest("hex");
+
+    console.log("COMPUTED HASH:", computedHash);
+    console.log("MATCH:", computedHash === hash);
 
     return computedHash === hash;
   }
