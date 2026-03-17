@@ -92,6 +92,10 @@ export default function StudentDetailPage() {
               </CardHeader>
               <CardContent className="space-y-2.5 text-sm">
                 <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Роль</span>
+                  <span>Студент</span>
+                </div>
+                <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">Имя</span>
                   <span className="text-right">
                     {getUserDisplayName(student)}

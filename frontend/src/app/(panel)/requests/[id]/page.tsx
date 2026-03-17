@@ -165,19 +165,19 @@ export default function RequestDetailPage() {
         {/* Right: sidebar */}
         <div className="space-y-4">
           {/* Citizen */}
-          <Card>
+          <Card
+              className="cursor-pointer hover:bg-muted/40 transition-colors"
+              onClick={() => citizen && router.push(`/users/${citizen._id}`)}
+            >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Пользователь</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {citizen ? (
                 <>
-                  <button
-                    className="font-medium hover:underline text-left w-full truncate"
-                    onClick={() => router.push(`/users/${citizen._id}`)}
-                  >
+                  <span className="font-medium truncate">
                     {getUserDisplayName(citizen)}
-                  </button>
+                  </span>
                   {citizen.username && (
                     <p className="text-muted-foreground">@{citizen.username}</p>
                   )}
@@ -193,7 +193,8 @@ export default function RequestDetailPage() {
                     size="sm"
                     variant="outline"
                     className="w-full mt-1"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       const text = await dialog.prompt(
                         "Введите сообщение для пользователя:",
                         {
@@ -232,17 +233,17 @@ export default function RequestDetailPage() {
 
           {/* Student */}
           {student && (
-            <Card>
+            <Card
+                className="cursor-pointer hover:bg-muted/40 transition-colors"
+                onClick={() => student && router.push(`/students/${student._id}`)}
+              >
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Исполнитель</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <button
-                  className="font-medium hover:underline text-left w-full truncate"
-                  onClick={() => router.push(`/students/${student._id}`)}
-                >
+                <span className="font-medium truncate">
                   {getUserDisplayName(student)}
-                </button>
+                </span>
                 {student.username && (
                   <p className="text-muted-foreground">@{student.username}</p>
                 )}

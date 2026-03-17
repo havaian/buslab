@@ -83,6 +83,10 @@ export default function UserDetailPage() {
               <CardTitle className="text-sm">Информация</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground shrink-0">Роль</span>
+                <span>Пользователь</span>
+              </div>
               {user.username && (
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">
