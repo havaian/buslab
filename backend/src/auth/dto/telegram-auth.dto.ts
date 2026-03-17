@@ -2,8 +2,7 @@ import { IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
 
 export class TelegramAuthDto {
   @IsNotEmpty()
-  @IsString()
-  id: string;
+  id: number | string;
 
   @IsNotEmpty()
   @IsString()
