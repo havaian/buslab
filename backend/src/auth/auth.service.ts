@@ -7,28 +7,18 @@ import { JwtService } from "@nestjs/jwt";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import * as crypto from "crypto";
-import {
-  AdminUser,
-  AdminUserDocument,
-} from "../admin-users/schemas/admin-user.schema";
+import { User, UserDocument } from "../users/schemas/user.schema";
 import { TelegramAuthDto } from "./dto/telegram-auth.dto";
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectModel(AdminUser.name)
-    private adminUserModel: Model<AdminUserDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService
   ) {}
 
-  // Verifies Telegram Login Widget data hash
   verifyTelegramHash(data: TelegramAuthDto): boolean {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    console.log(
-      "BOT TOKEN:",
-      botToken ? `${botToken.slice(0, 10)}...` : "UNDEFINED"
-    );
-
     const secret = crypto.createHash("sha256").update(botToken).digest();
 
     const { hash, ...rest } = data;
@@ -37,16 +27,10 @@ export class AuthService {
       .map((k) => `${k}=${rest[k]}`)
       .join("\n");
 
-    console.log("CHECK STRING:", checkString);
-    console.log("EXPECTED HASH:", hash);
-
     const computedHash = crypto
       .createHmac("sha256", secret)
       .update(checkString)
       .digest("hex");
-
-    console.log("COMPUTED HASH:", computedHash);
-    console.log("MATCH:", computedHash === hash);
 
     return computedHash === hash;
   }
@@ -56,29 +40,28 @@ export class AuthService {
       throw new UnauthorizedException("Invalid Telegram auth data");
     }
 
-    // auth_date must not be older than 24 hours
     const now = Math.floor(Date.now() / 1000);
     if (now - dto.auth_date > 86400) {
       throw new UnauthorizedException("Telegram auth data is expired");
     }
 
-    const user = await this.adminUserModel.findOne({
-      telegramId: String(dto.id),
+    const user = await this.userModel.findOne({
+      telegramId: Number(dto.id),
+      role: { $in: ["admin", "student"] },
     });
 
     if (!user) {
       throw new UnauthorizedException("User not registered in the system");
     }
 
-    if (user.isBlocked) {
+    if (user.isBanned) {
       throw new ForbiddenException("User is blocked");
     }
 
-    // Update profile data from Telegram
+    // Update profile from Telegram
     user.firstName = dto.first_name;
     user.lastName = dto.last_name || "";
     user.username = dto.username || "";
-    user.photoUrl = dto.photo_url || "";
     await user.save();
 
     const payload = {
@@ -96,15 +79,14 @@ export class AuthService {
         lastName: user.lastName,
         username: user.username,
         role: user.role,
-        photoUrl: user.photoUrl,
       },
     };
   }
 
   async getMe(userId: string) {
-    const user = await this.adminUserModel.findById(userId).lean();
+    const user = await this.userModel.findById(userId).lean();
     if (!user) throw new UnauthorizedException("User not found");
-    if (user.isBlocked) throw new ForbiddenException("User is blocked");
+    if (user.isBanned) throw new ForbiddenException("User is blocked");
     return {
       id: String(user._id),
       telegramId: user.telegramId,
@@ -112,7 +94,6 @@ export class AuthService {
       lastName: user.lastName,
       username: user.username,
       role: user.role,
-      photoUrl: user.photoUrl,
     };
   }
 }

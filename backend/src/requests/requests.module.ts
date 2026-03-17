@@ -3,10 +3,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { RequestsController } from "./requests.controller";
 import { RequestsService } from "./requests.service";
 import { Request, RequestSchema } from "./schemas/request.schema";
-import {
-  AdminUser,
-  AdminUserSchema,
-} from "../admin-users/schemas/admin-user.schema";
+import { User, UserSchema } from "../users/schemas/user.schema";
 import {
   StudentLog,
   StudentLogSchema,
@@ -16,7 +13,7 @@ import {
   imports: [
     MongooseModule.forFeature([
       { name: Request.name, schema: RequestSchema },
-      { name: AdminUser.name, schema: AdminUserSchema },
+      { name: User.name, schema: UserSchema },
       { name: StudentLog.name, schema: StudentLogSchema },
     ]),
   ],

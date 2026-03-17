@@ -7,14 +7,8 @@ import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { Category, CategoryDocument } from "./schemas/category.schema";
 import { Request, RequestDocument } from "../requests/schemas/request.schema";
-import { RequestStatus } from "../common/enums/request-status.enum";
 
-const ACTIVE_STATUSES = [
-  RequestStatus.PENDING,
-  RequestStatus.APPROVED,
-  RequestStatus.IN_PROGRESS,
-  RequestStatus.ANSWER_REVIEW,
-];
+const ACTIVE_STATUSES = ["pending", "approved", "assigned", "answered"];
 
 @Injectable()
 export class CategoriesService {
@@ -33,15 +27,15 @@ export class CategoriesService {
     return cat;
   }
 
-  async create(name: string, description?: string) {
-    return this.categoryModel.create({ name, description: description || "" });
+  async create(name: string, hashtag: string) {
+    return this.categoryModel.create({ name, hashtag });
   }
 
-  async update(id: string, name?: string, description?: string) {
+  async update(id: string, name?: string, hashtag?: string) {
     const cat = await this.categoryModel.findById(id);
     if (!cat) throw new NotFoundException("Category not found");
     if (name !== undefined) cat.name = name;
-    if (description !== undefined) cat.description = description;
+    if (hashtag !== undefined) cat.hashtag = hashtag;
     return cat.save();
   }
 

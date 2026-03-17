@@ -3,16 +3,14 @@ import { Document } from "mongoose";
 
 export type CategoryDocument = Category & Document;
 
-@Schema({ timestamps: true })
+// Matches existing bot's Category model
+@Schema({ timestamps: true, collection: "categories" })
 export class Category {
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   name: string;
 
-  @Prop({ default: "" })
-  description: string;
-
-  @Prop({ default: true })
-  isActive: boolean;
+  @Prop({ required: true, unique: true })
+  hashtag: string;
 }
 
 export const CategorySchema = SchemaFactory.createForClass(Category);

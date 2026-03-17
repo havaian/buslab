@@ -1,25 +1,19 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model, Types } from "mongoose";
+import { Model } from "mongoose";
 import { Request, RequestDocument } from "../requests/schemas/request.schema";
-import {
-  AdminUser,
-  AdminUserDocument,
-} from "../admin-users/schemas/admin-user.schema";
+import { User, UserDocument } from "../users/schemas/user.schema";
 import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
-import { RequestStatus } from "../common/enums/request-status.enum";
 import { StudentAction } from "../common/enums/student-action.enum";
-import { UserRole } from "../common/enums/user-role.enum";
 
 @Injectable()
 export class StatsService {
   constructor(
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
-    @InjectModel(AdminUser.name)
-    private adminUserModel: Model<AdminUserDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(StudentLog.name)
     private studentLogModel: Model<StudentLogDocument>
   ) {}
@@ -48,9 +42,9 @@ export class StatsService {
       activeStudents,
     ] = await Promise.all([
       this.requestModel.countDocuments(),
-      this.requestModel.countDocuments({ status: RequestStatus.PENDING }),
-      this.requestModel.countDocuments({ status: RequestStatus.IN_PROGRESS }),
-      this.requestModel.countDocuments({ status: RequestStatus.CLOSED }),
+      this.requestModel.countDocuments({ status: "pending" }),
+      this.requestModel.countDocuments({ status: "assigned" }),
+      this.requestModel.countDocuments({ status: "closed" }),
       this.requestModel.countDocuments({ createdAt: { $gte: startOfToday } }),
       this.requestModel.countDocuments({ createdAt: { $gte: startOfWeek } }),
       this.requestModel.countDocuments({ createdAt: { $gte: startOfMonth } }),
@@ -71,20 +65,15 @@ export class StatsService {
       this.requestModel.aggregate([
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
-      this.requestModel.distinct("studentId", {
-        status: RequestStatus.IN_PROGRESS,
-      }),
+      this.requestModel.distinct("studentId", { status: "assigned" }),
     ]);
 
-    // Requests per day for last 30 days
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const byDay = await this.requestModel.aggregate([
       { $match: { createdAt: { $gte: thirtyDaysAgo } } },
       {
         $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
-          },
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
           count: { $sum: 1 },
         },
       },
@@ -100,9 +89,7 @@ export class StatsService {
   }
 
   async getStudentsSummary() {
-    const students = await this.adminUserModel
-      .find({ role: UserRole.STUDENT })
-      .lean();
+    const students = await this.userModel.find({ role: "student" }).lean();
 
     const summary = await Promise.all(
       students.map(async (s) => {
@@ -138,10 +125,9 @@ export class StatsService {
         const approvalRate =
           submitted > 0 ? Math.round((approved / submitted) * 100) : 0;
 
-        // Current status
         const active = await this.requestModel.findOne({
           studentId: s._id,
-          status: RequestStatus.IN_PROGRESS,
+          status: "assigned",
         });
         const overdue =
           active && active.timerDeadline && active.timerDeadline < new Date();

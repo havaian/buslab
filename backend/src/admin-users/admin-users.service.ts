@@ -4,69 +4,57 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
-import { AdminUser, AdminUserDocument } from "./schemas/admin-user.schema";
-import { UserRole } from "../common/enums/user-role.enum";
+import { Model, Types } from "mongoose";
+import { User, UserDocument } from "../users/schemas/user.schema";
+import { Request, RequestDocument } from "../requests/schemas/request.schema";
 import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
 import { StudentAction } from "../common/enums/student-action.enum";
-import { Request, RequestDocument } from "../requests/schemas/request.schema";
-import { RequestStatus } from "../common/enums/request-status.enum";
 
 @Injectable()
 export class AdminUsersService {
   constructor(
-    @InjectModel(AdminUser.name)
-    private adminUserModel: Model<AdminUserDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(StudentLog.name)
     private studentLogModel: Model<StudentLogDocument>,
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>
   ) {}
 
-  async findAll() {
-    return this.adminUserModel.find().lean();
-  }
-
   async findStudents() {
-    return this.adminUserModel.find({ role: UserRole.STUDENT }).lean();
+    return this.userModel.find({ role: "student" }).lean();
   }
 
   async findFreeStudents() {
-    // Students with no active IN_PROGRESS request
+    // Students with no active assigned request
     const busyIds = await this.requestModel
-      .find({ status: RequestStatus.IN_PROGRESS })
+      .find({ status: "assigned" })
       .distinct("studentId");
-    return this.adminUserModel
-      .find({
-        role: UserRole.STUDENT,
-        isBlocked: false,
-        _id: { $nin: busyIds },
-      })
+    return this.userModel
+      .find({ role: "student", isBanned: false, _id: { $nin: busyIds } })
       .lean();
   }
 
   async findById(id: string) {
-    const user = await this.adminUserModel.findById(id).lean();
+    const user = await this.userModel.findById(id).lean();
     if (!user) throw new NotFoundException("User not found");
     return user;
   }
 
   async block(id: string) {
-    const user = await this.adminUserModel.findById(id);
+    const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException("User not found");
-    if (user.role === UserRole.ADMIN) {
-      throw new BadRequestException("Cannot block an admin");
-    }
-    user.isBlocked = true;
+    if (user.role === "admin")
+      throw new BadRequestException("Cannot ban an admin");
+    user.isBanned = true;
     return user.save();
   }
 
   async unblock(id: string) {
-    const user = await this.adminUserModel.findById(id);
+    const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException("User not found");
-    user.isBlocked = false;
+    user.isBanned = false;
     return user.save();
   }
 
@@ -108,8 +96,6 @@ export class AdminUsersService {
 
     const approvalRate =
       submitted > 0 ? Math.round((approved / submitted) * 100) : 0;
-
-    // Simple rating: approval rate weighted by volume
     const rating = submitted >= 5 ? approvalRate : null;
 
     return {

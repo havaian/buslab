@@ -1,14 +1,18 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Document } from "mongoose";
+import { Document, Types } from "mongoose";
 
 export type UserDocument = User & Document;
 
-@Schema({ timestamps: true })
+// Single collection for all roles — matches existing bot's User model
+@Schema({ timestamps: true, collection: "users" })
 export class User {
-  @Prop({ required: true, unique: true })
-  telegramId: string;
+  @Prop({ required: true, unique: true, type: Number })
+  telegramId: number;
 
-  @Prop({ required: true })
+  @Prop({ enum: ["user", "student", "admin"], default: "user" })
+  role: string;
+
+  @Prop({ default: "" })
   firstName: string;
 
   @Prop({ default: "" })
@@ -17,15 +21,17 @@ export class User {
   @Prop({ default: "" })
   username: string;
 
-  // Default language is uz per TZ
-  @Prop({ default: "uz", enum: ["ru", "uz", "en"] })
+  @Prop({ enum: ["ru", "uz", "en", "kk"], default: "ru" })
   language: string;
 
   @Prop({ default: false })
-  isBlocked: boolean;
+  isBanned: boolean;
 
-  @Prop({ default: "" })
-  photoUrl: string;
+  @Prop({ default: false })
+  offerAccepted: boolean;
+
+  @Prop({ type: Types.ObjectId, ref: "Request", default: null })
+  currentAssignmentId: Types.ObjectId | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

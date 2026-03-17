@@ -21,10 +21,11 @@ import { StudentLogsModule } from "./student-logs/student-logs.module";
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRoot(
-      process.env.MONGO_URL || "mongodb://localhost:27017/legal_clinic"
+      process.env.MONGO_URL ||
+        process.env.MONGO_URI ||
+        "mongodb://localhost:27017/legal_clinic"
     ),
     ScheduleModule.forRoot(),
-    // Serve uploaded files as static under /uploads/* (fallback if FilesController is bypassed)
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), "uploads"),
       serveRoot: "/static/uploads",

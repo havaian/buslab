@@ -7,34 +7,27 @@ import {
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, Types } from "mongoose";
 import { Request, RequestDocument } from "./schemas/request.schema";
-import { RequestStatus } from "../common/enums/request-status.enum";
-import {
-  AdminUser,
-  AdminUserDocument,
-} from "../admin-users/schemas/admin-user.schema";
+import { User, UserDocument } from "../users/schemas/user.schema";
 import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
 import { StudentAction } from "../common/enums/student-action.enum";
 import { NotificationsService } from "../notifications/notifications.service";
-import { UserRole } from "../common/enums/user-role.enum";
 
-// Default timer duration: 12 hours in ms
 const TIMER_DURATION_MS = 12 * 60 * 60 * 1000;
 
 @Injectable()
 export class RequestsService {
   constructor(
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
-    @InjectModel(AdminUser.name)
-    private adminUserModel: Model<AdminUserDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(StudentLog.name)
     private studentLogModel: Model<StudentLogDocument>,
     private readonly notifications: NotificationsService
   ) {}
 
-  // ── LIST ────────────────────────────────────────────────────────────────
+  // ── LIST ─────────────────────────────────────────────────────────────────
 
   async findAll(filters: {
     status?: string;
@@ -55,7 +48,6 @@ export class RequestsService {
       limit = 20,
     } = filters;
     const query: any = {};
-
     if (status) query.status = status;
     if (categoryId) query.categoryId = new Types.ObjectId(categoryId);
     if (search) query.text = { $regex: search, $options: "i" };
@@ -71,130 +63,122 @@ export class RequestsService {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate("categoryId", "name")
-        .populate("studentId", "firstName lastName username")
+        .populate("categoryId", "name hashtag")
+        .populate("studentId", "firstName lastName username telegramId")
+        .populate("userId", "firstName lastName username telegramId language")
         .lean(),
       this.requestModel.countDocuments(query),
     ]);
-
     return { requests, total, page, limit };
   }
 
-  // Student: list of APPROVED requests (available to pick)
   async findAvailable() {
     return this.requestModel
-      .find({ status: RequestStatus.APPROVED })
+      .find({ status: "approved" })
       .sort({ createdAt: 1 })
-      .populate("categoryId", "name")
-      .select("-telegramUserId -userFirstName -userLastName -userUsername") // hide citizen data from students
+      .populate("categoryId", "name hashtag")
       .lean();
   }
 
   async findById(id: string) {
     const req = await this.requestModel
       .findById(id)
-      .populate("categoryId", "name")
+      .populate("categoryId", "name hashtag")
       .populate("studentId", "firstName lastName username telegramId")
+      .populate("userId", "firstName lastName username telegramId language")
       .lean();
     if (!req) throw new NotFoundException("Request not found");
     return req;
   }
 
-  // Student: their own history
   async findStudentHistory(studentId: string) {
     return this.requestModel
-      .find({
-        studentId: new Types.ObjectId(studentId),
-        status: {
-          $in: [
-            RequestStatus.CLOSED,
-            RequestStatus.APPROVED,
-            RequestStatus.IN_PROGRESS,
-            RequestStatus.ANSWER_REVIEW,
-          ],
-        },
-      })
+      .find({ studentId: new Types.ObjectId(studentId) })
       .sort({ createdAt: -1 })
-      .populate("categoryId", "name")
+      .populate("categoryId", "name hashtag")
       .lean();
   }
 
   // ── ADMIN ACTIONS ────────────────────────────────────────────────────────
 
   async approve(requestId: string) {
-    const req = await this.requestModel.findById(requestId);
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("userId", "telegramId language firstName");
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.PENDING) {
-      throw new BadRequestException("Request is not in PENDING status");
-    }
-    req.status = RequestStatus.APPROVED;
+    if (req.status !== "pending")
+      throw new BadRequestException("Request is not pending");
+    req.status = "approved";
     await req.save();
 
-    // Notify student group chat
+    const user = req.userId as any;
+    if (user?.telegramId) {
+      await this.notifications.notifyUserApproved(
+        String(user.telegramId),
+        user.language || "ru"
+      );
+    }
     const cat = req.categoryId as any;
     await this.notifications.notifyStudentChatApproved(
       requestId,
       cat?.name || "",
       req.text.slice(0, 100)
     );
-    // Notify citizen
-    await this.notifications.notifyUserApproved(
-      req.telegramUserId,
-      req.userLanguage
-    );
-
     return req;
   }
 
   async reject(requestId: string, reason: string) {
-    const req = await this.requestModel.findById(requestId);
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("userId", "telegramId language");
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.PENDING) {
-      throw new BadRequestException("Request is not in PENDING status");
-    }
-    req.status = RequestStatus.REJECTED;
+    if (req.status !== "pending")
+      throw new BadRequestException("Request is not pending");
+    req.status = "declined";
     req.declineReason = reason;
     await req.save();
 
-    await this.notifications.notifyUserRejected(
-      req.telegramUserId,
-      req.userLanguage,
-      reason
-    );
+    const user = req.userId as any;
+    if (user?.telegramId) {
+      await this.notifications.notifyUserRejected(
+        String(user.telegramId),
+        user.language || "ru",
+        reason
+      );
+    }
     return req;
   }
 
   async assignStudent(requestId: string, studentId: string) {
     const req = await this.requestModel.findById(requestId);
-    if (!req) throw new NotFoundException("Request not found");
-    if (req.status !== RequestStatus.APPROVED) {
-      throw new BadRequestException(
-        "Request must be in APPROVED status to assign"
-      );
-    }
+    if (!req) throw new NotFoundException();
+    if (req.status !== "approved")
+      throw new BadRequestException("Request must be approved");
 
-    const student = await this.adminUserModel.findById(studentId);
-    if (!student || student.role !== UserRole.STUDENT) {
+    const student = await this.userModel.findById(studentId);
+    if (!student || student.role !== "student")
       throw new BadRequestException("Student not found");
-    }
-    if (student.isBlocked) throw new BadRequestException("Student is blocked");
+    if (student.isBanned) throw new BadRequestException("Student is banned");
 
-    // Check student has no active request
     const existing = await this.requestModel.findOne({
       studentId: new Types.ObjectId(studentId),
-      status: RequestStatus.IN_PROGRESS,
+      status: "assigned",
     });
     if (existing)
       throw new BadRequestException("Student already has an active request");
 
     const now = new Date();
     req.studentId = new Types.ObjectId(studentId) as any;
-    req.status = RequestStatus.IN_PROGRESS;
-    req.timerStart = now;
+    req.status = "assigned";
+    req.assignedAt = now;
     req.timerDeadline = new Date(now.getTime() + TIMER_DURATION_MS);
     req.timerWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
+
+    // Update student's currentAssignmentId
+    student.currentAssignmentId = req._id as any;
+    await student.save();
 
     await this.studentLogModel.create({
       studentId: new Types.ObjectId(studentId),
@@ -203,11 +187,10 @@ export class RequestsService {
     });
 
     await this.notifications.notifyStudentAssigned(
-      student.telegramId,
+      String(student.telegramId),
       requestId,
       req.text.slice(0, 100)
     );
-
     return req;
   }
 
@@ -216,32 +199,35 @@ export class RequestsService {
       .findById(requestId)
       .populate("studentId");
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.IN_PROGRESS) {
-      throw new BadRequestException("Request is not IN_PROGRESS");
-    }
+    if (req.status !== "assigned")
+      throw new BadRequestException("Request is not assigned");
 
     const student = req.studentId as any;
-    const studentObjId = new Types.ObjectId(String(student._id || student));
+    if (student?._id) {
+      await this.studentLogModel.create({
+        studentId: student._id,
+        action: StudentAction.UNASSIGNED_BY_ADMIN,
+        requestId: req._id,
+      });
+      await this.userModel.updateOne(
+        { _id: student._id },
+        { currentAssignmentId: null }
+      );
+      if (student.telegramId)
+        await this.notifications.notifyStudentUnassigned(
+          String(student.telegramId)
+        );
+    }
 
-    await this.studentLogModel.create({
-      studentId: studentObjId,
-      action: StudentAction.UNASSIGNED_BY_ADMIN,
-      requestId: req._id,
-    });
-
-    req.status = RequestStatus.APPROVED;
+    req.status = "approved";
     req.studentId = null;
-    req.timerStart = null;
+    req.assignedAt = null;
     req.timerDeadline = null;
     req.timerWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
 
-    if (student?.telegramId) {
-      await this.notifications.notifyStudentUnassigned(student.telegramId);
-    }
     await this.notifications.notifyStudentChatReturned(requestId);
-
     return req;
   }
 
@@ -251,44 +237,35 @@ export class RequestsService {
       .populate("studentId");
     if (!req) throw new NotFoundException();
 
-    const allowedStatuses = [
-      RequestStatus.APPROVED,
-      RequestStatus.IN_PROGRESS,
-      RequestStatus.CLOSED,
-      RequestStatus.REJECTED,
-    ];
-    if (!allowedStatuses.includes(req.status as any)) {
-      throw new BadRequestException("Cannot return this request to queue");
-    }
-
     const student = req.studentId as any;
-    if (student) {
+    if (student?._id) {
       await this.studentLogModel.create({
-        studentId: new Types.ObjectId(String(student._id || student)),
+        studentId: student._id,
         action: StudentAction.UNASSIGNED_BY_ADMIN,
         requestId: req._id,
         details: "returned to queue",
       });
-      if (student?.telegramId) {
+      await this.userModel.updateOne(
+        { _id: student._id },
+        { currentAssignmentId: null }
+      );
+      if (student.telegramId)
         await this.notifications.notifyStudentReturnedToQueue(
-          student.telegramId
+          String(student.telegramId)
         );
-      }
     }
 
-    req.status = RequestStatus.APPROVED;
+    req.status = "approved";
     req.studentId = null;
-    req.timerStart = null;
+    req.assignedAt = null;
     req.timerDeadline = null;
     req.timerWarningSent = false;
     req.timerExpiredNotified = false;
-    req.studentAnswer = "";
-    req.studentAnswerFiles = [];
-    req.adminComment = "";
+    req.answerText = null;
+    req.adminComment = null;
     await req.save();
 
     await this.notifications.notifyStudentChatReturned(requestId);
-
     return req;
   }
 
@@ -299,39 +276,42 @@ export class RequestsService {
   ) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("studentId");
+      .populate("studentId")
+      .populate("userId", "telegramId language");
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.ANSWER_REVIEW) {
-      throw new BadRequestException("Request is not in ANSWER_REVIEW status");
-    }
+    if (req.status !== "answered")
+      throw new BadRequestException("Request is not in answered status");
 
-    req.status = RequestStatus.CLOSED;
-    req.finalAnswer = finalAnswer ?? req.studentAnswer;
-    if (finalAnswerFiles) req.finalAnswerFiles = finalAnswerFiles;
-
+    req.status = "closed";
+    req.finalAnswerText = finalAnswer ?? req.answerText;
     await req.save();
 
     const student = req.studentId as any;
-    if (student) {
+    if (student?._id) {
       await this.studentLogModel.create({
-        studentId: new Types.ObjectId(String(student._id)),
+        studentId: student._id,
         action: StudentAction.ANSWER_APPROVED,
         requestId: req._id,
       });
-      if (student.telegramId) {
+      await this.userModel.updateOne(
+        { _id: student._id },
+        { currentAssignmentId: null }
+      );
+      if (student.telegramId)
         await this.notifications.notifyStudentAnswerApproved(
-          student.telegramId,
+          String(student.telegramId),
           requestId
         );
-      }
     }
 
-    await this.notifications.notifyUserAnswerReady(
-      req.telegramUserId,
-      req.userLanguage,
-      req.finalAnswer
-    );
-
+    const user = req.userId as any;
+    if (user?.telegramId) {
+      await this.notifications.notifyUserAnswerReady(
+        String(user.telegramId),
+        user.language || "ru",
+        req.finalAnswerText
+      );
+    }
     return req;
   }
 
@@ -340,38 +320,42 @@ export class RequestsService {
       .findById(requestId)
       .populate("studentId");
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.ANSWER_REVIEW) {
-      throw new BadRequestException("Request is not in ANSWER_REVIEW status");
-    }
+    if (req.status !== "answered")
+      throw new BadRequestException("Request is not in answered status");
 
-    req.status = RequestStatus.IN_PROGRESS;
+    req.status = "assigned";
     req.adminComment = comment;
     await req.save();
 
     const student = req.studentId as any;
-    if (student) {
+    if (student?._id) {
       await this.studentLogModel.create({
-        studentId: new Types.ObjectId(String(student._id)),
+        studentId: student._id,
         action: StudentAction.ANSWER_REJECTED,
         requestId: req._id,
         details: comment,
       });
-      if (student.telegramId) {
+      if (student.telegramId)
         await this.notifications.notifyStudentAnswerRejected(
-          student.telegramId,
+          String(student.telegramId),
           requestId,
           comment
         );
-      }
     }
-
     return req;
   }
 
   async sendDirectMessage(requestId: string, text: string) {
-    const req = await this.requestModel.findById(requestId);
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("userId", "telegramId");
     if (!req) throw new NotFoundException();
-    await this.notifications.notifyUserDirectMessage(req.telegramUserId, text);
+    const user = req.userId as any;
+    if (user?.telegramId)
+      await this.notifications.notifyUserDirectMessage(
+        String(user.telegramId),
+        text
+      );
     return { sent: true };
   }
 
@@ -380,36 +364,36 @@ export class RequestsService {
   async takeRequest(requestId: string, studentId: string) {
     const req = await this.requestModel.findById(requestId);
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.APPROVED) {
+    if (req.status !== "approved")
       throw new BadRequestException("Request is not available");
-    }
 
-    // Check student has no active request
     const existing = await this.requestModel.findOne({
       studentId: new Types.ObjectId(studentId),
-      status: RequestStatus.IN_PROGRESS,
+      status: "assigned",
     });
     if (existing)
       throw new BadRequestException("You already have an active request");
 
-    const student = await this.adminUserModel.findById(studentId);
-    if (!student) throw new NotFoundException("Student not found");
+    const student = await this.userModel.findById(studentId);
+    if (!student) throw new NotFoundException();
 
     const now = new Date();
     req.studentId = new Types.ObjectId(studentId) as any;
-    req.status = RequestStatus.IN_PROGRESS;
-    req.timerStart = now;
+    req.status = "assigned";
+    req.assignedAt = now;
     req.timerDeadline = new Date(now.getTime() + TIMER_DURATION_MS);
     req.timerWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
+
+    student.currentAssignmentId = req._id as any;
+    await student.save();
 
     await this.studentLogModel.create({
       studentId: new Types.ObjectId(studentId),
       action: StudentAction.TOOK_REQUEST,
       requestId: req._id,
     });
-
     return req;
   }
 
@@ -421,23 +405,18 @@ export class RequestsService {
   ) {
     const req = await this.requestModel.findById(requestId);
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.IN_PROGRESS) {
-      throw new BadRequestException("Request is not IN_PROGRESS");
-    }
-    if (String(req.studentId) !== studentId) {
-      throw new ForbiddenException("This is not your request");
-    }
+    if (req.status !== "assigned")
+      throw new BadRequestException("Request is not assigned");
+    if (String(req.studentId) !== studentId)
+      throw new ForbiddenException("Not your request");
 
-    const timeSpentMinutes = req.timerStart
-      ? Math.round((Date.now() - req.timerStart.getTime()) / 60000)
+    const timeSpentMinutes = req.assignedAt
+      ? Math.round((Date.now() - req.assignedAt.getTime()) / 60000)
       : null;
 
-    req.status = RequestStatus.ANSWER_REVIEW;
-    req.studentAnswer = answer;
-    if (files) req.studentAnswerFiles = files;
+    req.status = "answered";
+    req.answerText = answer;
     await req.save();
-
-    const student = await this.adminUserModel.findById(studentId);
 
     await this.studentLogModel.create({
       studentId: new Types.ObjectId(studentId),
@@ -446,24 +425,23 @@ export class RequestsService {
       timeSpentMinutes,
     });
 
+    const student = await this.userModel.findById(studentId);
+    const cat = req.categoryId as any;
     await this.notifications.notifyAdminAnswerSubmitted(
       requestId,
       student ? `${student.firstName} ${student.lastName}`.trim() : "",
-      ""
+      cat?.name || ""
     );
-
     return req;
   }
 
   async declineRequest(requestId: string, studentId: string) {
     const req = await this.requestModel.findById(requestId);
     if (!req) throw new NotFoundException();
-    if (req.status !== RequestStatus.IN_PROGRESS) {
-      throw new BadRequestException("Request is not IN_PROGRESS");
-    }
-    if (String(req.studentId) !== studentId) {
-      throw new ForbiddenException("This is not your request");
-    }
+    if (req.status !== "assigned")
+      throw new BadRequestException("Request is not assigned");
+    if (String(req.studentId) !== studentId)
+      throw new ForbiddenException("Not your request");
 
     await this.studentLogModel.create({
       studentId: new Types.ObjectId(studentId),
@@ -471,21 +449,25 @@ export class RequestsService {
       requestId: req._id,
     });
 
-    req.status = RequestStatus.APPROVED;
+    req.status = "approved";
     req.studentId = null;
-    req.timerStart = null;
+    req.assignedAt = null;
     req.timerDeadline = null;
     req.timerWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
 
-    const student = await this.adminUserModel.findById(studentId);
+    await this.userModel.updateOne(
+      { _id: studentId },
+      { currentAssignmentId: null }
+    );
+
+    const student = await this.userModel.findById(studentId);
     await this.notifications.notifyAdminStudentDeclined(
       requestId,
       student ? `${student.firstName} ${student.lastName}`.trim() : ""
     );
     await this.notifications.notifyStudentChatReturned(requestId);
-
     return req;
   }
 }

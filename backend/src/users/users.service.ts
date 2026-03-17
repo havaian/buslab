@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { User, UserDocument } from "./schemas/user.schema";
@@ -16,7 +12,7 @@ export class UsersService {
   ) {}
 
   async findAll(search?: string, page = 1, limit = 20) {
-    const query: any = {};
+    const query: any = { role: "user" };
     if (search) {
       query.$or = [
         { firstName: { $regex: search, $options: "i" } },
@@ -47,19 +43,16 @@ export class UsersService {
     if (!user) throw new NotFoundException("User not found");
 
     const [total, closed, rejected] = await Promise.all([
-      this.requestModel.countDocuments({ telegramUserId: user.telegramId }),
+      this.requestModel.countDocuments({ userId: user._id }),
+      this.requestModel.countDocuments({ userId: user._id, status: "closed" }),
       this.requestModel.countDocuments({
-        telegramUserId: user.telegramId,
-        status: "closed",
-      }),
-      this.requestModel.countDocuments({
-        telegramUserId: user.telegramId,
-        status: "rejected",
+        userId: user._id,
+        status: "declined",
       }),
     ]);
 
     const history = await this.requestModel
-      .find({ telegramUserId: user.telegramId })
+      .find({ userId: user._id })
       .sort({ createdAt: -1 })
       .select("_id status createdAt categoryId text")
       .lean();
@@ -70,14 +63,14 @@ export class UsersService {
   async block(id: string) {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException("User not found");
-    user.isBlocked = true;
+    user.isBanned = true;
     return user.save();
   }
 
   async unblock(id: string) {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException("User not found");
-    user.isBlocked = false;
+    user.isBanned = false;
     return user.save();
   }
 }

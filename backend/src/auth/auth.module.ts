@@ -5,10 +5,7 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
-import {
-  AdminUser,
-  AdminUserSchema,
-} from "../admin-users/schemas/admin-user.schema";
+import { User, UserSchema } from "../users/schemas/user.schema";
 
 @Module({
   imports: [
@@ -19,9 +16,7 @@ import {
         signOptions: { expiresIn: 604800 },
       }),
     }),
-    MongooseModule.forFeature([
-      { name: AdminUser.name, schema: AdminUserSchema },
-    ]),
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

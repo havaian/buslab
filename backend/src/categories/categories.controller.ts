@@ -12,14 +12,12 @@ import { CategoriesService } from "./categories.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
-import { UserRole } from "../common/enums/user-role.enum";
 
 @UseGuards(JwtAuthGuard)
 @Controller("categories")
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
-  // Both admin and student need categories (for request detail view)
   @Get()
   findAll() {
     return this.categoriesService.findAll();
@@ -31,28 +29,25 @@ export class CategoriesController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles("admin")
   @Post()
-  create(
-    @Body("name") name: string,
-    @Body("description") description?: string
-  ) {
-    return this.categoriesService.create(name, description);
+  create(@Body("name") name: string, @Body("hashtag") hashtag: string) {
+    return this.categoriesService.create(name, hashtag);
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles("admin")
   @Patch(":id")
   update(
     @Param("id") id: string,
     @Body("name") name?: string,
-    @Body("description") description?: string
+    @Body("hashtag") hashtag?: string
   ) {
-    return this.categoriesService.update(id, name, description);
+    return this.categoriesService.update(id, name, hashtag);
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles("admin")
   @Delete(":id")
   remove(@Param("id") id: string) {
     return this.categoriesService.remove(id);
