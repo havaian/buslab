@@ -28,7 +28,7 @@ export class AdminUsersController {
   // NOTE: static sub-routes (/free, /stats, /logs) must come BEFORE :id
   @Roles(UserRole.ADMIN)
   @Get("students/:id")
-  async findStudentById(@Param("id") id: string) {
+  async findStudentById(@Param("id") id: string): Promise<Record<string, unknown>> {
     const student = await this.adminUsersService.findById(id);
     return { ...student, id: String((student as any)._id) };
   }
