@@ -10,7 +10,6 @@ import {
   CheckCheck,
   XCircle,
   UserCheck,
-  ExternalLink,
 } from "lucide-react";
 import {
   requestsApi,
@@ -173,20 +172,12 @@ export default function RequestDetailPage() {
             <CardContent className="space-y-2 text-sm">
               {citizen ? (
                 <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium truncate">
-                      {getUserDisplayName(citizen)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 shrink-0"
-                      title="Открыть профиль"
-                      onClick={() => router.push(`/users/${citizen._id}`)}
-                    >
-                      <ExternalLink size={13} />
-                    </Button>
-                  </div>
+                  <button
+                    className="font-medium hover:underline text-left w-full truncate"
+                    onClick={() => router.push(`/users/${citizen._id}`)}
+                  >
+                    {getUserDisplayName(citizen)}
+                  </button>
                   {citizen.username && (
                     <p className="text-muted-foreground">@{citizen.username}</p>
                   )}
@@ -246,20 +237,12 @@ export default function RequestDetailPage() {
                 <CardTitle className="text-sm">Исполнитель</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium truncate">
-                    {getUserDisplayName(student)}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 p-0 shrink-0"
-                    title="Открыть профиль студента"
-                    onClick={() => router.push(`/students/${student._id}`)}
-                  >
-                    <ExternalLink size={13} />
-                  </Button>
-                </div>
+                <button
+                  className="font-medium hover:underline text-left w-full truncate"
+                  onClick={() => router.push(`/students/${student._id}`)}
+                >
+                  {getUserDisplayName(student)}
+                </button>
                 {student.username && (
                   <p className="text-muted-foreground">@{student.username}</p>
                 )}

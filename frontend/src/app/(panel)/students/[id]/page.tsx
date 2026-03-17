@@ -18,7 +18,7 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getUserDisplayName } from "@/lib/utils";
 
 const ACTION_LABELS: Record<string, string> = {
   took_request: "Взял обращение",
@@ -63,12 +63,6 @@ export default function StudentDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const displayName = student
-    ? `${student.firstName} ${student.lastName}`.trim() ||
-      student.username ||
-      "Студент"
-    : "Студент";
-
   if (loading || !stats) {
     return (
       <PageShell title="Студент">
@@ -79,7 +73,7 @@ export default function StudentDetailPage() {
 
   return (
     <PageShell
-      title={displayName}
+      title={getUserDisplayName(student)}
       actions={
         <Button variant="outline" size="sm" onClick={() => router.back()}>
           <ArrowLeft size={14} />
@@ -100,7 +94,7 @@ export default function StudentDetailPage() {
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">Имя</span>
                   <span className="text-right">
-                    {`${student.firstName} ${student.lastName}`.trim() || "—"}
+                    {getUserDisplayName(student)}
                   </span>
                 </div>
                 {student.username && (
