@@ -1,13 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { Request, RequestDocument } from "../requests/schemas/request.schema";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
-import { StudentAction } from "../common/enums/student-action.enum";
 
 @Injectable()
 export class StatsService {
@@ -93,31 +92,28 @@ export class StatsService {
 
     const summary = await Promise.all(
       students.map(async (s) => {
-        const logs = await this.studentLogModel
-          .find({ studentId: s._id })
-          .lean();
+        // Cast to ObjectId for proper MongoDB query
+        const sid = new Types.ObjectId(String(s._id));
+        const logs = await this.studentLogModel.find({ studentId: sid }).lean();
 
         const submitted = logs.filter(
-          (l) => l.action === StudentAction.SUBMITTED_ANSWER
+          (l) => l.action === "submitted_answer"
         ).length;
         const approved = logs.filter(
-          (l) => l.action === StudentAction.ANSWER_APPROVED
+          (l) => l.action === "answer_approved"
         ).length;
         const rejected = logs.filter(
-          (l) => l.action === StudentAction.ANSWER_REJECTED
+          (l) => l.action === "answer_rejected"
         ).length;
-        const expired = logs.filter(
-          (l) => l.action === StudentAction.TIMER_EXPIRED
-        ).length;
+        const expired = logs.filter((l) => l.action === "timer_expired").length;
 
         const timeLogs = logs.filter(
-          (l) =>
-            l.action === StudentAction.SUBMITTED_ANSWER && l.timeSpentMinutes
+          (l) => l.action === "submitted_answer" && l.timeSpentMinutes
         );
         const avgTime =
           timeLogs.length > 0
             ? Math.round(
-                timeLogs.reduce((a, b) => a + b.timeSpentMinutes, 0) /
+                timeLogs.reduce((a, b) => a + (b.timeSpentMinutes || 0), 0) /
                   timeLogs.length
               )
             : 0;
@@ -126,7 +122,7 @@ export class StatsService {
           submitted > 0 ? Math.round((approved / submitted) * 100) : 0;
 
         const active = await this.requestModel.findOne({
-          studentId: s._id,
+          studentId: sid,
           status: "assigned",
         });
         const overdue =

@@ -11,7 +11,6 @@ import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
-import { StudentAction } from "../common/enums/student-action.enum";
 
 @Injectable()
 export class AdminUsersService {
@@ -27,7 +26,6 @@ export class AdminUsersService {
   }
 
   async findFreeStudents() {
-    // Students with no active assigned request
     const busyIds = await this.requestModel
       .find({ status: "assigned" })
       .distinct("studentId");
@@ -59,37 +57,28 @@ export class AdminUsersService {
   }
 
   async getStudentStats(studentId: string) {
-    const logs = await this.studentLogModel.find({ studentId }).lean();
+    const sid = new Types.ObjectId(studentId);
+    const logs = await this.studentLogModel.find({ studentId: sid }).lean();
 
-    const total = logs.filter(
-      (l) => l.action === StudentAction.TOOK_REQUEST
-    ).length;
+    const total = logs.filter((l) => l.action === "took_request").length;
     const submitted = logs.filter(
-      (l) => l.action === StudentAction.SUBMITTED_ANSWER
+      (l) => l.action === "submitted_answer"
     ).length;
-    const approved = logs.filter(
-      (l) => l.action === StudentAction.ANSWER_APPROVED
-    ).length;
-    const rejected = logs.filter(
-      (l) => l.action === StudentAction.ANSWER_REJECTED
-    ).length;
-    const declines = logs.filter(
-      (l) => l.action === StudentAction.DECLINED_REQUEST
-    ).length;
+    const approved = logs.filter((l) => l.action === "answer_approved").length;
+    const rejected = logs.filter((l) => l.action === "answer_rejected").length;
+    const declines = logs.filter((l) => l.action === "declined_request").length;
     const unassigned = logs.filter(
-      (l) => l.action === StudentAction.UNASSIGNED_BY_ADMIN
+      (l) => l.action === "unassigned_by_admin"
     ).length;
-    const expired = logs.filter(
-      (l) => l.action === StudentAction.TIMER_EXPIRED
-    ).length;
+    const expired = logs.filter((l) => l.action === "timer_expired").length;
 
     const timeLogs = logs.filter(
-      (l) => l.action === StudentAction.SUBMITTED_ANSWER && l.timeSpentMinutes
+      (l) => l.action === "submitted_answer" && l.timeSpentMinutes
     );
     const avgTime =
       timeLogs.length > 0
         ? Math.round(
-            timeLogs.reduce((a, b) => a + b.timeSpentMinutes, 0) /
+            timeLogs.reduce((a, b) => a + (b.timeSpentMinutes || 0), 0) /
               timeLogs.length
           )
         : 0;
@@ -113,9 +102,11 @@ export class AdminUsersService {
   }
 
   async getStudentLogs(studentId: string) {
+    const sid = new Types.ObjectId(studentId);
     return this.studentLogModel
-      .find({ studentId })
+      .find({ studentId: sid })
       .sort({ createdAt: -1 })
       .lean();
   }
 }
+    
