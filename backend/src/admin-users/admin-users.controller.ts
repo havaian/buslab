@@ -25,6 +25,14 @@ export class AdminUsersController {
     return students.map((s: any) => ({ ...s, id: String(s._id) }));
   }
 
+  // NOTE: static sub-routes (/free, /stats, /logs) must come BEFORE :id
+  @Roles(UserRole.ADMIN)
+  @Get("students/:id")
+  async findStudentById(@Param("id") id: string) {
+    const student = await this.adminUsersService.findById(id);
+    return { ...student, id: String((student as any)._id) };
+  }
+
   @Roles(UserRole.ADMIN)
   @Get("students/:id/stats")
   getStudentStats(@Param("id") id: string) {

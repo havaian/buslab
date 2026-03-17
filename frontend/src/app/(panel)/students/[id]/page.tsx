@@ -43,25 +43,31 @@ const ACTION_COLORS: Record<string, string> = {
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+
+  const [student, setStudent] = useState<PanelUser | null>(null);
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [logs, setLogs] = useState<StudentLogEntry[]>([]);
-  const [student, setStudent] = useState<PanelUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
+      adminUsersApi.studentById(id),
       adminUsersApi.studentStats(id),
       adminUsersApi.studentLogs(id),
-      adminUsersApi.students(),
     ])
-      .then(([s, l, all]) => {
-        setStats(s);
+      .then(([s, st, l]) => {
+        setStudent(s);
+        setStats(st);
         setLogs(l);
-        const found = all.find((u) => u.id === id) ?? null;
-        setStudent(found);
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const displayName = student
+    ? `${student.firstName} ${student.lastName}`.trim() ||
+      student.username ||
+      "Студент"
+    : "Студент";
 
   if (loading || !stats) {
     return (
@@ -70,12 +76,6 @@ export default function StudentDetailPage() {
       </PageShell>
     );
   }
-
-  const displayName = student
-    ? `${student.firstName} ${student.lastName}`.trim() ||
-      student.username ||
-      "Студент"
-    : "Статистика студента";
 
   return (
     <PageShell
@@ -97,6 +97,12 @@ export default function StudentDetailPage() {
                 <CardTitle className="text-sm">Информация</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2.5 text-sm">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Имя</span>
+                  <span className="text-right">
+                    {`${student.firstName} ${student.lastName}`.trim() || "—"}
+                  </span>
+                </div>
                 {student.username && (
                   <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground shrink-0">
@@ -164,7 +170,7 @@ export default function StudentDetailPage() {
                 [
                   Clock,
                   "text-amber-500",
-                  `${stats.avgTime} мин`,
+                  stats.avgTime ? `${stats.avgTime} мин` : "—",
                   "Ср. время ответа",
                 ],
                 [AlertTriangle, "text-red-500", stats.expired, "Просрочек"],

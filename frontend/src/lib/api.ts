@@ -91,6 +91,7 @@ export const requestsApi = {
 export const adminUsersApi = {
   students: () => get<PanelUser[]>("/admin-users/students"),
   freeStudents: () => get<PanelUser[]>("/admin-users/students/free"),
+  studentById: (id: string) => get<PanelUser>(`/admin-users/students/${id}`),
   studentStats: (id: string) =>
     get<StudentStats>(`/admin-users/students/${id}/stats`),
   studentLogs: (id: string) =>
