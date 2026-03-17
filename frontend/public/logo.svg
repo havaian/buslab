@@ -1,0 +1,24 @@
+<svg viewBox="40 12 192 208" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e40af" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="lg3" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.8"/>
+    </linearGradient>
+    <linearGradient id="lg4" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1d4ed8" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0.55"/>
+    </linearGradient>
+  </defs>
+  <path d="M 152 20 C 94 20,48 64,48 122 C 48 168,76 200,114 212 C 90 192,78 162,84 132 C 90 100,112 78,140 72 C 162 68,184 78,196 94 C 188 60,174 20,152 20 Z" fill="url(#lg1)"/>
+  <path d="M 145 36 C 98 36,60 74,60 124 C 60 164,84 194,116 204 C 98 188,88 162,92 136 C 96 106,118 86,142 82 C 162 78,180 88,190 104 C 184 72,168 36,145 36 Z" fill="url(#lg2)"/>
+  <path d="M 136 54 C 102 54,74 80,74 120 C 74 154,94 176,120 184 C 108 170,102 150,106 128 C 110 104,128 88,148 86 C 164 84,178 96,183 112 C 178 84,162 54,136 54 Z" fill="url(#lg3)"/>
+  <path d="M 120 210 C 178 210,224 164,224 106 C 224 60,196 30,158 20 C 178 42,188 72,182 104 C 176 138,154 158,130 162 C 112 166,94 156,84 140 C 88 172,98 210,120 210 Z" fill="url(#lg4)"/>
+</svg>

@@ -73,11 +73,14 @@ export function Sidebar() {
       >
         {/* Logo + close button (mobile) */}
         <div className="flex h-14 items-center justify-between border-b px-4">
-          <span className="font-semibold text-sm leading-tight">
-            Юридическая клиника
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <img src="/logo.svg" alt="Логотип" className="h-7 w-7 shrink-0" />
+            <span className="font-semibold text-sm leading-tight truncate">
+              Юридическая клиника
+            </span>
+          </div>
           <button
-            className="lg:hidden text-muted-foreground hover:text-foreground p-1"
+            className="lg:hidden text-muted-foreground hover:text-foreground p-1 shrink-0"
             onClick={() => setOpen(false)}
             aria-label="Закрыть меню"
           >
