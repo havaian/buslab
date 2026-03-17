@@ -8,8 +8,6 @@ services:
       dockerfile: Dockerfile
     container_name: legal_clinic_bot
     restart: always
-    environment:
-      - MONGO_URI=${MONGO_URL}
     env_file:
       - ./.env
     volumes:

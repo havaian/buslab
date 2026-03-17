@@ -19,7 +19,7 @@ const { logAction, logUserMessage, logError, logInfo, logWarn } = require('./log
 const { t } = require('./utils/i18nHelper');
 
 // Check required environment variables
-const requiredEnvVars = ['BOT_TOKEN', 'MONGO_URI', 'ADMIN_CHAT_ID', 'STUDENT_CHAT_ID'];
+const requiredEnvVars = ['BOT_TOKEN', 'MONGO_URL', 'ADMIN_CHAT_ID', 'STUDENT_CHAT_ID'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
@@ -31,9 +31,9 @@ if (missingEnvVars.length > 0) {
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URL)
   .then(() => {
-    logInfo('Connected to MongoDB', { database: process.env.MONGO_URI.split('/').pop() });
+    logInfo('Connected to MongoDB', { database: process.env.MONGO_URL.split('/').pop() });
   })
   .catch(err => {
     logError(err, { context: 'MongoDB connection failed' });

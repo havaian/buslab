@@ -23,7 +23,7 @@ services:
     env_file:
       - ./.env
     environment:
-      - MONGO_URI=mongodb://mongodb:27017/${MONGO_DATABASE:-legal_clinic}
+      - MONGO_URL=mongodb://mongodb:27017/${MONGO_DATABASE:-legal_clinic}
     ports:
       - "127.0.0.1:3001:3001"
     volumes:
