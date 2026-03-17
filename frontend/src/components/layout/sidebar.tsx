@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,6 +14,7 @@ import {
   History,
   BarChart2,
   LogOut,
+  Menu,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,63 +35,63 @@ const studentNav = [
   { href: "/my-stats", label: "Статистика", icon: BarChart2 },
 ];
 
-interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const nav = user?.role === "admin" ? adminNav : studentNav;
-
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    onClose();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  const [open, setOpen] = useState(false);
 
   return (
     <>
+      {/* Mobile hamburger — fixed top-left, only on small screens */}
+      <button
+        className="fixed left-0 top-0 z-50 flex h-14 w-14 items-center justify-center text-muted-foreground hover:text-foreground lg:hidden"
+        onClick={() => setOpen(true)}
+        aria-label="Открыть меню"
+      >
+        <Menu size={20} />
+      </button>
+
       {/* Mobile overlay */}
-      {isOpen && (
+      {open && (
         <div
           className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-          onClick={onClose}
+          onClick={() => setOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar panel */}
       <aside
         className={cn(
           "flex h-screen w-56 shrink-0 flex-col border-r bg-card",
-          // Desktop: always visible, static
+          // Desktop: always in flow
           "lg:static lg:translate-x-0 lg:z-auto",
-          // Mobile: fixed, slides in/out
+          // Mobile: fixed overlay, slide in/out
           "fixed left-0 top-0 z-40 transition-transform duration-200 lg:transition-none",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
-        {/* Logo + mobile close */}
+        {/* Logo + close button (mobile) */}
         <div className="flex h-14 items-center justify-between border-b px-4">
           <span className="font-semibold text-sm leading-tight">
             Юридическая клиника
           </span>
           <button
             className="lg:hidden text-muted-foreground hover:text-foreground p-1"
-            onClick={onClose}
+            onClick={() => setOpen(false)}
             aria-label="Закрыть меню"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Nav */}
+        {/* Nav links */}
         <nav className="flex-1 overflow-y-auto py-3">
           {nav.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
+              onClick={() => setOpen(false)}
               className={cn(
                 "flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-accent",
                 pathname === href || pathname.startsWith(href + "/")
@@ -104,7 +105,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        {/* User + logout */}
+        {/* User info + logout */}
         <div className="border-t p-4">
           {user && (
             <div className="mb-3">
