@@ -16,7 +16,7 @@ import { FilesModule } from "./files/files.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { StudentLogsModule } from "./student-logs/student-logs.module";
-import { ThrottlerModule } from "@nestjs/throttler";
+import { BotModule } from "./bot/bot.module";
 
 @Module({
   imports: [
@@ -26,10 +26,6 @@ import { ThrottlerModule } from "@nestjs/throttler";
         process.env.MONGO_URI ||
         "mongodb://localhost:27017/legal_clinic"
     ),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,  // окно 60 секунд
-      limit: 10,   // максимум 10 попыток
-    }]),
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), "uploads"),
@@ -47,6 +43,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
     FilesModule,
     SchedulerModule,
     StudentLogsModule,
+    BotModule,
   ],
 })
 export class AppModule {}

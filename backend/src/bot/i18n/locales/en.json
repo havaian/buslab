@@ -1,0 +1,80 @@
+{
+  "commands": {
+    "start": {
+      "welcome_user": "Welcome to the Legal Clinic Bot!\n\nHere you can:\n- Ask legal questions\n- Browse frequently asked questions (FAQ)\n- Track the status of your requests\n\nSelect an action from the menu below:",
+      "welcome_student": "Welcome!\n\nYou will receive notifications about new requests. Use the web panel to manage your work."
+    }
+  },
+  "buttons": {
+    "ask_question": "Ask Question",
+    "faq": "FAQ",
+    "my_requests": "My Requests",
+    "help": "❓ Help",
+    "back": "◀️ Back",
+    "confirm": "✅ Confirm",
+    "edit": "✏️ Edit",
+    "cancel": "❌ Cancel",
+    "current_assignment": "Current Assignment",
+    "my_answers": "My Answers",
+    "statistics": "Statistics",
+    "confirm_answer": "Confirm Answer Submission",
+    "edit_answer": "Edit Answer",
+    "reject_assignment": "Reject Assignment"
+  },
+  "onboarding": {
+    "offer_text": "Please review the [public offer agreement](https://teletype.in/@businesslaw/publicoffer_en).\n\nBy pressing «Accept», you agree to the terms of service.",
+    "accept": "✅ Accept",
+    "decline": "❌ Decline",
+    "offer_accepted": "✅ You have accepted the public offer agreement. Welcome!",
+    "offer_declined": "⚠️ You cannot use the bot without accepting the public offer agreement.\n\nPlease review the [public offer agreement](https://teletype.in/@businesslaw/publicoffer_en) and press «Accept» to continue.",
+    "offer_required": "⚠️ You must accept the public offer agreement to use the bot. Press /start"
+  },
+  "errors": {
+    "general": "An error occurred. Please try again later.",
+    "admin_only": "This command is available only to administrators.",
+    "student_only": "This function is available only to students.",
+    "not_found": "Not found.",
+    "invalid_length": "Request text must contain at least {{min}} characters. Please expand your question.",
+    "category_not_found": "Category not found. Please select from the list.",
+    "no_categories": "No categories are currently available. Please try again later.",
+    "no_active_assignment": "You have no active assignments.",
+    "already_has_assignment": "You are already processing another request. Complete it before taking a new one."
+  },
+  "success": {
+    "request_sent": "Your request has been successfully submitted! We will notify you when it is reviewed.",
+    "category_created": "Category \"{{name}}\" with hashtag {{hashtag}} has been successfully created!",
+    "language_changed": "Language successfully changed to English!"
+  },
+  "statuses": {
+    "pending": "⏳ Under Review",
+    "approved": "👨‍💼 Awaiting Executor",
+    "declined": "❌ Declined",
+    "assigned": "🔄 In Progress",
+    "answered": "✅ Answer Under Review",
+    "closed": "✅ Closed"
+  },
+  "prompts": {
+    "select_category": "Select the category of your question:",
+    "enter_request": "Enter the text of your legal question (at least 150 characters):",
+    "confirm_request": "Check your request text:",
+    "select_faq_category": "Select FAQ category:",
+    "select_faq_question": "Select a question:",
+    "enter_answer": "Write your answer to this request.",
+    "check_answer": "Check your answer:"
+  },
+  "language": {
+    "select": "Select language / Выберите язык / Tilni tanlang:",
+    "changed": "Language successfully changed to English!"
+  },
+  "lists": {
+    "my_requests_title": "📋 Your requests:",
+    "no_requests": "You don't have any requests yet.",
+    "request_date": "Date:",
+    "answer_label": "📝 Answer:",
+    "comment_label": "Comment:",
+    "select_action": "Select an action:"
+  },
+  "help": {
+    "user": "📚 **Legal Clinic Bot Usage Guide**\n\n**Main Functions:**\n\n🔸 **Ask a Question**\n   • Select the appropriate category for your legal question\n   • Describe your situation in detail (minimum 150 characters)\n   • Review the text and confirm submission\n\n🔸 **FAQ (Frequently Asked Questions)**\n   • Browse ready answers to popular questions\n   • Select a category and find a suitable question\n\n🔸 **My Requests**\n   • Track the status of your requests\n   • View received answers\n\n**📋 Request Statuses:**\n• ⏳ Under Review\n• 👨‍💼 Awaiting Executor\n• 🔄 In Progress\n• ✅ Answer Under Review\n• ✅ Closed\n• ❌ Declined\n\n**📝 Question Requirements:**\n• Minimum 150 characters in request text\n• Clearly formulate your legal situation\n\n**⏰ Processing Time:**\n• Admin review: usually within 1-2 days\n• Student answer preparation: 3-7 days\n• Admin answer review: 1-2 days"
+  }
+}

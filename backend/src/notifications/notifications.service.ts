@@ -1,10 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
 
-// Thin wrapper around Telegram Bot API sendMessage.
-// Does NOT use Telegraf — bot/ service owns the bot instance.
-// This service calls the HTTP API directly so the backend can send
-// notifications without coupling to the bot process.
-
 const TELEGRAM_API = "https://api.telegram.org";
 
 @Injectable()
@@ -15,11 +10,22 @@ export class NotificationsService {
   private readonly studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
   private readonly webPanelUrl = process.env.WEB_PANEL_URL || "";
 
+  // ── Core primitives ───────────────────────────────────────────────────────
+
   private async send(chatId: string, text: string): Promise<void> {
-    if (!this.token || !chatId) return;
+    await this.sendWithResponse(chatId, text);
+  }
+
+  /** Sends a message and returns message_id from Telegram, or null on failure. */
+  async sendWithResponse(
+    chatId: string,
+    text: string,
+    replyMarkup?: object
+  ): Promise<number | null> {
+    if (!this.token || !chatId) return null;
     try {
       const url = `${TELEGRAM_API}/bot${this.token}/sendMessage`;
-      await fetch(url, {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -27,13 +33,69 @@ export class NotificationsService {
           text,
           parse_mode: "HTML",
           disable_web_page_preview: true,
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
         }),
       });
+      const data = (await res.json()) as any;
+      return data?.result?.message_id ?? null;
     } catch (e) {
       this.logger.error(
         `Failed to send Telegram message to ${chatId}: ${e.message}`
       );
+      return null;
     }
+  }
+
+  /** Edits text of an existing message (removes inline keyboard). */
+  async editMessage(
+    chatId: string,
+    messageId: number,
+    text: string
+  ): Promise<void> {
+    if (!this.token || !chatId || !messageId) return;
+    try {
+      const url = `${TELEGRAM_API}/bot${this.token}/editMessageText`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+          reply_markup: { inline_keyboard: [] },
+        }),
+      });
+    } catch (e) {
+      // Editing can fail if the message is too old or already deleted — non-fatal
+      this.logger.warn(
+        `Failed to edit message ${messageId} in ${chatId}: ${e.message}`
+      );
+    }
+  }
+
+  /**
+   * Splits text into chunks ≤ maxLen following §7 rules:
+   * double newlines → single newlines → spaces → hard cut.
+   */
+  private splitMessage(text: string, maxLen = 4096): string[] {
+    if (text.length <= maxLen) return [text];
+    const chunks: string[] = [];
+    let remaining = text;
+
+    while (remaining.length > maxLen) {
+      let splitAt = remaining.lastIndexOf("\n\n", maxLen);
+      if (splitAt < 1) splitAt = remaining.lastIndexOf("\n", maxLen);
+      if (splitAt < 1) splitAt = remaining.lastIndexOf(" ", maxLen);
+      if (splitAt < 1) splitAt = maxLen;
+
+      chunks.push(remaining.slice(0, splitAt).trim());
+      remaining = remaining.slice(splitAt).trim();
+    }
+
+    if (remaining.length > 0) chunks.push(remaining);
+    return chunks;
   }
 
   // ── Admin chat ────────────────────────────────────────────────────────────
@@ -80,23 +142,53 @@ export class NotificationsService {
 
   // ── Student chat ──────────────────────────────────────────────────────────
 
+  /**
+   * Posts a new "available request" announcement in the student chat.
+   * Uses a URL button linking to the web panel (no callback_data).
+   * Returns the Telegram message_id so it can be stored and later edited.
+   */
   async notifyStudentChatApproved(
     requestId: string,
     category: string,
     shortText: string
-  ) {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
-    await this.send(
-      this.studentChatId,
-      `📋 <b>Новое обращение доступно</b>\nКатегория: ${category}\n${shortText}\n\n<a href="${link}">Взять в работу →</a>`
-    );
+  ): Promise<number | null> {
+    const link = `${this.webPanelUrl}/tasks?take=${requestId}`;
+    const text = `📋 <b>Новое обращение доступно</b>\nКатегория: ${category}\n${shortText}`;
+    return this.sendWithResponse(this.studentChatId, text, {
+      inline_keyboard: [[{ text: "🔄 Взять в работу", url: link }]],
+    });
   }
 
-  async notifyStudentChatReturned(requestId: string) {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
-    await this.send(
+  /**
+   * Posts a "returned to queue" announcement in the student chat (fresh message
+   * with URL button). Returns the new message_id.
+   */
+  async notifyStudentChatReturned(
+    requestId: string,
+    category: string,
+    shortText: string
+  ): Promise<number | null> {
+    const link = `${this.webPanelUrl}/tasks?take=${requestId}`;
+    const text = `🔄 <b>Обращение возвращено в очередь</b>\nКатегория: ${category}\n${shortText}`;
+    return this.sendWithResponse(this.studentChatId, text, {
+      inline_keyboard: [[{ text: "🔄 Взять в работу", url: link }]],
+    });
+  }
+
+  /**
+   * Edits the student chat announcement after a student takes the request via web.
+   * Reconstructs the message text from the request data and adds "Взято: [name]".
+   */
+  async updateStudentChatTaken(
+    messageId: number,
+    category: string,
+    shortText: string,
+    studentName: string
+  ): Promise<void> {
+    await this.editMessage(
       this.studentChatId,
-      `🔄 Обращение возвращено в очередь\n\n<a href="${link}">Открыть →</a>`
+      messageId,
+      `📋 <b>Обращение взято в работу</b>\nКатегория: ${category}\n${shortText}\n\n✅ <b>Взято: ${studentName}</b>`
     );
   }
 
@@ -178,56 +270,44 @@ export class NotificationsService {
     reason: string
   ) {
     const prefixes: Record<string, string> = {
-      ru: "❌ Ваше обращение отклонено",
-      uz: "❌ Murojaatingiz rad etildi",
-      en: "❌ Your request has been rejected",
+      ru: "❌ Ваше обращение отклонено.\n\nПричина:",
+      uz: "❌ Murojaatingiz rad etildi.\n\nSabab:",
+      en: "❌ Your request has been declined.\n\nReason:",
     };
     const prefix = prefixes[language] || prefixes.ru;
-    await this.send(telegramId, `${prefix}\n\n${reason}`);
+    await this.send(telegramId, `${prefix} ${reason}`);
   }
 
+  /**
+   * Sends the final answer to the citizen.
+   * Automatically splits messages longer than 4096 characters (§7).
+   */
   async notifyUserAnswerReady(
     telegramId: string,
     language: string,
-    answer: string
+    answerText: string | null
   ) {
-    const prefixes: Record<string, string> = {
-      ru: "📨 Ваш ответ готов:",
-      uz: "📨 Javobingiz tayyor:",
-      en: "📨 Your answer is ready:",
+    if (!answerText) return;
+
+    const headers: Record<string, string> = {
+      ru: "✅ Ваш вопрос рассмотрен. Ответ юридической клиники:\n\n",
+      uz: "✅ Savolingiz ko'rib chiqildi. Huquqiy klinika javobi:\n\n",
+      en: "✅ Your question has been reviewed. Legal Clinic answer:\n\n",
     };
-    const prefix = prefixes[language] || prefixes.ru;
-    // Split long messages at paragraph boundaries (Telegram 4096 char limit)
-    const parts = splitMessage(`${prefix}\n\n${answer}`);
-    for (const part of parts) {
-      await this.send(telegramId, part);
+
+    const fullText = (headers[language] || headers.ru) + answerText;
+    const parts = this.splitMessage(fullText);
+
+    for (let i = 0; i < parts.length; i++) {
+      await this.send(telegramId, parts[i]);
       // Small delay between parts to preserve order
-      await new Promise((r) => setTimeout(r, 300));
+      if (i < parts.length - 1) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
     }
   }
 
   async notifyUserDirectMessage(telegramId: string, text: string) {
     await this.send(telegramId, text);
   }
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-const MAX_LEN = 4096;
-
-function splitMessage(text: string): string[] {
-  if (text.length <= MAX_LEN) return [text];
-  const parts: string[] = [];
-  let remaining = text;
-
-  while (remaining.length > MAX_LEN) {
-    let cutAt = remaining.lastIndexOf("\n\n", MAX_LEN);
-    if (cutAt <= 0) cutAt = remaining.lastIndexOf("\n", MAX_LEN);
-    if (cutAt <= 0) cutAt = remaining.lastIndexOf(" ", MAX_LEN);
-    if (cutAt <= 0) cutAt = MAX_LEN; // hard cut — last resort
-    parts.push(remaining.slice(0, cutAt));
-    remaining = remaining.slice(cutAt).trimStart();
-  }
-  if (remaining.length > 0) parts.push(remaining);
-  return parts;
 }

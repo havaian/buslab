@@ -1,0 +1,620 @@
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import { Bot, InlineKeyboard, Keyboard } from "grammy";
+import { BotContext } from "./context.type";
+import { UserState, AdminState } from "./states.type";
+import { CB, CBRegex, STUDENT_CHAT_PREVIEW_LENGTH } from "./bot.constants";
+import { BotI18nService } from "./bot-i18n.service";
+import { SubmitRequestConversation } from "./conversations/submit-request.conversation";
+import { RequestsService } from "../requests/requests.service";
+import { User, UserDocument } from "../users/schemas/user.schema";
+import { Faq, FaqDocument } from "../faq/schemas/faq.schema";
+
+@Injectable()
+export class BotUpdate {
+  private readonly logger = new Logger(BotUpdate.name);
+
+  // In-memory state maps keyed by Telegram user ID (number)
+  private readonly userStates = new Map<number, UserState>();
+  private readonly adminStates = new Map<number, AdminState>();
+
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(Faq.name) private readonly faqModel: Model<FaqDocument>,
+    private readonly requestsService: RequestsService,
+    private readonly i18n: BotI18nService,
+    private readonly submitRequest: SubmitRequestConversation
+  ) {}
+
+  // ── Registration ────────────────────────────────────────────────────────
+
+  /** Called by BotService.onModuleInit() — registers all handlers on the bot instance. */
+  register(bot: Bot<BotContext>): void {
+    // Commands
+    bot.command("start", (ctx) => this.handleStart(ctx));
+
+    // Onboarding
+    bot.callbackQuery(CBRegex.ONBOARD_LANG, (ctx) =>
+      this.handleOnboardLang(ctx)
+    );
+    bot.callbackQuery(CB.OFFER_ACCEPT, (ctx) => this.handleOfferAccept(ctx));
+    bot.callbackQuery(CB.OFFER_DECLINE, (ctx) => this.handleOfferDecline(ctx));
+
+    // Language
+    bot.callbackQuery(CBRegex.LANG, (ctx) => this.handleLangChange(ctx));
+
+    // FAQ
+    bot.callbackQuery(CBRegex.FAQ_CAT, (ctx) => this.handleFaqCategory(ctx));
+    bot.callbackQuery(CBRegex.FAQ_ITEM, (ctx) => this.handleFaqItem(ctx));
+
+    // Admin moderation callbacks
+    bot.callbackQuery(CBRegex.APPROVE_REQUEST, (ctx) =>
+      this.handleApproveRequest(ctx)
+    );
+    bot.callbackQuery(CBRegex.DECLINE_REQUEST, (ctx) =>
+      this.handleDeclineRequestInit(ctx)
+    );
+    bot.callbackQuery(CBRegex.APPROVE_ANSWER, (ctx) =>
+      this.handleApproveAnswer(ctx)
+    );
+    bot.callbackQuery(CBRegex.DECLINE_ANSWER, (ctx) =>
+      this.handleDeclineAnswerInit(ctx)
+    );
+
+    // All text messages
+    bot.on("message:text", (ctx) => this.handleText(ctx));
+
+    this.logger.log("All handlers registered");
+  }
+
+  // ── /start ──────────────────────────────────────────────────────────────
+
+  private async handleStart(ctx: BotContext): Promise<void> {
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    const studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
+    const chatId = ctx.chat?.id?.toString();
+
+    if (chatId === adminChatId || chatId === studentChatId) {
+      await ctx.reply("Бот запущен.");
+      return;
+    }
+
+    if (!ctx.from) return;
+    const user = await this.getOrCreate(ctx);
+
+    if (!user.offerAccepted) {
+      await this.sendOnboarding(ctx);
+      return;
+    }
+
+    await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
+      reply_markup: this.mainMenuKb(ctx),
+    });
+  }
+
+  private async sendOnboarding(ctx: BotContext): Promise<void> {
+    const kb = new InlineKeyboard()
+      .text("🇷🇺 Русский", `${CB.ONBOARD_LANG}:ru`)
+      .row()
+      .text("🇺🇿 O'zbek", `${CB.ONBOARD_LANG}:uz`)
+      .row()
+      .text("🇺🇸 English", `${CB.ONBOARD_LANG}:en`);
+
+    await ctx.reply(
+      "🇷🇺 Добро пожаловать! Выберите язык.\n\n" +
+        "🇺🇿 Xush kelibsiz! Tilni tanlang.\n\n" +
+        "🇺🇸 Welcome! Choose your language.",
+      { reply_markup: kb }
+    );
+  }
+
+  // ── Onboarding callbacks ─────────────────────────────────────────────────
+
+  private async handleOnboardLang(ctx: BotContext): Promise<void> {
+    const locale = ctx.match![1];
+    if (!ctx.from) return;
+
+    await this.userModel.updateOne(
+      { telegramId: ctx.from.id },
+      { language: locale }
+    );
+    ctx.locale = locale;
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(this.t(ctx, "language.changed"), {
+      reply_markup: { inline_keyboard: [] },
+    });
+
+    const offerKb = new InlineKeyboard()
+      .text(this.t(ctx, "onboarding.accept"), CB.OFFER_ACCEPT)
+      .text(this.t(ctx, "onboarding.decline"), CB.OFFER_DECLINE);
+
+    await ctx.reply(this.t(ctx, "onboarding.offer_text"), {
+      parse_mode: "Markdown",
+      reply_markup: offerKb,
+      // @ts-ignore — Grammy passes through API fields
+      disable_web_page_preview: true,
+    });
+  }
+
+  private async handleOfferAccept(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+
+    await this.userModel.updateOne(
+      { telegramId: ctx.from.id },
+      { offerAccepted: true }
+    );
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(this.t(ctx, "onboarding.offer_accepted"), {
+      reply_markup: { inline_keyboard: [] },
+    });
+    await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
+      reply_markup: this.mainMenuKb(ctx),
+    });
+  }
+
+  private async handleOfferDecline(ctx: BotContext): Promise<void> {
+    await ctx.answerCallbackQuery();
+
+    const offerKb = new InlineKeyboard()
+      .text(this.t(ctx, "onboarding.accept"), CB.OFFER_ACCEPT)
+      .text(this.t(ctx, "onboarding.decline"), CB.OFFER_DECLINE);
+
+    await ctx.editMessageText(this.t(ctx, "onboarding.offer_declined"), {
+      parse_mode: "Markdown",
+      reply_markup: offerKb,
+      // @ts-ignore
+      disable_web_page_preview: true,
+    });
+  }
+
+  // ── Language change ──────────────────────────────────────────────────────
+
+  private async handleLangChange(ctx: BotContext): Promise<void> {
+    const locale = ctx.match![1];
+    if (!ctx.from) return;
+
+    await this.userModel.updateOne(
+      { telegramId: ctx.from.id },
+      { language: locale }
+    );
+    ctx.locale = locale;
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(this.t(ctx, "language.changed"), {
+      reply_markup: { inline_keyboard: [] },
+    });
+    await ctx.reply(this.t(ctx, "lists.select_action"), {
+      reply_markup: this.mainMenuKb(ctx),
+    });
+  }
+
+  // ── FAQ ──────────────────────────────────────────────────────────────────
+
+  private async handleFaqCategory(ctx: BotContext): Promise<void> {
+    const categoryId = ctx.match![1];
+    const faqs = await this.faqModel.find({ categoryId }).lean();
+
+    await ctx.answerCallbackQuery();
+
+    if (!faqs.length) {
+      await ctx.reply(this.t(ctx, "errors.no_categories"));
+      return;
+    }
+
+    const kb = new InlineKeyboard();
+    for (const faq of faqs) {
+      kb.text(faq.question.slice(0, 64), `${CB.FAQ_ITEM}:${faq._id}`).row();
+    }
+
+    await ctx.reply(this.t(ctx, "prompts.select_faq_question"), {
+      reply_markup: kb,
+    });
+  }
+
+  private async handleFaqItem(ctx: BotContext): Promise<void> {
+    const faqId = ctx.match![1];
+    const faq = await this.faqModel.findById(faqId).lean();
+
+    await ctx.answerCallbackQuery();
+
+    if (!faq) {
+      await ctx.reply(this.t(ctx, "errors.not_found"));
+      return;
+    }
+
+    await ctx.reply(`❓ ${faq.question}\n\n💬 ${faq.answer}`);
+    await ctx.reply(this.t(ctx, "lists.select_action"), {
+      reply_markup: this.mainMenuKb(ctx),
+    });
+  }
+
+  // ── Admin: approve / decline request ────────────────────────────────────
+
+  private async handleApproveRequest(ctx: BotContext): Promise<void> {
+    const requestId = ctx.match![1];
+    try {
+      await this.requestsService.approve(requestId);
+      await ctx.answerCallbackQuery("✅ Одобрено");
+      await ctx.editMessageText(
+        this.originalText(ctx) + "\n\n✅ <b>Одобрено</b>",
+        { parse_mode: "HTML", reply_markup: { inline_keyboard: [] } }
+      );
+    } catch (e) {
+      await ctx.answerCallbackQuery(`Ошибка: ${(e as Error).message}`);
+    }
+  }
+
+  private async handleDeclineRequestInit(ctx: BotContext): Promise<void> {
+    const requestId = ctx.match![1];
+    if (!ctx.from) return;
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(
+      this.originalText(ctx) + "\n\n⏳ Введите причину отклонения...",
+      { parse_mode: "HTML", reply_markup: { inline_keyboard: [] } }
+    );
+
+    const prompt = await ctx.reply(
+      `Введите причину отклонения обращения #${requestId}:`
+    );
+
+    this.adminStates.set(ctx.from.id, {
+      state: "entering_decline_reason",
+      requestId,
+      promptMessageId: prompt.message_id,
+    });
+  }
+
+  // ── Admin: approve / decline answer ─────────────────────────────────────
+
+  private async handleApproveAnswer(ctx: BotContext): Promise<void> {
+    const requestId = ctx.match![1];
+    try {
+      await this.requestsService.approveAnswer(requestId);
+      await ctx.answerCallbackQuery("✅ Ответ одобрен и отправлен");
+      await ctx.editMessageText(
+        this.originalText(ctx) + "\n\n✅ <b>Ответ одобрен</b>",
+        { parse_mode: "HTML", reply_markup: { inline_keyboard: [] } }
+      );
+    } catch (e) {
+      await ctx.answerCallbackQuery(`Ошибка: ${(e as Error).message}`);
+    }
+  }
+
+  private async handleDeclineAnswerInit(ctx: BotContext): Promise<void> {
+    const requestId = ctx.match![1];
+    if (!ctx.from) return;
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageText(
+      this.originalText(ctx) + "\n\n⏳ Введите комментарий для студента...",
+      { parse_mode: "HTML", reply_markup: { inline_keyboard: [] } }
+    );
+
+    const prompt = await ctx.reply(
+      `Введите комментарий для студента по обращению #${requestId}:`
+    );
+
+    this.adminStates.set(ctx.from.id, {
+      state: "entering_answer_decline_reason",
+      requestId,
+      promptMessageId: prompt.message_id,
+    });
+  }
+
+  // ── Text message router ──────────────────────────────────────────────────
+
+  private async handleText(ctx: BotContext): Promise<void> {
+    if (!ctx.from || !ctx.message?.text) return;
+
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    const studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
+    const chatId = ctx.chat?.id?.toString();
+    const text = ctx.message.text;
+
+    // ── Admin group chat ─────────────────────────────────────────────────
+    if (chatId === adminChatId) {
+      const adminState = this.adminStates.get(ctx.from.id);
+      if (adminState?.state === "entering_decline_reason") {
+        return this.handleDeclineReasonText(ctx, adminState.requestId);
+      }
+      if (adminState?.state === "entering_answer_decline_reason") {
+        return this.handleDeclineAnswerReasonText(ctx, adminState.requestId);
+      }
+      return;
+    }
+
+    // ── Student group chat: ignore all messages ──────────────────────────
+    if (chatId === studentChatId) return;
+
+    // ── Private chat ─────────────────────────────────────────────────────
+
+    // Offer guard — all non-command messages require accepted offer
+    if (!text.startsWith("/")) {
+      const dbUser = await this.userModel
+        .findOne({ telegramId: ctx.from.id })
+        .select("offerAccepted")
+        .lean();
+      if (!dbUser?.offerAccepted) {
+        await ctx.reply(this.t(ctx, "onboarding.offer_required"));
+        return;
+      }
+    }
+
+    const userState = this.userStates.get(ctx.from.id);
+
+    // ── Back button ──────────────────────────────────────────────────────
+    if (text === this.t(ctx, "buttons.back")) {
+      this.userStates.delete(ctx.from.id);
+      await ctx.reply(this.t(ctx, "lists.select_action"), {
+        reply_markup: this.mainMenuKb(ctx),
+      });
+      return;
+    }
+
+    // ── Submit request conversation ───────────────────────────────────────
+
+    if (text === this.t(ctx, "buttons.ask_question")) {
+      await this.submitRequest.start(ctx, this.userStates);
+      return;
+    }
+
+    if (userState?.state === "selecting_category") {
+      await this.submitRequest.onCategorySelected(ctx, text, this.userStates);
+      return;
+    }
+
+    if (userState?.state === "entering_request") {
+      await this.submitRequest.onRequestText(
+        ctx,
+        text,
+        userState,
+        this.userStates
+      );
+      return;
+    }
+
+    if (userState?.state === "confirming_request") {
+      if (text === this.t(ctx, "buttons.confirm")) {
+        const user = await this.getOrCreate(ctx);
+        await this.submitRequest.onConfirm(
+          ctx,
+          userState,
+          user._id as any,
+          this.userStates,
+          () => this.mainMenuKb(ctx)
+        );
+        return;
+      }
+      if (text === this.t(ctx, "buttons.edit")) {
+        await this.submitRequest.onEdit(ctx, userState, this.userStates);
+        return;
+      }
+    }
+
+    // ── Other main menu buttons ───────────────────────────────────────────
+
+    if (text === this.t(ctx, "buttons.my_requests")) {
+      await this.handleMyRequests(ctx);
+      return;
+    }
+
+    if (
+      text === this.t(ctx, "buttons.help") ||
+      text === "❓ Help" ||
+      text === "❓ Yordam"
+    ) {
+      await this.handleHelp(ctx);
+      return;
+    }
+
+    if (text === "🌐 Language") {
+      await this.handleLanguageMenu(ctx);
+      return;
+    }
+
+    // ── FAQ text-based category selection ─────────────────────────────────
+    if (userState?.state === "selecting_faq_category") {
+      await this.handleFaqCategoryByName(ctx, text);
+      return;
+    }
+
+    // Fallback
+    await ctx.reply(this.t(ctx, "lists.select_action"), {
+      reply_markup: this.mainMenuKb(ctx),
+    });
+  }
+
+  // ── Admin text state completions ─────────────────────────────────────────
+
+  private async handleDeclineReasonText(
+    ctx: BotContext,
+    requestId: string
+  ): Promise<void> {
+    if (!ctx.from || !ctx.message?.text) return;
+    const reason = ctx.message.text;
+    this.adminStates.delete(ctx.from.id);
+
+    try {
+      await this.requestsService.reject(requestId, reason);
+      await ctx.reply(
+        `✅ Обращение #${requestId} отклонено.\nПричина: ${reason}`
+      );
+    } catch (e) {
+      await ctx.reply(`❌ Ошибка: ${(e as Error).message}`);
+    }
+  }
+
+  private async handleDeclineAnswerReasonText(
+    ctx: BotContext,
+    requestId: string
+  ): Promise<void> {
+    if (!ctx.from || !ctx.message?.text) return;
+    const comment = ctx.message.text;
+    this.adminStates.delete(ctx.from.id);
+
+    try {
+      await this.requestsService.rejectAnswer(requestId, comment);
+      await ctx.reply(
+        `✅ Ответ по обращению #${requestId} возвращён на доработку.\nКомментарий студенту: ${comment}`
+      );
+    } catch (e) {
+      await ctx.reply(`❌ Ошибка: ${(e as Error).message}`);
+    }
+  }
+
+  // ── Citizen: my requests ──────────────────────────────────────────────────
+
+  private async handleMyRequests(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+    const user = await this.getOrCreate(ctx);
+
+    const mongoose = await import("mongoose");
+    const requests = await mongoose.default
+      .model("Request")
+      .find({ userId: user._id })
+      .sort({ createdAt: -1 })
+      .populate("categoryId", "name")
+      .lean();
+
+    if (!requests.length) {
+      await ctx.reply(this.t(ctx, "lists.no_requests"), {
+        reply_markup: this.mainMenuKb(ctx),
+      });
+      return;
+    }
+
+    let message = this.t(ctx, "lists.my_requests_title") + "\n\n";
+
+    for (let i = 0; i < requests.length; i++) {
+      const req = requests[i] as any;
+      const date = new Date(req.createdAt).toLocaleDateString("ru-RU");
+      const cat = req.categoryId?.name ?? "—";
+      const status = this.t(ctx, `statuses.${req.status}`);
+
+      message += `${i + 1}. ${cat} — ${status}\n`;
+      message += `   ${this.t(ctx, "lists.request_date")} ${date}\n`;
+
+      if (req.status === "closed" && req.finalAnswerText) {
+        const preview = req.finalAnswerText.slice(0, 150);
+        const suffix = req.finalAnswerText.length > 150 ? "..." : "";
+        message += `   ${this.t(
+          ctx,
+          "lists.answer_label"
+        )} ${preview}${suffix}\n`;
+      }
+
+      if (req.status === "declined" && req.declineReason) {
+        message += `   ${this.t(ctx, "lists.comment_label")} ${
+          req.declineReason
+        }\n`;
+      }
+
+      message += "\n";
+    }
+
+    await ctx.reply(message, { reply_markup: this.mainMenuKb(ctx) });
+  }
+
+  // ── Citizen: help & language ──────────────────────────────────────────────
+
+  private async handleHelp(ctx: BotContext): Promise<void> {
+    await ctx.reply(this.t(ctx, "help.user"), {
+      parse_mode: "Markdown",
+      // @ts-ignore
+      disable_web_page_preview: true,
+      reply_markup: this.mainMenuKb(ctx),
+    });
+  }
+
+  private async handleLanguageMenu(ctx: BotContext): Promise<void> {
+    const kb = new InlineKeyboard()
+      .text("🇷🇺 Русский", `${CB.LANG}:ru`)
+      .row()
+      .text("🇺🇿 O'zbek", `${CB.LANG}:uz`)
+      .row()
+      .text("🇺🇸 English", `${CB.LANG}:en`);
+
+    await ctx.reply(this.t(ctx, "language.select"), { reply_markup: kb });
+  }
+
+  private async handleFaqCategoryByName(
+    ctx: BotContext,
+    categoryName: string
+  ): Promise<void> {
+    if (!ctx.from) return;
+    const mongoose = await import("mongoose");
+    const category = await mongoose.default
+      .model("Category")
+      .findOne({ name: categoryName })
+      .lean();
+
+    if (!category) {
+      await ctx.reply(this.t(ctx, "errors.category_not_found"));
+      return;
+    }
+
+    const faqs = await this.faqModel
+      .find({ categoryId: (category as any)._id })
+      .lean();
+
+    if (!faqs.length) {
+      await ctx.reply(this.t(ctx, "errors.no_categories"));
+      return;
+    }
+
+    const kb = new InlineKeyboard();
+    for (const faq of faqs) {
+      kb.text(faq.question.slice(0, 64), `${CB.FAQ_ITEM}:${faq._id}`).row();
+    }
+
+    this.userStates.delete(ctx.from.id);
+    await ctx.reply(this.t(ctx, "prompts.select_faq_question"), {
+      reply_markup: kb,
+    });
+  }
+
+  // ── Shared helpers ────────────────────────────────────────────────────────
+
+  private t(
+    ctx: BotContext,
+    key: string,
+    vars?: Record<string, string | number>
+  ): string {
+    return this.i18n.t(ctx.locale, key, vars);
+  }
+
+  private async getOrCreate(ctx: BotContext): Promise<UserDocument> {
+    if (!ctx.from) throw new Error("No from in context");
+    let user = await this.userModel.findOne({ telegramId: ctx.from.id });
+    if (!user) {
+      user = await this.userModel.create({
+        telegramId: ctx.from.id,
+        firstName: ctx.from.first_name ?? "",
+        lastName: ctx.from.last_name ?? "",
+        username: ctx.from.username ?? "",
+        language: ctx.locale || "ru",
+      });
+    }
+    return user;
+  }
+
+  mainMenuKb(ctx: BotContext) {
+    return new Keyboard()
+      .text(this.t(ctx, "buttons.ask_question"))
+      .row()
+      .text(this.t(ctx, "buttons.my_requests"))
+      .row()
+      .text(this.t(ctx, "buttons.help"))
+      .text("🌐 Language")
+      .resized();
+  }
+
+  /** Safely extracts the original text from a callback query message. */
+  private originalText(ctx: BotContext): string {
+    return (ctx.callbackQuery?.message as any)?.text ?? "";
+  }
+}

@@ -36,7 +36,7 @@ export class Request {
   @Prop({ default: null, type: Number })
   studentChatMessageId: number | null;
 
-  // Extended fields for web panel (not in bot schema, added by panel)
+  // Extended fields for web panel (not in original bot schema)
   @Prop({ default: null })
   declineReason: string | null;
 
@@ -51,6 +51,30 @@ export class Request {
 
   @Prop({ default: false })
   timerExpiredNotified: boolean;
+
+  /** Files attached to the student's answer (uploaded via web panel). */
+  @Prop({
+    type: [
+      {
+        filename: String,
+        originalName: String,
+        mimetype: String,
+        size: Number,
+        // ref = stored filename on disk (used by /api/files/:ref)
+        ref: String,
+        source: { type: String, default: "web" },
+      },
+    ],
+    default: [],
+  })
+  answerFiles: {
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    size: number;
+    ref: string;
+    source: string;
+  }[];
 }
 
 export const RequestSchema = SchemaFactory.createForClass(Request);

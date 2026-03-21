@@ -126,8 +126,8 @@ export class RequestsController {
 
   // ── Student ──────────────────────────────────────────────────────────────
 
-  // NOTE: these static sub-routes must come BEFORE :id to avoid Express
-  // matching "student" as a request id
+  // NOTE: static sub-routes MUST come before :id to avoid Express treating
+  // "student" as a request id
   @UseGuards(RolesGuard)
   @Roles(UserRole.STUDENT)
   @Get("student/available")
@@ -159,7 +159,7 @@ export class RequestsController {
     @Body("answer") answer: string,
     @UploadedFiles() files?: Express.Multer.File[]
   ) {
-    return this.requestsService.submitAnswer(id, user.sub, answer);
+    return this.requestsService.submitAnswer(id, user.sub, answer, files);
   }
 
   @UseGuards(RolesGuard)

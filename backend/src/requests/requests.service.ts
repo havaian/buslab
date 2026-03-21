@@ -57,13 +57,11 @@ export class RequestsService {
       if (dateTo) query.createdAt.$lte = new Date(dateTo);
     }
 
-    // Search: text, or by user/student name/username (requires lookup)
     if (search) {
       const isObjectId = /^[a-f\d]{24}$/i.test(search);
       if (isObjectId) {
         query._id = new Types.ObjectId(search);
       } else {
-        // Find matching users first
         const matchingUsers = await this.userModel
           .find({
             $or: [
@@ -125,15 +123,17 @@ export class RequestsService {
       .lean();
   }
 
-  // ── ADMIN ACTIONS ────────────────────────────────────────────────────────
+  // ── ADMIN ACTIONS ─────────────────────────────────────────────────────────
 
   async approve(requestId: string) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("userId", "telegramId language firstName");
+      .populate("userId", "telegramId language firstName")
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "pending")
       throw new BadRequestException("Request is not pending");
+
     req.status = "approved";
     await req.save();
 
@@ -144,12 +144,21 @@ export class RequestsService {
         user.language || "ru"
       );
     }
+
     const cat = req.categoryId as any;
-    await this.notifications.notifyStudentChatApproved(
+    // Send to student chat with URL button — save returned message_id
+    const messageId = await this.notifications.notifyStudentChatApproved(
       requestId,
       cat?.name || "",
       req.text.slice(0, 100)
     );
+    if (messageId) {
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { studentChatMessageId: messageId }
+      );
+    }
+
     return req;
   }
 
@@ -160,6 +169,7 @@ export class RequestsService {
     if (!req) throw new NotFoundException();
     if (req.status !== "pending")
       throw new BadRequestException("Request is not pending");
+
     req.status = "declined";
     req.declineReason = reason;
     await req.save();
@@ -176,7 +186,9 @@ export class RequestsService {
   }
 
   async assignStudent(requestId: string, studentId: string) {
-    const req = await this.requestModel.findById(requestId);
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "approved")
       throw new BadRequestException("Request must be approved");
@@ -211,6 +223,21 @@ export class RequestsService {
       requestId: req._id,
     });
 
+    // Edit student chat message to mark as taken
+    if (req.studentChatMessageId) {
+      const cat = req.categoryId as any;
+      await this.notifications.updateStudentChatTaken(
+        req.studentChatMessageId,
+        cat?.name || "",
+        req.text.slice(0, 100),
+        `${student.firstName} ${student.lastName || ""}`.trim()
+      );
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { studentChatMessageId: null }
+      );
+    }
+
     await this.notifications.notifyStudentAssigned(
       String(student.telegramId),
       requestId,
@@ -222,7 +249,8 @@ export class RequestsService {
   async unassign(requestId: string) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("studentId");
+      .populate("studentId")
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "assigned")
       throw new BadRequestException("Request is not assigned");
@@ -252,14 +280,28 @@ export class RequestsService {
     req.timerExpiredNotified = false;
     await req.save();
 
-    await this.notifications.notifyStudentChatReturned(requestId);
+    // Republish to student chat with a fresh URL-button announcement
+    const cat = req.categoryId as any;
+    const messageId = await this.notifications.notifyStudentChatReturned(
+      requestId,
+      cat?.name || "",
+      req.text.slice(0, 100)
+    );
+    if (messageId) {
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { studentChatMessageId: messageId }
+      );
+    }
+
     return req;
   }
 
   async returnToQueue(requestId: string) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("studentId");
+      .populate("studentId")
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
 
     const student = req.studentId as any;
@@ -290,7 +332,20 @@ export class RequestsService {
     req.adminComment = null;
     await req.save();
 
-    await this.notifications.notifyStudentChatReturned(requestId);
+    // Republish to student chat with a fresh URL-button announcement
+    const cat = req.categoryId as any;
+    const messageId = await this.notifications.notifyStudentChatReturned(
+      requestId,
+      cat?.name || "",
+      req.text.slice(0, 100)
+    );
+    if (messageId) {
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { studentChatMessageId: messageId }
+      );
+    }
+
     return req;
   }
 
@@ -380,10 +435,12 @@ export class RequestsService {
     return { sent: true };
   }
 
-  // ── STUDENT ACTIONS ──────────────────────────────────────────────────────
+  // ── STUDENT ACTIONS ───────────────────────────────────────────────────────
 
   async takeRequest(requestId: string, studentId: string) {
-    const req = await this.requestModel.findById(requestId);
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "approved")
       throw new BadRequestException("Request is not available");
@@ -415,6 +472,23 @@ export class RequestsService {
       action: StudentAction.TOOK_REQUEST,
       requestId: req._id,
     });
+
+    // Edit the student chat announcement to mark as taken + remove the button
+    if (req.studentChatMessageId) {
+      const cat = req.categoryId as any;
+      await this.notifications.updateStudentChatTaken(
+        req.studentChatMessageId,
+        cat?.name || "",
+        req.text.slice(0, 100),
+        `${student.firstName} ${student.lastName || ""}`.trim()
+      );
+      // Clear the stored message_id — message has been edited, no longer "active"
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { studentChatMessageId: null }
+      );
+    }
+
     return req;
   }
 
@@ -422,7 +496,7 @@ export class RequestsService {
     requestId: string,
     studentId: string,
     answer: string,
-    files?: any[]
+    files?: Express.Multer.File[]
   ) {
     const req = await this.requestModel.findById(requestId);
     if (!req) throw new NotFoundException();
@@ -437,6 +511,18 @@ export class RequestsService {
 
     req.status = "answered";
     req.answerText = answer;
+
+    if (files?.length) {
+      req.answerFiles = files.map((f) => ({
+        filename: f.filename,
+        originalName: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size,
+        ref: f.filename,
+        source: "web",
+      }));
+    }
+
     await req.save();
 
     await this.studentLogModel.create({
@@ -457,7 +543,9 @@ export class RequestsService {
   }
 
   async declineRequest(requestId: string, studentId: string) {
-    const req = await this.requestModel.findById(requestId);
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "assigned")
       throw new BadRequestException("Request is not assigned");
@@ -488,7 +576,21 @@ export class RequestsService {
       requestId,
       student ? `${student.firstName} ${student.lastName}`.trim() : ""
     );
-    await this.notifications.notifyStudentChatReturned(requestId);
+
+    // Republish to student chat so other students can take it
+    const cat = req.categoryId as any;
+    const messageId = await this.notifications.notifyStudentChatReturned(
+      requestId,
+      cat?.name || "",
+      req.text.slice(0, 100)
+    );
+    if (messageId) {
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { studentChatMessageId: messageId }
+      );
+    }
+
     return req;
   }
 }
