@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { MongooseModule } from "@nestjs/mongoose";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ServeStaticModule } from "@nestjs/serve-static";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { join } from "path";
 
 import { AuthModule } from "./auth/auth.module";
@@ -26,6 +27,12 @@ import { BotModule } from "./bot/bot.module";
         process.env.MONGO_URI ||
         "mongodb://localhost:27017/legal_clinic"
     ),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 10,
+      },
+    ]),
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), "uploads"),
