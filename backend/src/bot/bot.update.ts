@@ -67,6 +67,10 @@ export class BotUpdate {
     // All text messages
     bot.on("message:text", (ctx) => this.handleText(ctx));
 
+    // Citizen file attachments (only in private chat, attaching_files state)
+    bot.on("message:photo", (ctx) => this.handleMediaMessage(ctx));
+    bot.on("message:document", (ctx) => this.handleMediaMessage(ctx));
+
     this.logger.log("All handlers registered");
   }
 
@@ -407,6 +411,26 @@ export class BotUpdate {
       return;
     }
 
+    // ── Attaching files step ──────────────────────────────────────────────
+    if (userState?.state === "attaching_files") {
+      const continueLabel = this.submitRequest.getContinueLabel(
+        ctx.locale || "ru"
+      );
+      if (text === continueLabel || text === this.t(ctx, "buttons.confirm")) {
+        await this.submitRequest.onContinue(ctx, userState, this.userStates);
+        return;
+      }
+      // Any other text while in this state — remind to continue
+      await ctx.reply("Отправьте файл или нажмите кнопку «Продолжить».", {
+        reply_markup: new Keyboard()
+          .text(continueLabel)
+          .row()
+          .text(this.t(ctx, "buttons.back"))
+          .resized(),
+      });
+      return;
+    }
+
     if (userState?.state === "confirming_request") {
       if (text === this.t(ctx, "buttons.confirm")) {
         const user = await this.getOrCreate(ctx);
@@ -456,6 +480,24 @@ export class BotUpdate {
     await ctx.reply(this.t(ctx, "lists.select_action"), {
       reply_markup: this.mainMenuKb(ctx),
     });
+  }
+
+  // ── Media messages (photo / document) ───────────────────────────────────
+
+  private async handleMediaMessage(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    const studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
+    const chatId = ctx.chat?.id?.toString();
+
+    // Only handle in private chats
+    if (chatId === adminChatId || chatId === studentChatId) return;
+
+    const userState = this.userStates.get(ctx.from.id);
+    if (userState?.state === "attaching_files") {
+      await this.submitRequest.onFileReceived(ctx, userState, this.userStates);
+    }
   }
 
   // ── Admin text state completions ─────────────────────────────────────────

@@ -305,11 +305,13 @@ export class NotificationsService implements OnModuleInit {
   /**
    * Sends the final answer to the citizen.
    * Automatically splits messages longer than 4096 characters (§7).
+   * Sends attached files (answerFiles) after the text.
    */
   async notifyUserAnswerReady(
     telegramId: string,
     language: string,
-    answerText: string | null
+    answerText: string | null,
+    answerFiles?: { ref: string; originalName: string; source: string }[]
   ) {
     if (!answerText) return;
 
@@ -324,10 +326,61 @@ export class NotificationsService implements OnModuleInit {
 
     for (let i = 0; i < parts.length; i++) {
       await this.send(telegramId, parts[i]);
-      // Small delay between parts to preserve order
       if (i < parts.length - 1) {
         await new Promise((r) => setTimeout(r, 300));
       }
+    }
+
+    // Send attached files one by one
+    if (answerFiles?.length) {
+      for (const file of answerFiles) {
+        if (file.source === "web" && file.ref) {
+          await this.sendDocumentToUser(
+            telegramId,
+            file.ref,
+            file.originalName
+          );
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+    }
+  }
+
+  /** Reads a file from disk and sends it to the user via Telegram sendDocument. */
+  private async sendDocumentToUser(
+    chatId: string,
+    filename: string,
+    originalName: string
+  ): Promise<void> {
+    if (!this.token || !chatId) return;
+    try {
+      const { existsSync, readFileSync } = await import("fs");
+      const { join } = await import("path");
+      const filePath = join(process.cwd(), "uploads", filename);
+      if (!existsSync(filePath)) {
+        this.logger.warn(`sendDocumentToUser: file not found: ${filename}`);
+        return;
+      }
+
+      const fileBuffer = readFileSync(filePath);
+      const blob = new Blob([fileBuffer]);
+
+      const form = new FormData();
+      form.append("chat_id", chatId);
+      form.append("document", blob, originalName || filename);
+
+      const res = await fetch(`${TELEGRAM_API}/bot${this.token}/sendDocument`, {
+        method: "POST",
+        body: form,
+      });
+      const data = (await res.json()) as any;
+      if (!data.ok) {
+        this.logger.error(
+          `sendDocument failed for ${chatId}: [${data.error_code}] ${data.description}`
+        );
+      }
+    } catch (e) {
+      this.logger.error(`sendDocumentToUser error: ${e.message}`);
     }
   }
 

@@ -2,6 +2,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, Types } from "mongoose";
 import { Keyboard } from "grammy";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join, extname } from "path";
+import { v4 as uuidv4 } from "uuid";
 import { BotContext } from "../context.type";
 import { UserState } from "../states.type";
 import { BotI18nService } from "../bot-i18n.service";
@@ -15,19 +18,22 @@ import {
   STUDENT_CHAT_PREVIEW_LENGTH,
 } from "../bot.constants";
 
-/**
- * Handles the multi-step "submit a request" flow for citizens.
- *
- * State transitions:
- *   idle
- *     → selecting_category   (user presses "Задать вопрос")
- *     → entering_request     (user picks a category)
- *     → confirming_request   (user enters text ≥ 150 chars)
- *     → idle                 (user confirms → request created)
- *
- * The state map lives in BotUpdate and is passed by reference on every call
- * so this service stays stateless and NestJS-friendly.
- */
+type AttachingState = Extract<UserState, { state: "attaching_files" }>;
+type ConfirmingState = Extract<UserState, { state: "confirming_request" }>;
+
+const UPLOADS_DIR = join(process.cwd(), "uploads");
+
+const ATTACH_PROMPTS: Record<string, string> = {
+  ru: "📎 Хотите прикрепить документы или фотографии?\n\nОтправьте файлы (PDF, фото) или нажмите «Продолжить».",
+  uz: "📎 Hujjat yoki rasm biriktirmoqchimisiz?\n\nFayl yuboring (PDF, rasm) yoki «Davom etish» tugmasini bosing.",
+  en: "📎 Would you like to attach documents or photos?\n\nSend files (PDF, photos) or press «Continue».",
+};
+const CONTINUE_LABELS: Record<string, string> = {
+  ru: "✅ Продолжить",
+  uz: "✅ Davom etish",
+  en: "✅ Continue",
+};
+
 @Injectable()
 export class SubmitRequestConversation {
   private readonly logger = new Logger(SubmitRequestConversation.name);
@@ -49,7 +55,6 @@ export class SubmitRequestConversation {
 
   // ── Entry point ────────────────────────────────────────────────────────
 
-  /** Called when citizen presses "Задать вопрос". */
   async start(
     ctx: BotContext,
     userStates: Map<number, UserState>
@@ -62,13 +67,10 @@ export class SubmitRequestConversation {
     }
 
     const kb = new Keyboard();
-    for (const cat of categories) {
-      kb.text(cat.name).row();
-    }
+    for (const cat of categories) kb.text(cat.name).row();
     kb.text(this.t(ctx, "buttons.back"));
 
     userStates.set(ctx.from!.id, { state: "selecting_category" });
-
     await ctx.reply(this.t(ctx, "prompts.select_category"), {
       reply_markup: kb.resized(),
     });
@@ -76,7 +78,6 @@ export class SubmitRequestConversation {
 
   // ── Category selected ──────────────────────────────────────────────────
 
-  /** Called when user types a category name while in selecting_category. */
   async onCategorySelected(
     ctx: BotContext,
     categoryName: string,
@@ -104,7 +105,6 @@ export class SubmitRequestConversation {
 
   // ── Request text entered ───────────────────────────────────────────────
 
-  /** Called when user sends text while in entering_request. */
   async onRequestText(
     ctx: BotContext,
     text: string,
@@ -118,12 +118,127 @@ export class SubmitRequestConversation {
       return;
     }
 
+    // Move to file attachment step
+    userStates.set(ctx.from!.id, {
+      state: "attaching_files",
+      categoryId: state.categoryId,
+      categoryName: state.categoryName,
+      requestText: text,
+      requestFiles: [],
+    });
+
+    const locale = ctx.locale || "ru";
+    const continueLabel = CONTINUE_LABELS[locale] || CONTINUE_LABELS.ru;
+
+    const kb = new Keyboard()
+      .text(continueLabel)
+      .row()
+      .text(this.t(ctx, "buttons.back"))
+      .resized();
+
+    await ctx.reply(ATTACH_PROMPTS[locale] || ATTACH_PROMPTS.ru, {
+      reply_markup: kb,
+    });
+  }
+
+  // ── File received ──────────────────────────────────────────────────────
+
+  /**
+   * Called from bot.update.ts when a photo or document arrives in attaching_files state.
+   * Downloads the file via Grammy, saves to shared uploads dir, updates state.
+   */
+  async onFileReceived(
+    ctx: BotContext,
+    state: AttachingState,
+    userStates: Map<number, UserState>
+  ): Promise<void> {
+    let fileId: string;
+    let originalName: string;
+    let mimeType: string;
+
+    if (ctx.message?.document) {
+      fileId = ctx.message.document.file_id;
+      originalName = ctx.message.document.file_name || "document";
+      mimeType = ctx.message.document.mime_type || "application/octet-stream";
+    } else if (ctx.message?.photo) {
+      const largest = ctx.message.photo[ctx.message.photo.length - 1];
+      fileId = largest.file_id;
+      originalName = `photo_${Date.now()}.jpg`;
+      mimeType = "image/jpeg";
+    } else {
+      return;
+    }
+
+    try {
+      if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+
+      const file = await ctx.api.getFile(fileId);
+      const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error(`Telegram file fetch failed: ${res.status}`);
+
+      const buf = Buffer.from(await res.arrayBuffer());
+      const ext =
+        extname(originalName) || (mimeType === "image/jpeg" ? ".jpg" : "");
+      const filename = `${uuidv4()}${ext}`;
+      writeFileSync(join(UPLOADS_DIR, filename), buf);
+
+      const updatedFiles = [
+        ...state.requestFiles,
+        { fileId, originalName, mimeType },
+      ];
+
+      // Store filename in state as well so we can use it on save
+      // We'll use a side-channel: encode filename into originalName for now,
+      // or store as extra field (TypeScript won't complain since we cast)
+      const updatedState: any = {
+        ...state,
+        requestFiles: updatedFiles.map((f, i) =>
+          i === updatedFiles.length - 1
+            ? { ...f, savedFilename: filename }
+            : (state.requestFiles[i] as any)
+        ),
+      };
+      userStates.set(ctx.from!.id, updatedState);
+
+      const locale = ctx.locale || "ru";
+      const continueLabel = CONTINUE_LABELS[locale] || CONTINUE_LABELS.ru;
+      const kb = new Keyboard()
+        .text(continueLabel)
+        .row()
+        .text(this.t(ctx, "buttons.back"))
+        .resized();
+
+      const countMsg = {
+        ru: `✅ Файл прикреплён (${updatedFiles.length}). Можно отправить ещё или нажать «Продолжить».`,
+        uz: `✅ Fayl biriktirildi (${updatedFiles.length}). Yana yuboring yoki «Davom etish» tugmasini bosing.`,
+        en: `✅ File attached (${updatedFiles.length}). Send more or press «Continue».`,
+      };
+      await ctx.reply(countMsg[locale] || countMsg.ru, { reply_markup: kb });
+    } catch (err) {
+      this.logger.error("onFileReceived error:", err);
+      await ctx.reply("⚠️ Не удалось сохранить файл. Попробуйте ещё раз.");
+    }
+  }
+
+  // ── Continue (skip or after files) ────────────────────────────────────
+
+  async onContinue(
+    ctx: BotContext,
+    state: AttachingState,
+    userStates: Map<number, UserState>
+  ): Promise<void> {
     userStates.set(ctx.from!.id, {
       state: "confirming_request",
       categoryId: state.categoryId,
       categoryName: state.categoryName,
-      requestText: text,
+      requestText: state.requestText,
+      requestFiles: state.requestFiles,
     });
+
+    const filesSummary = (state.requestFiles as any[]).length
+      ? `\n\n📎 Прикреплено файлов: ${(state.requestFiles as any[]).length}`
+      : "";
 
     const confirmKb = new Keyboard()
       .text(this.t(ctx, "buttons.confirm"))
@@ -133,16 +248,19 @@ export class SubmitRequestConversation {
       .text(this.t(ctx, "buttons.back"))
       .resized();
 
-    await ctx.reply(`${this.t(ctx, "prompts.confirm_request")}\n\n${text}`, {
-      reply_markup: confirmKb,
-    });
+    await ctx.reply(
+      `${this.t(ctx, "prompts.confirm_request")}\n\n${
+        state.requestText
+      }${filesSummary}`,
+      { reply_markup: confirmKb }
+    );
   }
 
   // ── Edit: go back to entering text ────────────────────────────────────
 
   async onEdit(
     ctx: BotContext,
-    state: Extract<UserState, { state: "confirming_request" }>,
+    state: ConfirmingState,
     userStates: Map<number, UserState>
   ): Promise<void> {
     userStates.set(ctx.from!.id, {
@@ -158,13 +276,9 @@ export class SubmitRequestConversation {
 
   // ── Confirm: create request ───────────────────────────────────────────
 
-  /**
-   * Called when user presses "Подтвердить" in confirming_request.
-   * Creates the Request document directly via Mongoose and notifies admin chat.
-   */
   async onConfirm(
     ctx: BotContext,
-    state: Extract<UserState, { state: "confirming_request" }>,
+    state: ConfirmingState,
     userId: Types.ObjectId,
     userStates: Map<number, UserState>,
     mainMenuKeyboard: () => any
@@ -172,21 +286,34 @@ export class SubmitRequestConversation {
     userStates.delete(ctx.from!.id);
 
     try {
-      // Import at call-time to avoid circular NestJS module dependency
       const mongoose = await import("mongoose");
+
+      // Build requestFiles from saved filenames stored in state
+      const requestFiles = (state.requestFiles as any[]).map((f) => ({
+        filename: f.savedFilename || f.fileId,
+        originalName: f.originalName,
+        mimetype: f.mimeType,
+        size: 0,
+        ref: f.savedFilename || f.fileId,
+        source: "telegram",
+      }));
+
       const newRequest = await mongoose.default.model("Request").create({
         userId,
         categoryId: new mongoose.default.Types.ObjectId(state.categoryId),
         text: state.requestText,
         status: "pending",
+        requestFiles,
       });
 
-      // Notify admin chat — includes approve/decline inline buttons
-      // (those are handled by BotUpdate.handleApproveRequest / handleDeclineRequestInit)
+      const filesNote = requestFiles.length
+        ? `\n📎 Прикреплено файлов: ${requestFiles.length}`
+        : "";
+
       await this.notifications.notifyAdminNewRequest(
         String(newRequest._id),
         state.categoryName,
-        state.requestText.slice(0, STUDENT_CHAT_PREVIEW_LENGTH)
+        state.requestText.slice(0, STUDENT_CHAT_PREVIEW_LENGTH) + filesNote
       );
 
       await ctx.reply(this.t(ctx, "success.request_sent"), {
@@ -200,9 +327,14 @@ export class SubmitRequestConversation {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────
 
   private backKeyboard(ctx: BotContext) {
     return new Keyboard().text(this.t(ctx, "buttons.back")).resized();
+  }
+
+  /** Returns the continue button label for the user's locale. */
+  getContinueLabel(locale: string): string {
+    return CONTINUE_LABELS[locale] || CONTINUE_LABELS.ru;
   }
 }

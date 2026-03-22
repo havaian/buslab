@@ -544,7 +544,8 @@ export class RequestsService {
       await this.notifications.notifyUserAnswerReady(
         String(user.telegramId),
         user.language || "ru",
-        req.finalAnswerText
+        req.finalAnswerText,
+        req.answerFiles ?? []
       );
 
     return req;
