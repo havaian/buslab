@@ -121,12 +121,12 @@ export default function RequestDetailPage() {
         </Button>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* ── Left: main content ─────────────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-3">
           {/* Request text */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2 pt-3 px-4">
               <div className="flex items-center gap-3 flex-wrap">
                 <StatusBadge status={request.status} />
                 <span className="text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ export default function RequestDetailPage() {
                 </span>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-3 pt-0">
               <p className="text-sm whitespace-pre-wrap leading-relaxed">
                 {request.text}
               </p>
@@ -149,14 +149,14 @@ export default function RequestDetailPage() {
           {/* Answer card — shown when answered or closed */}
           {(request.status === "answered" || request.status === "closed") && (
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-1 pt-3 px-4">
                 <CardTitle className="text-sm">
                   {request.status === "closed"
                     ? "Финальный ответ"
                     : "Ответ студента (на проверке)"}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="px-4 pb-3 pt-1 space-y-3">
                 {/* Editable textarea for admin to tweak before approving */}
                 {request.status === "answered" ? (
                   <>
@@ -215,16 +215,16 @@ export default function RequestDetailPage() {
         </div>
 
         {/* ── Right: sidebar ─────────────────────────────────────────────── */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Citizen card */}
           <Card
             className="cursor-pointer hover:bg-muted/40 transition-colors"
             onClick={() => citizen && router.push(`/users/${citizen._id}`)}
           >
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-1 pt-3 px-4">
               <CardTitle className="text-sm">Пользователь</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
+            <CardContent className="px-4 pb-3 pt-1 space-y-1.5 text-sm">
               {citizen ? (
                 <>
                   <span className="font-medium truncate">
@@ -238,7 +238,7 @@ export default function RequestDetailPage() {
                   </p>
                   {citizen.language && (
                     <p className="text-muted-foreground text-xs">
-                      Язык: {citizen.language.toUpperCase()}
+                      Язык: {(citizen.language as string).toUpperCase()}
                     </p>
                   )}
                   <Button
@@ -274,7 +274,7 @@ export default function RequestDetailPage() {
           {/* Timer */}
           {request.status === "assigned" && request.timerDeadline && (
             <Card>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-1 pt-3 px-4">
                 <CardTitle className="text-sm">Таймер</CardTitle>
               </CardHeader>
               <CardContent>
@@ -289,10 +289,10 @@ export default function RequestDetailPage() {
               className="cursor-pointer hover:bg-muted/40 transition-colors"
               onClick={() => router.push(`/students/${student._id}`)}
             >
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-1 pt-3 px-4">
                 <CardTitle className="text-sm">Исполнитель</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="px-4 pb-3 pt-1 space-y-1.5 text-sm">
                 <span className="font-medium truncate">
                   {getUserDisplayName(student)}
                 </span>
@@ -305,10 +305,10 @@ export default function RequestDetailPage() {
 
           {/* Actions */}
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-1 pt-3 px-4">
               <CardTitle className="text-sm">Действия</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="px-4 pb-3 pt-1 space-y-2">
               {/* pending */}
               {request.status === "pending" && (
                 <>

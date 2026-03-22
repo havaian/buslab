@@ -36,9 +36,10 @@ export class FaqController {
   create(
     @Body("categoryId") categoryId: string,
     @Body("question") question: string,
-    @Body("answer") answer: string
+    @Body("answer") answer: string,
+    @Body("translations") translations?: any
   ) {
-    return this.faqService.create(categoryId, question, answer);
+    return this.faqService.create(categoryId, question, answer, translations);
   }
 
   @UseGuards(RolesGuard)
@@ -48,9 +49,16 @@ export class FaqController {
     @Param("id") id: string,
     @Body("question") question?: string,
     @Body("answer") answer?: string,
-    @Body("categoryId") categoryId?: string
+    @Body("categoryId") categoryId?: string,
+    @Body("translations") translations?: any
   ) {
-    return this.faqService.update(id, question, answer, categoryId);
+    return this.faqService.update(
+      id,
+      question,
+      answer,
+      categoryId,
+      translations
+    );
   }
 
   @UseGuards(RolesGuard)

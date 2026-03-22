@@ -131,10 +131,12 @@ export const usersApi = {
 
 export const categoriesApi = {
   list: () => get<Category[]>("/categories"),
-  create: (name: string, hashtag: string) =>
-    post<Category>("/categories", { name, hashtag }),
-  update: (id: string, name?: string, hashtag?: string) =>
-    patch<Category>(`/categories/${id}`, { name, hashtag }),
+  create: (data: { name: string; hashtag: string; names: LocalizedNames }) =>
+    post<Category>("/categories", data),
+  update: (
+    id: string,
+    data: { name?: string; hashtag?: string; names?: LocalizedNames }
+  ) => patch<Category>(`/categories/${id}`, data),
   remove: (id: string) => del<{ deleted: boolean }>(`/categories/${id}`),
 };
 
@@ -145,10 +147,16 @@ export const faqApi = {
     get<FaqItem[]>(
       `/faq${search ? `?search=${encodeURIComponent(search)}` : ""}`
     ),
-  create: (categoryId: string, question: string, answer: string) =>
-    post<FaqItem>("/faq", { categoryId, question, answer }),
-  update: (id: string, data: Partial<FaqItem>) =>
-    patch<FaqItem>(`/faq/${id}`, data),
+  create: (
+    categoryId: string,
+    question: string,
+    answer: string,
+    translations?: FaqTranslations
+  ) => post<FaqItem>("/faq", { categoryId, question, answer, translations }),
+  update: (
+    id: string,
+    data: Partial<FaqItem> & { translations?: FaqTranslations }
+  ) => patch<FaqItem>(`/faq/${id}`, data),
   remove: (id: string) => del<{ deleted: boolean }>(`/faq/${id}`),
 };
 
@@ -303,10 +311,28 @@ export interface RequestListParams {
   limit?: number;
 }
 
+export interface LocalizedNames {
+  ru: string;
+  uz: string;
+  en: string;
+}
+
+export interface FaqTranslation {
+  question: string;
+  answer: string;
+}
+
+export interface FaqTranslations {
+  ru?: FaqTranslation;
+  uz?: FaqTranslation;
+  en?: FaqTranslation;
+}
+
 export interface Category {
   _id: string;
   name: string;
   hashtag: string;
+  names: LocalizedNames;
 }
 
 export interface FaqItem {
@@ -314,6 +340,7 @@ export interface FaqItem {
   categoryId: string;
   question: string;
   answer: string;
+  translations: FaqTranslations;
 }
 
 export interface CitizenUserStats {

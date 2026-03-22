@@ -31,8 +31,12 @@ export class CategoriesController {
   @UseGuards(RolesGuard)
   @Roles("admin")
   @Post()
-  create(@Body("name") name: string, @Body("hashtag") hashtag: string) {
-    return this.categoriesService.create(name, hashtag);
+  create(
+    @Body("name") name: string,
+    @Body("hashtag") hashtag: string,
+    @Body("names") names?: { ru: string; uz?: string; en?: string }
+  ) {
+    return this.categoriesService.create(name, hashtag, names);
   }
 
   @UseGuards(RolesGuard)
@@ -41,9 +45,10 @@ export class CategoriesController {
   update(
     @Param("id") id: string,
     @Body("name") name?: string,
-    @Body("hashtag") hashtag?: string
+    @Body("hashtag") hashtag?: string,
+    @Body("names") names?: { ru: string; uz?: string; en?: string }
   ) {
-    return this.categoriesService.update(id, name, hashtag);
+    return this.categoriesService.update(id, name, hashtag, names);
   }
 
   @UseGuards(RolesGuard)

@@ -73,7 +73,12 @@ export class SubmitRequestConversation {
     }
 
     const kb = new Keyboard();
-    for (const cat of categories) kb.text(cat.name).row();
+    for (const cat of categories) {
+      const locale = ctx.locale || "ru";
+      const localeName =
+        (cat as any).names?.[locale] || (cat as any).names?.ru || cat.name;
+      kb.text(localeName).row();
+    }
     kb.text(this.t(ctx, "buttons.back"));
 
     userStates.set(ctx.from!.id, { state: "selecting_category" });
@@ -89,9 +94,15 @@ export class SubmitRequestConversation {
     categoryName: string,
     userStates: Map<number, UserState>
   ): Promise<void> {
-    const category = await this.categoryModel
-      .findOne({ name: categoryName })
-      .lean();
+    const locale = ctx.locale || "ru";
+    // Search by localized name first, then fall back to legacy name field
+    const categories = await this.categoryModel.find().lean();
+    const category = categories.find(
+      (c) =>
+        (c as any).names?.[locale] === categoryName ||
+        (c as any).names?.ru === categoryName ||
+        c.name === categoryName
+    );
 
     if (!category) {
       await ctx.reply(this.t(ctx, "errors.category_not_found"));
