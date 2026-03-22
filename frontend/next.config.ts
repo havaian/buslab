@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
           process.env.NEXT_PUBLIC_API_URL || "http://backend:3001"
         }/api/:path*`,
       },
+      {
+        source: "/static/uploads/:path*",
+        destination: `${
+          process.env.NEXT_PUBLIC_API_URL || "http://backend:3001"
+        }/static/uploads/:path*`,
+      },
     ];
   },
   images: {
