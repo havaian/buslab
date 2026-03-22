@@ -219,6 +219,15 @@ export interface PopulatedUser {
   language?: string;
 }
 
+export interface RequestFile {
+  filename: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+  ref: string;
+  source: "web" | "telegram";
+}
+
 export interface Request {
   _id: string;
   userId: PopulatedUser | null;
@@ -228,6 +237,7 @@ export interface Request {
   studentId: PopulatedUser | null;
   assignedAt: string | null;
   answerText: string | null;
+  answerFiles: RequestFile[];
   adminComment: string | null;
   declineReason: string | null;
   finalAnswerText: string | null;

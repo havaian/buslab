@@ -21,7 +21,6 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectTrigger,
@@ -31,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timer } from "@/components/shared/timer";
+import { FileList } from "@/components/shared/file-list";
 import { useToast } from "@/components/ui/toast-provider";
 import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDate, getCategoryName, getUserDisplayName } from "@/lib/utils";
@@ -106,8 +106,9 @@ export default function RequestDetailPage() {
       }
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left: main content */}
+        {/* ── Left: main content ─────────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Request text */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3 flex-wrap">
@@ -127,7 +128,7 @@ export default function RequestDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Answer */}
+          {/* Answer card — shown when answered or closed */}
           {(request.status === "answered" || request.status === "closed") && (
             <Card>
               <CardHeader className="pb-3">
@@ -138,6 +139,7 @@ export default function RequestDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Editable textarea for admin to tweak before approving */}
                 {request.status === "answered" ? (
                   <>
                     <Textarea
@@ -146,6 +148,8 @@ export default function RequestDetailPage() {
                       rows={8}
                       className="text-sm"
                     />
+                    {/* Files attached by student */}
+                    <FileList files={request.answerFiles} />
                     {request.adminComment && (
                       <p className="text-xs text-muted-foreground border-l-2 pl-3">
                         Комментарий: {request.adminComment}
@@ -153,22 +157,52 @@ export default function RequestDetailPage() {
                     )}
                   </>
                 ) : (
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {request.finalAnswerText || request.answerText}
-                  </p>
+                  <>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {request.finalAnswerText || request.answerText}
+                    </p>
+                    {/* Files in closed state too */}
+                    <FileList files={request.answerFiles} />
+                    {/* Show original student answer if admin edited it */}
+                    {request.status === "closed" &&
+                      request.finalAnswerText &&
+                      request.answerText &&
+                      request.finalAnswerText !== request.answerText && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Оригинал ответа студента:
+                          </p>
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                            {request.answerText}
+                          </p>
+                        </div>
+                      )}
+                  </>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Decline reason */}
+          {request.status === "declined" && request.declineReason && (
+            <Card>
+              <CardContent className="pt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Причина отклонения
+                </p>
+                <p className="text-sm">{request.declineReason}</p>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* Right: sidebar */}
+        {/* ── Right: sidebar ─────────────────────────────────────────────── */}
         <div className="space-y-4">
-          {/* Citizen */}
+          {/* Citizen card */}
           <Card
-              className="cursor-pointer hover:bg-muted/40 transition-colors"
-              onClick={() => citizen && router.push(`/users/${citizen._id}`)}
-            >
+            className="cursor-pointer hover:bg-muted/40 transition-colors"
+            onClick={() => citizen && router.push(`/users/${citizen._id}`)}
+          >
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Пользователь</CardTitle>
             </CardHeader>
@@ -214,7 +248,7 @@ export default function RequestDetailPage() {
                   </Button>
                 </>
               ) : (
-                <p className="text-muted-foreground">—</p>
+                <p className="text-muted-foreground text-xs">Нет данных</p>
               )}
             </CardContent>
           </Card>
@@ -231,12 +265,12 @@ export default function RequestDetailPage() {
             </Card>
           )}
 
-          {/* Student */}
+          {/* Student card */}
           {student && (
             <Card
-                className="cursor-pointer hover:bg-muted/40 transition-colors"
-                onClick={() => student && router.push(`/students/${student._id}`)}
-              >
+              className="cursor-pointer hover:bg-muted/40 transition-colors"
+              onClick={() => router.push(`/students/${student._id}`)}
+            >
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Исполнитель</CardTitle>
               </CardHeader>
@@ -265,9 +299,7 @@ export default function RequestDetailPage() {
                     className="w-full"
                     disabled={busy}
                     onClick={async () => {
-                      const ok = await dialog.confirm("Одобрить обращение?", {
-                        confirmLabel: "Одобрить",
-                      });
+                      const ok = await dialog.confirm("Одобрить обращение?");
                       if (ok) run(() => requestsApi.approve(id), "Одобрено");
                     }}
                   >
@@ -275,16 +307,15 @@ export default function RequestDetailPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                    variant="destructive"
+                    className="w-full"
                     disabled={busy}
                     onClick={async () => {
                       const reason = await dialog.prompt(
                         "Укажите причину отклонения:",
                         {
-                          title: "Отклонить обращение?",
+                          title: "Отклонить обращение",
                           placeholder: "Причина...",
-                          variant: "destructive",
                           confirmLabel: "Отклонить",
                         }
                       );
@@ -303,16 +334,13 @@ export default function RequestDetailPage() {
               {/* approved */}
               {request.status === "approved" && (
                 <>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">
-                      Назначить студента
-                    </Label>
+                  <div className="space-y-1.5">
                     <Select
                       value={assignStudentId}
                       onValueChange={setAssignStudentId}
                     >
-                      <SelectTrigger className="w-full text-sm">
-                        <SelectValue placeholder="Выбрать студента" />
+                      <SelectTrigger className="text-xs h-8">
+                        <SelectValue placeholder="Выбрать студента..." />
                       </SelectTrigger>
                       <SelectContent>
                         {freeStudents.map((s) => (
@@ -401,17 +429,17 @@ export default function RequestDetailPage() {
                 </>
               )}
 
-              {/* answered */}
+              {/* answered — approve or send back for revision */}
               {request.status === "answered" && (
                 <>
                   <Button
-                    size="sm"
                     className="w-full"
+                    size="sm"
                     disabled={busy}
                     onClick={async () => {
                       const ok = await dialog.confirm(
-                        "Подтвердить и отправить ответ пользователю?",
-                        { confirmLabel: "Подтвердить" }
+                        "Одобрить и отправить ответ пользователю?",
+                        { confirmLabel: "Одобрить" }
                       );
                       if (ok)
                         run(
@@ -423,17 +451,16 @@ export default function RequestDetailPage() {
                     <CheckCheck size={13} /> Подтвердить ответ
                   </Button>
                   <Button
+                    variant="destructive"
                     size="sm"
-                    variant="outline"
-                    className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                    className="w-full"
                     disabled={busy}
                     onClick={async () => {
                       const comment = await dialog.prompt(
-                        "Укажите комментарий для студента:",
+                        "Комментарий для студента:",
                         {
-                          title: "Вернуть на доработку?",
-                          placeholder: "Комментарий...",
-                          variant: "destructive",
+                          title: "Вернуть на доработку",
+                          placeholder: "Что нужно исправить...",
                           confirmLabel: "Вернуть",
                         }
                       );
@@ -449,18 +476,19 @@ export default function RequestDetailPage() {
                 </>
               )}
 
-              {/* closed / declined */}
+              {/* closed / declined — reopen */}
               {(request.status === "closed" ||
                 request.status === "declined") && (
                 <Button
-                  size="sm"
                   variant="outline"
+                  size="sm"
                   className="w-full"
                   disabled={busy}
                   onClick={async () => {
-                    const ok = await dialog.confirm("Переоткрыть обращение?", {
-                      confirmLabel: "Переоткрыть",
-                    });
+                    const ok = await dialog.confirm(
+                      "Вернуть обращение в очередь?",
+                      { confirmLabel: "Переоткрыть" }
+                    );
                     if (ok)
                       run(() => requestsApi.returnToQueue(id), "Переоткрыто");
                   }}
