@@ -98,6 +98,9 @@ export const adminUsersApi = {
     get<StudentLogEntry[]>(`/admin-users/students/${id}/logs`),
   block: (id: string) => patch<PanelUser>(`/admin-users/${id}/block`),
   unblock: (id: string) => patch<PanelUser>(`/admin-users/${id}/unblock`),
+  // ── Student self-access ─────────────────────────────────────────────────
+  myStats: () => get<StudentStats>("/admin-users/my-stats"),
+  myLogs: () => get<StudentLogEntry[]>("/admin-users/my-logs"),
   // ── Student management ──────────────────────────────────────────────────
   createInvite: () => post<InviteResult>("/admin-users/invite"),
   searchUsers: (q: string) =>

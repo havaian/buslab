@@ -13,7 +13,6 @@ import {
   type StudentStats,
   type StudentLogEntry,
 } from "@/lib/api";
-import { useAuth } from "@/contexts/auth-context";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
@@ -21,41 +20,26 @@ import { formatDate } from "@/lib/utils";
 const ACTION_LABELS: Record<string, string> = {
   took_request: "Взял обращение",
   submitted_answer: "Отправил ответ",
-  answer_approved: "Ответ одобрен",
-  answer_rejected: "Ответ отклонён",
+  answer_approved: "✅ Ответ одобрен",
+  answer_rejected: "❌ Ответ отклонён",
   declined_request: "Отказался от обращения",
   unassigned_by_admin: "Задание снято администратором",
-  timer_expired: "Таймер истёк",
-};
-
-const ACTION_COLORS: Record<string, string> = {
-  answer_approved: "text-green-600",
-  answer_rejected: "text-red-500",
-  timer_expired: "text-red-500",
-  declined_request: "text-orange-500",
-  unassigned_by_admin: "text-orange-500",
-  took_request: "text-blue-600",
-  submitted_answer: "text-purple-600",
+  timer_expired: "⏰ Таймер истёк",
 };
 
 export default function MyStatsPage() {
-  const { user } = useAuth();
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [logs, setLogs] = useState<StudentLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    Promise.all([
-      adminUsersApi.studentStats(user.id),
-      adminUsersApi.studentLogs(user.id),
-    ])
+    Promise.all([adminUsersApi.myStats(), adminUsersApi.myLogs()])
       .then(([s, l]) => {
         setStats(s);
         setLogs(l);
       })
       .finally(() => setLoading(false));
-  }, [user]);
+  }, []);
 
   if (loading || !stats) {
     return (
@@ -67,67 +51,50 @@ export default function MyStatsPage() {
 
   return (
     <PageShell title="Моя статистика">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Left: stats */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="space-y-4">
+          {/* Rating */}
           {stats.rating !== null && (
             <Card className="border-primary/30 bg-primary/5">
               <CardContent className="flex items-center gap-4 pt-5 pb-5">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/10">
                   <span className="text-2xl font-bold text-primary">
-                    {stats.rating}
+                    {stats.rating}%
                   </span>
                 </div>
                 <div>
-                  <p className="font-semibold">Рейтинг</p>
+                  <p className="font-semibold text-lg">Рейтинг</p>
                   <p className="text-xs text-muted-foreground">
-                    На основе % одобрения (мин. 5 ответов)
+                    На основе процента одобрения
                   </p>
                 </div>
               </CardContent>
             </Card>
           )}
 
+          {/* Stats grid */}
           <div className="grid grid-cols-2 gap-3">
             {(
               [
-                [TrendingUp, "text-blue-600", stats.total, "Всего взято"],
+                ["Всего взято", stats.total, TrendingUp, "text-blue-600"],
+                ["Одобрено", stats.approved, CheckCircle, "text-green-600"],
+                ["Отклонено", stats.rejected, XCircle, "text-red-500"],
                 [
-                  TrendingUp,
-                  "text-purple-600",
-                  stats.submitted,
-                  "Отправлено ответов",
-                ],
-                [CheckCircle, "text-green-600", stats.approved, "Одобрено"],
-                [XCircle, "text-red-500", stats.rejected, "Отклонено"],
-                [
-                  CheckCircle,
-                  stats.approvalRate >= 80
-                    ? "text-green-600"
-                    : stats.approvalRate >= 50
-                    ? "text-orange-500"
-                    : "text-red-500",
-                  `${stats.approvalRate}%`,
-                  "Процент одобрения",
-                ],
-                [
-                  Clock,
-                  "text-muted-foreground",
-                  stats.avgTime ? `${stats.avgTime} мин` : "—",
                   "Среднее время",
+                  stats.avgTime ? `${stats.avgTime} мин` : "—",
+                  Clock,
+                  "text-orange-500",
                 ],
-                [AlertTriangle, "text-red-500", stats.expired, "Просрочек"],
-                [XCircle, "text-orange-500", stats.declines, "Отказов"],
-              ] as [React.ElementType, string, number | string, string][]
-            ).map(([Icon, color, value, label]) => (
+                ["Просрочек", stats.expired, AlertTriangle, "text-red-500"],
+                ["Отказов", stats.declines, XCircle, "text-muted-foreground"],
+              ] as [string, string | number, any, string][]
+            ).map(([label, value, Icon, color]) => (
               <Card key={label}>
-                <CardContent className="flex items-center gap-3 pt-4 pb-4">
-                  <Icon size={16} className={`shrink-0 ${color}`} />
+                <CardContent className="pt-4 pb-4 flex items-center gap-3">
+                  <Icon size={18} className={`${color} shrink-0`} />
                   <div>
-                    <p className="text-lg font-bold leading-tight">{value}</p>
-                    <p className="text-xs text-muted-foreground leading-tight">
-                      {label}
-                    </p>
+                    <p className={`text-lg font-bold ${color}`}>{value}</p>
+                    <p className="text-xs text-muted-foreground">{label}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -135,42 +102,38 @@ export default function MyStatsPage() {
           </div>
         </div>
 
-        {/* Right: log */}
+        {/* Action log */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">
-              Журнал действий ({logs.length})
-            </CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Журнал действий</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {logs.length === 0 ? (
-              <p className="text-sm text-muted-foreground px-4 py-4">
-                Действий нет
+              <p className="px-4 py-6 text-sm text-muted-foreground">
+                Нет записей
               </p>
             ) : (
-              <div className="divide-y max-h-[520px] overflow-y-auto">
-                {logs.map((entry) => (
-                  <div
-                    key={entry._id}
-                    className="flex items-start justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p
-                        className={`text-sm font-medium ${
-                          ACTION_COLORS[entry.action] ?? "text-foreground"
-                        }`}
-                      >
-                        {ACTION_LABELS[entry.action] ?? entry.action}
+              <div className="divide-y max-h-[500px] overflow-y-auto">
+                {logs.map((l) => (
+                  <div key={l._id} className="flex items-start gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">
+                        {ACTION_LABELS[l.action] || l.action}
                       </p>
-                      {entry.timeSpentMinutes != null && (
+                      {l.details && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {l.details}
+                        </p>
+                      )}
+                      {l.timeSpentMinutes != null && (
                         <p className="text-xs text-muted-foreground">
-                          Время: {entry.timeSpentMinutes} мин
+                          Время: {l.timeSpentMinutes} мин
                         </p>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                      {formatDate(entry.createdAt)}
-                    </span>
+                    <p className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                      {formatDate(l.createdAt)}
+                    </p>
                   </div>
                 ))}
               </div>

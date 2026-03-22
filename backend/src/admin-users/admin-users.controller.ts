@@ -19,6 +19,21 @@ import { UserRole } from "../common/enums/user-role.enum";
 export class AdminUsersController {
   constructor(private readonly adminUsersService: AdminUsersService) {}
 
+  // ── Student self-access ───────────────────────────────────────────────────
+
+  /** Students call this to get their own stats — no admin role required. */
+  @Roles(UserRole.STUDENT)
+  @Get("my-stats")
+  getMyStats(@CurrentUser() user: any) {
+    return this.adminUsersService.getStudentStats(user.sub);
+  }
+
+  @Roles(UserRole.STUDENT)
+  @Get("my-logs")
+  getMyLogs(@CurrentUser() user: any) {
+    return this.adminUsersService.getStudentLogs(user.sub);
+  }
+
   // ── Students list ─────────────────────────────────────────────────────────
 
   @Roles(UserRole.ADMIN)

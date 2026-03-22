@@ -63,7 +63,7 @@ function TasksPageContent() {
       const [history, avail, stats] = await Promise.all([
         requestsApi.myHistory(),
         requestsApi.available(),
-        adminUsersApi.studentStats(user.id),
+        adminUsersApi.myStats(),
       ]);
       const active =
         history.find(
