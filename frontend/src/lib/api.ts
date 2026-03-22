@@ -98,6 +98,12 @@ export const adminUsersApi = {
     get<StudentLogEntry[]>(`/admin-users/students/${id}/logs`),
   block: (id: string) => patch<PanelUser>(`/admin-users/${id}/block`),
   unblock: (id: string) => patch<PanelUser>(`/admin-users/${id}/unblock`),
+  // ── Student management ──────────────────────────────────────────────────
+  createInvite: () => post<InviteResult>("/admin-users/invite"),
+  searchUsers: (q: string) =>
+    get<AnyUser[]>(`/admin-users/users/search?q=${encodeURIComponent(q)}`),
+  promote: (id: string) => patch<AnyUser>(`/admin-users/${id}/promote`),
+  demote: (id: string) => patch<AnyUser>(`/admin-users/${id}/demote`),
 };
 
 // ── Citizens ──────────────────────────────────────────────────────────────
@@ -162,7 +168,6 @@ function toQuery(params: object): string {
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
-// User in the panel (admin or student)
 export interface PanelUser {
   id: string;
   telegramId: number;
@@ -173,7 +178,6 @@ export interface PanelUser {
   isBanned?: boolean;
 }
 
-// Citizen user (role: 'user')
 export interface CitizenUser {
   _id: string;
   telegramId: number;
@@ -185,7 +189,24 @@ export interface CitizenUser {
   createdAt: string;
 }
 
-// Populated user ref inside a request
+/** Any user from DB (role: user | student | admin) — used in search results */
+export interface AnyUser {
+  _id: string;
+  telegramId: number;
+  firstName: string;
+  lastName: string;
+  username: string;
+  role: string;
+  isBanned: boolean;
+  createdAt: string;
+}
+
+export interface InviteResult {
+  token: string;
+  expiresAt: string;
+  link: string;
+}
+
 export interface PopulatedUser {
   _id: string;
   telegramId: number;
@@ -197,7 +218,6 @@ export interface PopulatedUser {
 
 export interface Request {
   _id: string;
-  // userId is populated
   userId: PopulatedUser | null;
   categoryId: { _id: string; name: string; hashtag: string } | string;
   text: string;

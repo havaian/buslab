@@ -8,6 +8,7 @@ import {
   StudentLogSchema,
 } from "../student-logs/schemas/student-log.schema";
 import { Request, RequestSchema } from "../requests/schemas/request.schema";
+import { InviteToken, InviteTokenSchema } from "./schemas/invite-token.schema";
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { Request, RequestSchema } from "../requests/schemas/request.schema";
       { name: User.name, schema: UserSchema },
       { name: StudentLog.name, schema: StudentLogSchema },
       { name: Request.name, schema: RequestSchema },
+      { name: InviteToken.name, schema: InviteTokenSchema },
     ]),
   ],
   controllers: [AdminUsersController],

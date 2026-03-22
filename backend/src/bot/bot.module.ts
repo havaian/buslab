@@ -11,6 +11,7 @@ import {
 } from "../categories/schemas/category.schema";
 import { Faq, FaqSchema } from "../faq/schemas/faq.schema";
 import { RequestsModule } from "../requests/requests.module";
+import { AdminUsersModule } from "../admin-users/admin-users.module";
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { RequestsModule } from "../requests/requests.module";
       { name: Category.name, schema: CategorySchema },
       { name: Faq.name, schema: FaqSchema },
     ]),
-    RequestsModule, // provides RequestsService via exports
+    RequestsModule,
+    AdminUsersModule, // provides AdminUsersService (with redeemInvite)
   ],
   providers: [BotService, BotUpdate, BotI18nService, SubmitRequestConversation],
 })

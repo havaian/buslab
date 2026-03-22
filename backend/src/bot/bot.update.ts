@@ -8,6 +8,7 @@ import { CB, CBRegex, STUDENT_CHAT_PREVIEW_LENGTH } from "./bot.constants";
 import { BotI18nService } from "./bot-i18n.service";
 import { SubmitRequestConversation } from "./conversations/submit-request.conversation";
 import { RequestsService } from "../requests/requests.service";
+import { AdminUsersService } from "../admin-users/admin-users.service";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { Faq, FaqDocument } from "../faq/schemas/faq.schema";
 
@@ -23,6 +24,7 @@ export class BotUpdate {
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Faq.name) private readonly faqModel: Model<FaqDocument>,
     private readonly requestsService: RequestsService,
+    private readonly adminUsersService: AdminUsersService,
     private readonly i18n: BotI18nService,
     private readonly submitRequest: SubmitRequestConversation
   ) {}
@@ -31,7 +33,7 @@ export class BotUpdate {
 
   /** Called by BotService.onModuleInit() — registers all handlers on the bot instance. */
   register(bot: Bot<BotContext>): void {
-    // Commands
+    // Commands — /start with optional deep-link parameter
     bot.command("start", (ctx) => this.handleStart(ctx));
 
     // Onboarding
@@ -82,6 +84,33 @@ export class BotUpdate {
 
     if (!ctx.from) return;
     const user = await this.getOrCreate(ctx);
+
+    // ── Invite token flow: /start ref_<uuid> ──────────────────────────────
+    const param: string = (ctx.match as any)?.[1] ?? "";
+    if (param.startsWith("ref_")) {
+      const token = param.slice(4);
+      const result = await this.adminUsersService.redeemInvite(
+        token,
+        ctx.from.id
+      );
+
+      if (!result.success) {
+        await ctx.reply(
+          "❌ Ссылка недействительна или уже использована. Попросите администратора выслать новую."
+        );
+        return;
+      }
+
+      if (result.alreadyStudent) {
+        await ctx.reply("✅ Вы уже являетесь студентом клиники.");
+      } else {
+        await ctx.reply(
+          "🎓 Вы успешно зарегистрированы как студент юридической клиники!\n\n" +
+            "Войдите в веб-панель для начала работы."
+        );
+      }
+      return;
+    }
 
     if (!user.offerAccepted) {
       await this.sendOnboarding(ctx);

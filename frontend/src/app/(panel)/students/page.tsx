@@ -1,73 +1,137 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { categoriesApi, type Category } from "@/lib/api";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import {
+  UserPlus,
+  Link,
+  Search,
+  Copy,
+  Check,
+  GraduationCap,
+  UserMinus,
+  ExternalLink,
+} from "lucide-react";
+import {
+  adminUsersApi,
+  type PanelUser,
+  type AnyUser,
+  type InviteResult,
+} from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
-import { useDialog } from "@/components/ui/dialog-provider";
+import { getUserDisplayName, formatDate } from "@/lib/utils";
 
-export default function CategoriesPage() {
+type Tab = "invite" | "search";
+
+export default function StudentsPage() {
+  const router = useRouter();
   const { toast } = useToast();
-  const dialog = useDialog();
-  const [categories, setCategories] = useState<Category[]>([]);
+
+  const [students, setStudents] = useState<PanelUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Category | null>(null);
-  const [name, setName] = useState("");
-  const [hashtag, setHashtag] = useState("");
+  // Add student modal
+  const [modalOpen, setModalOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("invite");
 
-  const load = async () => {
+  // Invite tab state
+  const [invite, setInvite] = useState<InviteResult | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Search tab state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<AnyUser[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Demote confirm
+  const [demoteTarget, setDemoteTarget] = useState<PanelUser | null>(null);
+
+  // ── Data ─────────────────────────────────────────────────────────────────
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      setCategories(await categoriesApi.list());
+      const list = await adminUsersApi.students();
+      setStudents(list.map((s: any) => ({ ...s, id: String(s._id ?? s.id) })));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
-  const openCreate = () => {
-    setEditTarget(null);
-    setName("");
-    setHashtag("");
-    setFormOpen(true);
+  // ── Invite tab ────────────────────────────────────────────────────────────
+
+  const generateInvite = async () => {
+    setInviteLoading(true);
+    try {
+      const result = await adminUsersApi.createInvite();
+      setInvite(result);
+      setCopied(false);
+    } catch (e: unknown) {
+      toast((e as Error).message, "error");
+    } finally {
+      setInviteLoading(false);
+    }
   };
 
-  const openEdit = (c: Category) => {
-    setEditTarget(c);
-    setName(c.name);
-    setHashtag(c.hashtag);
-    setFormOpen(true);
+  const copyLink = async () => {
+    if (!invite) return;
+    await navigator.clipboard.writeText(invite.link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const save = async () => {
-    if (!name.trim() || !hashtag.trim()) return;
+  const openModal = () => {
+    setModalOpen(true);
+    setTab("invite");
+    setInvite(null);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
+  // ── Search tab ────────────────────────────────────────────────────────────
+
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (value.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const results = await adminUsersApi.searchUsers(value.trim());
+        setSearchResults(results);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+  };
+
+  const handlePromote = async (user: AnyUser) => {
     setBusy(true);
     try {
-      if (editTarget) {
-        await categoriesApi.update(editTarget._id, name, hashtag);
-        toast("Категория обновлена", "success");
-      } else {
-        await categoriesApi.create(name, hashtag);
-        toast("Категория создана", "success");
-      }
-      setFormOpen(false);
+      await adminUsersApi.promote(user._id);
+      toast(`${getUserDisplayName(user)} теперь студент`, "success");
+      setModalOpen(false);
       await load();
     } catch (e: unknown) {
       toast((e as Error).message, "error");
@@ -76,20 +140,16 @@ export default function CategoriesPage() {
     }
   };
 
-  const remove = async (c: Category) => {
-    const ok = await dialog.confirm(
-      `Удалить категорию «${c.name}»? Нельзя удалить если используется в активных обращениях.`,
-      {
-        title: "Удалить категорию?",
-        variant: "destructive",
-        confirmLabel: "Удалить",
-      }
-    );
-    if (!ok) return;
+  const handleDemote = async () => {
+    if (!demoteTarget) return;
     setBusy(true);
     try {
-      await categoriesApi.remove(c._id);
-      toast("Категория удалена", "success");
+      await adminUsersApi.demote(demoteTarget.id);
+      toast(
+        `${getUserDisplayName(demoteTarget)} переведён в пользователи`,
+        "success"
+      );
+      setDemoteTarget(null);
       await load();
     } catch (e: unknown) {
       toast((e as Error).message, "error");
@@ -97,127 +157,291 @@ export default function CategoriesPage() {
       setBusy(false);
     }
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <PageShell
-      title="Категории"
+      title="Студенты"
+      description={`${students.length} студентов`}
       actions={
-        <Button size="sm" onClick={openCreate}>
-          <Plus size={14} />
-          Добавить
+        <Button size="sm" onClick={openModal}>
+          <UserPlus size={14} />
+          Добавить студента
         </Button>
       }
     >
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[340px]">
-              <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 text-left font-medium">
-                    Название
-                  </th>
-                  <th className="px-4 py-2.5 text-left font-medium">Хэштег</th>
-                  <th className="px-4 py-2.5 text-left font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="px-4 py-8 text-center text-muted-foreground"
-                    >
-                      Загрузка...
-                    </td>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Загрузка...</p>
+      ) : students.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <GraduationCap
+              size={36}
+              className="mx-auto text-muted-foreground/30 mb-3"
+            />
+            <p className="text-sm text-muted-foreground">Нет студентов</p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-4"
+              onClick={openModal}
+            >
+              Добавить первого студента
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                    <th className="px-4 py-2.5 text-left font-medium">
+                      Студент
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
+                      Telegram ID
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">
+                      Статус
+                    </th>
+                    <th className="px-4 py-2.5 text-right font-medium">
+                      Действия
+                    </th>
                   </tr>
-                ) : categories.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="px-4 py-8 text-center text-muted-foreground"
+                </thead>
+                <tbody>
+                  {students.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"
+                      onClick={() => router.push(`/students/${s.id}`)}
                     >
-                      Нет категорий
-                    </td>
-                  </tr>
-                ) : (
-                  categories.map((c) => (
-                    <tr key={c._id} className="border-b last:border-0">
-                      <td className="px-4 py-3 font-medium">{c.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground text-sm whitespace-nowrap">
-                        #{c.hashtag}
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium">{getUserDisplayName(s)}</p>
+                        {s.username && (
+                          <p className="text-xs text-muted-foreground">
+                            @{s.username}
+                          </p>
+                        )}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2 justify-end">
+                      <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">
+                        {s.telegramId}
+                      </td>
+                      <td className="px-4 py-2.5 hidden lg:table-cell">
+                        {s.isBanned ? (
+                          <span className="text-xs text-red-500">
+                            Заблокирован
+                          </span>
+                        ) : (
+                          <span className="text-xs text-green-600">
+                            Активен
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className="px-4 py-2.5 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex justify-end gap-2">
                           <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => openEdit(c)}
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-7"
+                            onClick={() => router.push(`/students/${s.id}`)}
                           >
-                            <Pencil size={14} />
+                            <ExternalLink size={12} />
+                            Профиль
                           </Button>
                           <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-red-500 hover:text-red-600"
-                            onClick={() => remove(c)}
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-7 text-destructive hover:text-destructive"
+                            onClick={() => setDemoteTarget(s)}
                           >
-                            <Trash2 size={14} />
+                            <UserMinus size={12} />
+                            Убрать
                           </Button>
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* max-w-sm gets capped to (100vw - 2rem) by DialogContent on mobile */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-sm">
+      {/* ── Add student modal ──────────────────────────────────────────────── */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editTarget ? "Редактировать категорию" : "Новая категория"}
-            </DialogTitle>
+            <DialogTitle>Добавить студента</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 mt-2">
-            <div className="space-y-1.5">
-              <Label>Название</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Название категории"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Хэштег</Label>
-              <Input
-                value={hashtag}
-                onChange={(e) => setHashtag(e.target.value)}
-                placeholder="например: grazhdanskoe_pravo"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setFormOpen(false)}
-                disabled={busy}
-              >
-                Отмена
-              </Button>
-              <Button
-                onClick={save}
-                disabled={!name.trim() || !hashtag.trim() || busy}
-              >
-                {busy ? "Сохранение..." : "Сохранить"}
-              </Button>
-            </div>
+
+          {/* Tab switcher */}
+          <div className="flex gap-1 border rounded-md p-1 bg-muted/30">
+            <button
+              onClick={() => setTab("invite")}
+              className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded transition-colors ${
+                tab === "invite"
+                  ? "bg-background shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Link size={12} />
+              Invite-ссылка
+            </button>
+            <button
+              onClick={() => setTab("search")}
+              className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded transition-colors ${
+                tab === "search"
+                  ? "bg-background shadow-sm font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Search size={12} />
+              Найти в базе
+            </button>
           </div>
+
+          {/* ── Invite tab ─────────────────────────────────────────────────── */}
+          {tab === "invite" && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Сгенерируйте одноразовую ссылку и отправьте студенту. После
+                перехода по ссылке и запуска бота — студент автоматически
+                получит роль.
+              </p>
+
+              {!invite ? (
+                <Button
+                  className="w-full"
+                  onClick={generateInvite}
+                  disabled={inviteLoading}
+                >
+                  {inviteLoading ? "Генерация..." : "Сгенерировать ссылку"}
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-md border bg-muted/30 p-3 break-all text-xs font-mono">
+                    {invite.link}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={copyLink}
+                    >
+                      {copied ? (
+                        <>
+                          <Check size={13} /> Скопировано
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} /> Копировать
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={generateInvite}
+                      disabled={inviteLoading}
+                    >
+                      Новая
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ссылка действительна до {formatDate(invite.expiresAt)} (48
+                    ч)
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Search tab ─────────────────────────────────────────────────── */}
+          {tab === "search" && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Найдите пользователя, который уже писал боту, по username или
+                Telegram ID.
+              </p>
+              <Input
+                placeholder="@username или Telegram ID"
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                autoFocus
+              />
+
+              {searchLoading && (
+                <p className="text-xs text-muted-foreground">Поиск...</p>
+              )}
+
+              {!searchLoading &&
+                searchQuery.length >= 2 &&
+                searchResults.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Ничего не найдено. Попробуйте другой запрос или используйте
+                    invite-ссылку.
+                  </p>
+                )}
+
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {searchResults.map((u) => (
+                  <div
+                    key={u._id}
+                    className="flex items-center justify-between rounded-md border px-3 py-2"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">
+                        {getUserDisplayName(u)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {u.username ? `@${u.username} · ` : ""}
+                        ID: {u.telegramId}
+                        {u.role === "student" && (
+                          <span className="ml-1 text-green-600">
+                            · уже студент
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {u.role !== "student" && u.role !== "admin" && (
+                      <Button
+                        size="sm"
+                        className="ml-3 shrink-0"
+                        disabled={busy}
+                        onClick={() => handlePromote(u)}
+                      >
+                        <GraduationCap size={13} />
+                        Сделать студентом
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Demote confirm ────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={!!demoteTarget}
+        onOpenChange={(v) => !v && setDemoteTarget(null)}
+        title={`Убрать ${getUserDisplayName(demoteTarget)} из студентов?`}
+        description="Пользователь потеряет доступ к веб-панели и будет переведён в обычные пользователи."
+        confirmLabel="Убрать"
+        variant="destructive"
+        loading={busy}
+        onConfirm={handleDemote}
+      />
     </PageShell>
   );
 }
