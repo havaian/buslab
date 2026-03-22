@@ -10,6 +10,7 @@ import {
   CategorySchema,
 } from "../categories/schemas/category.schema";
 import { Faq, FaqSchema } from "../faq/schemas/faq.schema";
+import { Request, RequestSchema } from "../requests/schemas/request.schema";
 import { RequestsModule } from "../requests/requests.module";
 import { AdminUsersModule } from "../admin-users/admin-users.module";
 
@@ -19,9 +20,10 @@ import { AdminUsersModule } from "../admin-users/admin-users.module";
       { name: User.name, schema: UserSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Faq.name, schema: FaqSchema },
+      { name: Request.name, schema: RequestSchema },
     ]),
     RequestsModule,
-    AdminUsersModule, // provides AdminUsersService (with redeemInvite)
+    AdminUsersModule,
   ],
   providers: [BotService, BotUpdate, BotI18nService, SubmitRequestConversation],
 })

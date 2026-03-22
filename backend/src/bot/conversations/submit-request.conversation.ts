@@ -14,6 +14,10 @@ import {
   CategoryDocument,
 } from "../../categories/schemas/category.schema";
 import {
+  Request,
+  RequestDocument,
+} from "../../requests/schemas/request.schema";
+import {
   REQUEST_MIN_LENGTH,
   STUDENT_CHAT_PREVIEW_LENGTH,
 } from "../bot.constants";
@@ -41,6 +45,8 @@ export class SubmitRequestConversation {
   constructor(
     @InjectModel(Category.name)
     private readonly categoryModel: Model<CategoryDocument>,
+    @InjectModel(Request.name)
+    private readonly requestModel: Model<RequestDocument>,
     private readonly notifications: NotificationsService,
     private readonly i18n: BotI18nService
   ) {}
@@ -286,9 +292,6 @@ export class SubmitRequestConversation {
     userStates.delete(ctx.from!.id);
 
     try {
-      const mongoose = await import("mongoose");
-
-      // Build requestFiles from saved filenames stored in state
       const requestFiles = (state.requestFiles as any[]).map((f) => ({
         filename: f.savedFilename || f.fileId,
         originalName: f.originalName,
@@ -298,9 +301,9 @@ export class SubmitRequestConversation {
         source: "telegram",
       }));
 
-      const newRequest = await mongoose.default.model("Request").create({
+      const newRequest = await this.requestModel.create({
         userId,
-        categoryId: new mongoose.default.Types.ObjectId(state.categoryId),
+        categoryId: new Types.ObjectId(state.categoryId),
         text: state.requestText,
         status: "pending",
         requestFiles,
