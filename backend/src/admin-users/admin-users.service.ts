@@ -73,7 +73,7 @@ export class AdminUsersService {
   async createInvite(
     adminId: string
   ): Promise<{ token: string; expiresAt: Date; link: string }> {
-    const token = uuidv4();
+    const token = uuidv4().replace(/-/g, "");
     const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 60 * 60 * 1000);
 
     await this.inviteModel.create({

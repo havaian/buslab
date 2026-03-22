@@ -85,8 +85,9 @@ export class BotUpdate {
     if (!ctx.from) return;
     const user = await this.getOrCreate(ctx);
 
-    // ── Invite token flow: /start ref_<uuid> ──────────────────────────────
-    const param: string = (ctx.match as any)?.[1] ?? "";
+    // ── Invite token flow: /start ref_<token> ──────────────────────────────
+    // In Grammy, ctx.match for bot.command() is the argument string after /start
+    const param: string = (ctx.match as string) ?? "";
     if (param.startsWith("ref_")) {
       const token = param.slice(4);
       const result = await this.adminUsersService.redeemInvite(
