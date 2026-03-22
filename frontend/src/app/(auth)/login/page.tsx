@@ -43,7 +43,8 @@ export default function LoginPage() {
     script.setAttribute("data-size", "large");
     script.setAttribute("data-radius", "8");
     script.setAttribute("data-onauth", "onTelegramAuth(user)");
-    script.setAttribute("data-request-access", "write");
+    // data-request-access="write" omitted intentionally —
+    // we only need basic profile (id, name, username), not phone number
     script.async = true;
 
     containerRef.current?.appendChild(script);
