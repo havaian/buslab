@@ -3,6 +3,15 @@ import { Document, Types } from "mongoose";
 
 export type RequestDocument = Request & Document;
 
+const FileSubSchema = {
+  filename: String,
+  originalName: String,
+  mimetype: String,
+  size: Number,
+  ref: String,
+  source: { type: String, default: "web" },
+};
+
 // Matches existing bot's Request model
 @Schema({ timestamps: true, collection: "requests" })
 export class Request {
@@ -36,7 +45,7 @@ export class Request {
   @Prop({ default: null, type: Number })
   studentChatMessageId: number | null;
 
-  // Extended fields for web panel (not in original bot schema)
+  // Extended fields for web panel
   @Prop({ default: null })
   declineReason: string | null;
 
@@ -52,21 +61,19 @@ export class Request {
   @Prop({ default: false })
   timerExpiredNotified: boolean;
 
-  /** Files attached to the student's answer (uploaded via web panel). */
-  @Prop({
-    type: [
-      {
-        filename: String,
-        originalName: String,
-        mimetype: String,
-        size: Number,
-        // ref = stored filename on disk (used by /api/files/:ref)
-        ref: String,
-        source: { type: String, default: "web" },
-      },
-    ],
-    default: [],
-  })
+  // Files attached by citizen when submitting the request
+  @Prop({ type: [FileSubSchema], default: [] })
+  requestFiles: {
+    filename: string;
+    originalName: string;
+    mimetype: string;
+    size: number;
+    ref: string;
+    source: string;
+  }[];
+
+  // Files attached by student in their answer
+  @Prop({ type: [FileSubSchema], default: [] })
   answerFiles: {
     filename: string;
     originalName: string;

@@ -28,6 +28,24 @@ const uploadStorage = diskStorage({
   },
 });
 
+const ALLOWED_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/msword", // .doc (fallback)
+];
+
+const answerUploadOptions = {
+  storage: uploadStorage,
+  fileFilter: (_req: any, file: Express.Multer.File, cb: any) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Допустимы только файлы PDF и Word (.docx)"), false);
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+};
+
 @UseGuards(JwtAuthGuard)
 @Controller("requests")
 export class RequestsController {
@@ -162,7 +180,7 @@ export class RequestsController {
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.STUDENT)
-  @UseInterceptors(FilesInterceptor("files", 10, { storage: uploadStorage }))
+  @UseInterceptors(FilesInterceptor("files", 5, answerUploadOptions))
   @Patch(":id/submit-answer")
   submitAnswer(
     @Param("id") id: string,

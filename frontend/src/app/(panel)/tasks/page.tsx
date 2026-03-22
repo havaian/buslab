@@ -236,7 +236,7 @@ function TasksPageContent() {
                     {activeRequest.text}
                   </p>
                   {/* Attached files from citizen */}
-                  <FileList files={(activeRequest as any).files} />
+                  <FileList files={activeRequest.requestFiles} />
                 </CardContent>
               </Card>
 
@@ -291,7 +291,7 @@ function TasksPageContent() {
                       ref={fileInputRef}
                       type="file"
                       multiple
-                      accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.txt"
+                      accept=".pdf,.docx"
                       className="hidden"
                       onChange={addFiles}
                     />

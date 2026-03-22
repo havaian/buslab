@@ -260,6 +260,7 @@ export interface Request {
   assignedAt: string | null;
   answerText: string | null;
   answerFiles: RequestFile[];
+  requestFiles: RequestFile[];
   adminComment: string | null;
   declineReason: string | null;
   finalAnswerText: string | null;

@@ -168,6 +168,55 @@ export class RequestsService {
       .lean();
   }
 
+  /** Called by the bot when a citizen submits a new request (with optional files). */
+  async submitRequest(
+    userId: string,
+    categoryId: string,
+    text: string,
+    files?: Express.Multer.File[]
+  ) {
+    const requestFiles = files?.length
+      ? files.map((f) => ({
+          filename: f.filename,
+          originalName: f.originalname,
+          mimetype: f.mimetype,
+          size: f.size,
+          ref: f.filename,
+          source: "web" as const,
+        }))
+      : [];
+
+    const req = await this.requestModel.create({
+      userId: new Types.ObjectId(userId),
+      categoryId: new Types.ObjectId(categoryId),
+      text,
+      status: "pending",
+      requestFiles,
+    });
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.REQUEST_SUBMITTED,
+      performedBy: userId,
+      performedByRole: "citizen",
+      statusFrom: null,
+      statusTo: "pending",
+    });
+
+    const cat = await (this.requestModel.db.model("Category") as any)
+      .findById(categoryId)
+      .lean()
+      .catch(() => null);
+
+    await this.notifications.notifyAdminNewRequest(
+      String(req._id),
+      cat?.name || "",
+      text.slice(0, 100)
+    );
+
+    return req;
+  }
+
   // ── ADMIN ACTIONS ─────────────────────────────────────────────────────────
 
   async approve(requestId: string, adminId?: string) {

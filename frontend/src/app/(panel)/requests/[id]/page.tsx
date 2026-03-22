@@ -141,6 +141,8 @@ export default function RequestDetailPage() {
               <p className="text-sm whitespace-pre-wrap leading-relaxed">
                 {request.text}
               </p>
+              {/* Citizen-attached files */}
+              <FileList files={request.requestFiles} />
             </CardContent>
           </Card>
 
