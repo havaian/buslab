@@ -12,9 +12,9 @@ interface FileEntry {
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 function fileUrl(file: FileEntry): string {
-  // ServeStaticModule serves /static/uploads/:filename without auth,
-  // so <a download> works correctly in the browser.
-  if (file.source === "web" && file.ref) return `/static/uploads/${file.ref}`;
+  // /api/files/* is proxied by Next.js to the backend.
+  // No auth header needed — FilesController has no JwtAuthGuard.
+  if (file.source === "web" && file.ref) return `/api/files/${file.ref}`;
   return "#";
 }
 

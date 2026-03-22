@@ -1,17 +1,10 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Res,
-  NotFoundException,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, Get, Param, Res, NotFoundException } from "@nestjs/common";
 import { Response } from "express";
 import { existsSync } from "fs";
 import { join } from "path";
-import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 
-@UseGuards(JwtAuthGuard)
+// No JwtAuthGuard — file refs are UUID-based and unguessable,
+// and <a download> in the browser cannot send Authorization headers.
 @Controller("files")
 export class FilesController {
   @Get(":filename")
