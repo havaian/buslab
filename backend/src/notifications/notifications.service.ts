@@ -1,14 +1,25 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 
 const TELEGRAM_API = "https://api.telegram.org";
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly token = process.env.TELEGRAM_BOT_TOKEN;
   private readonly adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
   private readonly studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
   private readonly webPanelUrl = process.env.WEB_PANEL_URL || "";
+
+  onModuleInit() {
+    this.logger.log(`TELEGRAM_BOT_TOKEN: ${this.token ? "SET" : "⚠️ MISSING"}`);
+    this.logger.log(
+      `TELEGRAM_ADMIN_CHAT_ID: ${this.adminChatId || "⚠️ MISSING"}`
+    );
+    this.logger.log(
+      `TELEGRAM_STUDENT_CHAT_ID: ${this.studentChatId || "⚠️ MISSING"}`
+    );
+    this.logger.log(`WEB_PANEL_URL: ${this.webPanelUrl || "⚠️ MISSING"}`);
+  }
 
   // ── Core primitives ───────────────────────────────────────────────────────
 
@@ -22,7 +33,14 @@ export class NotificationsService {
     text: string,
     replyMarkup?: object
   ): Promise<number | null> {
-    if (!this.token || !chatId) return null;
+    if (!this.token) {
+      this.logger.warn("sendWithResponse skipped: TELEGRAM_BOT_TOKEN not set");
+      return null;
+    }
+    if (!chatId) {
+      this.logger.warn("sendWithResponse skipped: chatId is empty");
+      return null;
+    }
     try {
       const url = `${TELEGRAM_API}/bot${this.token}/sendMessage`;
       const res = await fetch(url, {
@@ -37,6 +55,12 @@ export class NotificationsService {
         }),
       });
       const data = (await res.json()) as any;
+      if (!data.ok) {
+        this.logger.error(
+          `Telegram API error → chat ${chatId}: [${data.error_code}] ${data.description}`
+        );
+        return null;
+      }
       return data?.result?.message_id ?? null;
     } catch (e) {
       this.logger.error(
