@@ -17,7 +17,8 @@ function formatSize(bytes?: number): string {
 }
 
 async function downloadFile(file: FileEntry) {
-  if (!file.ref || file.source !== "web") return;
+  // Files from both "web" and "telegram" sources are stored locally by ref (UUID filename)
+  if (!file.ref) return;
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -49,7 +50,7 @@ export function FileList({ files }: { files?: FileEntry[] | null }) {
       {files.map((f, i) => {
         const name = f.originalName || f.filename || "файл";
         const size = formatSize(f.size);
-        const canDownload = f.source === "web" && !!f.ref;
+        const canDownload = !!f.ref;
 
         return (
           <button
