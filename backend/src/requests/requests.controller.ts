@@ -40,11 +40,6 @@ export class RequestsController {
     return this.requestsService.findById(id);
   }
 
-  @Get(":id/history")
-  getHistory(@Param("id") id: string) {
-    return this.requestsService.getHistory(id);
-  }
-
   // ── Admin ─────────────────────────────────────────────────────────────────
 
   @UseGuards(RolesGuard)
@@ -183,5 +178,11 @@ export class RequestsController {
   @Patch(":id/decline")
   declineRequest(@Param("id") id: string, @CurrentUser() user: any) {
     return this.requestsService.declineRequest(id, user.sub);
+  }
+
+  // NOTE: must be LAST among GET routes — :id catches everything not matched above
+  @Get(":id/history")
+  getHistory(@Param("id") id: string) {
+    return this.requestsService.getHistory(id);
   }
 }

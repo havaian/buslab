@@ -159,6 +159,8 @@ export class RequestsService {
   }
 
   async getHistory(requestId: string) {
+    if (!Types.ObjectId.isValid(requestId))
+      throw new BadRequestException("Invalid request id");
     return this.historyModel
       .find({ requestId: new Types.ObjectId(requestId) })
       .sort({ createdAt: 1 })
