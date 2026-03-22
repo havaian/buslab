@@ -73,6 +73,8 @@ export const requestsApi = {
     patch<Request>(`/requests/${id}/reject-answer`, { comment }),
   sendMessage: (id: string, text: string) =>
     post<{ sent: boolean }>(`/requests/${id}/message`, { text }),
+  getHistory: (id: string) =>
+    get<RequestHistoryEntry[]>(`/requests/${id}/history`),
   // Student
   available: () => get<Request[]>("/requests/student/available"),
   myHistory: () => get<Request[]>("/requests/student/history"),
@@ -217,6 +219,26 @@ export interface PopulatedUser {
   lastName: string;
   username: string;
   language?: string;
+}
+
+export interface RequestHistoryEntry {
+  _id: string;
+  requestId: string;
+  action: string;
+  performedBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    username: string;
+    role: string;
+  } | null;
+  performedByRole: "admin" | "student" | "citizen" | "system";
+  statusFrom: string | null;
+  statusTo: string | null;
+  answerText: string | null;
+  answerFiles: RequestFile[];
+  comment: string | null;
+  createdAt: string;
 }
 
 export interface RequestFile {

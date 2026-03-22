@@ -12,6 +12,11 @@ import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
+import {
+  RequestHistory,
+  RequestHistoryDocument,
+  RequestHistoryAction,
+} from "./schemas/request-history.schema";
 import { StudentAction } from "../common/enums/student-action.enum";
 import { NotificationsService } from "../notifications/notifications.service";
 
@@ -24,10 +29,40 @@ export class RequestsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(StudentLog.name)
     private studentLogModel: Model<StudentLogDocument>,
+    @InjectModel(RequestHistory.name)
+    private historyModel: Model<RequestHistoryDocument>,
     private readonly notifications: NotificationsService
   ) {}
 
-  // ── LIST ─────────────────────────────────────────────────────────────────
+  // ── Private helper ────────────────────────────────────────────────────────
+
+  private async log(entry: {
+    requestId: Types.ObjectId | string;
+    action: RequestHistoryAction;
+    performedBy?: Types.ObjectId | string | null;
+    performedByRole?: "admin" | "student" | "citizen" | "system";
+    statusFrom?: string | null;
+    statusTo?: string | null;
+    answerText?: string | null;
+    answerFiles?: any[];
+    comment?: string | null;
+  }) {
+    await this.historyModel.create({
+      requestId: new Types.ObjectId(String(entry.requestId)),
+      action: entry.action,
+      performedBy: entry.performedBy
+        ? new Types.ObjectId(String(entry.performedBy))
+        : null,
+      performedByRole: entry.performedByRole ?? "system",
+      statusFrom: entry.statusFrom ?? null,
+      statusTo: entry.statusTo ?? null,
+      answerText: entry.answerText ?? null,
+      answerFiles: entry.answerFiles ?? [],
+      comment: entry.comment ?? null,
+    });
+  }
+
+  // ── LIST ──────────────────────────────────────────────────────────────────
 
   async findAll(filters: {
     status?: string;
@@ -123,9 +158,17 @@ export class RequestsService {
       .lean();
   }
 
+  async getHistory(requestId: string) {
+    return this.historyModel
+      .find({ requestId: new Types.ObjectId(requestId) })
+      .sort({ createdAt: 1 })
+      .populate("performedBy", "firstName lastName username role")
+      .lean();
+  }
+
   // ── ADMIN ACTIONS ─────────────────────────────────────────────────────────
 
-  async approve(requestId: string) {
+  async approve(requestId: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("userId", "telegramId language firstName")
@@ -134,35 +177,42 @@ export class RequestsService {
     if (req.status !== "pending")
       throw new BadRequestException("Request is not pending");
 
+    const prev = req.status;
     req.status = "approved";
     await req.save();
 
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.REQUEST_APPROVED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: prev,
+      statusTo: "approved",
+    });
+
     const user = req.userId as any;
-    if (user?.telegramId) {
+    if (user?.telegramId)
       await this.notifications.notifyUserApproved(
         String(user.telegramId),
         user.language || "ru"
       );
-    }
 
     const cat = req.categoryId as any;
-    // Send to student chat with URL button — save returned message_id
     const messageId = await this.notifications.notifyStudentChatApproved(
       requestId,
       cat?.name || "",
       req.text.slice(0, 100)
     );
-    if (messageId) {
+    if (messageId)
       await this.requestModel.updateOne(
         { _id: req._id },
         { studentChatMessageId: messageId }
       );
-    }
 
     return req;
   }
 
-  async reject(requestId: string, reason: string) {
+  async reject(requestId: string, reason: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("userId", "telegramId language");
@@ -170,22 +220,33 @@ export class RequestsService {
     if (req.status !== "pending")
       throw new BadRequestException("Request is not pending");
 
+    const prev = req.status;
     req.status = "declined";
     req.declineReason = reason;
     await req.save();
 
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.REQUEST_REJECTED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: prev,
+      statusTo: "declined",
+      comment: reason,
+    });
+
     const user = req.userId as any;
-    if (user?.telegramId) {
+    if (user?.telegramId)
       await this.notifications.notifyUserRejected(
         String(user.telegramId),
         user.language || "ru",
         reason
       );
-    }
+
     return req;
   }
 
-  async assignStudent(requestId: string, studentId: string) {
+  async assignStudent(requestId: string, studentId: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("categoryId", "name");
@@ -205,6 +266,7 @@ export class RequestsService {
     if (existing)
       throw new BadRequestException("Student already has an active request");
 
+    const prev = req.status;
     const now = new Date();
     req.studentId = new Types.ObjectId(studentId) as any;
     req.status = "assigned";
@@ -223,7 +285,16 @@ export class RequestsService {
       requestId: req._id,
     });
 
-    // Edit student chat message to mark as taken
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.STUDENT_ASSIGNED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: prev,
+      statusTo: "assigned",
+      comment: `${student.firstName} ${student.lastName || ""}`.trim(),
+    });
+
     if (req.studentChatMessageId) {
       const cat = req.categoryId as any;
       await this.notifications.updateStudentChatTaken(
@@ -246,7 +317,7 @@ export class RequestsService {
     return req;
   }
 
-  async unassign(requestId: string) {
+  async unassign(requestId: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("studentId")
@@ -256,6 +327,8 @@ export class RequestsService {
       throw new BadRequestException("Request is not assigned");
 
     const student = req.studentId as any;
+    const prev = req.status;
+
     if (student?._id) {
       await this.studentLogModel.create({
         studentId: student._id,
@@ -280,24 +353,34 @@ export class RequestsService {
     req.timerExpiredNotified = false;
     await req.save();
 
-    // Republish to student chat with a fresh URL-button announcement
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.STUDENT_UNASSIGNED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: prev,
+      statusTo: "approved",
+      comment: student
+        ? `${student.firstName} ${student.lastName || ""}`.trim()
+        : null,
+    });
+
     const cat = req.categoryId as any;
     const messageId = await this.notifications.notifyStudentChatReturned(
       requestId,
       cat?.name || "",
       req.text.slice(0, 100)
     );
-    if (messageId) {
+    if (messageId)
       await this.requestModel.updateOne(
         { _id: req._id },
         { studentChatMessageId: messageId }
       );
-    }
 
     return req;
   }
 
-  async returnToQueue(requestId: string) {
+  async returnToQueue(requestId: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("studentId")
@@ -305,6 +388,8 @@ export class RequestsService {
     if (!req) throw new NotFoundException();
 
     const student = req.studentId as any;
+    const prev = req.status;
+
     if (student?._id) {
       await this.studentLogModel.create({
         studentId: student._id,
@@ -332,24 +417,35 @@ export class RequestsService {
     req.adminComment = null;
     await req.save();
 
-    // Republish to student chat with a fresh URL-button announcement
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.RETURNED_TO_QUEUE,
+      performedBy: adminId,
+      performedByRole: adminId ? "admin" : "system",
+      statusFrom: prev,
+      statusTo: "approved",
+    });
+
     const cat = req.categoryId as any;
     const messageId = await this.notifications.notifyStudentChatReturned(
       requestId,
       cat?.name || "",
       req.text.slice(0, 100)
     );
-    if (messageId) {
+    if (messageId)
       await this.requestModel.updateOne(
         { _id: req._id },
         { studentChatMessageId: messageId }
       );
-    }
 
     return req;
   }
 
-  async approveAnswer(requestId: string, finalAnswer?: string) {
+  async approveAnswer(
+    requestId: string,
+    finalAnswer?: string,
+    adminId?: string
+  ) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("studentId")
@@ -358,9 +454,21 @@ export class RequestsService {
     if (req.status !== "answered")
       throw new BadRequestException("Request is not in answered status");
 
+    const prev = req.status;
     req.status = "closed";
     req.finalAnswerText = finalAnswer ?? req.answerText;
     await req.save();
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.ANSWER_APPROVED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: prev,
+      statusTo: "closed",
+      answerText: req.finalAnswerText,
+      answerFiles: req.answerFiles ?? [],
+    });
 
     const student = req.studentId as any;
     if (student?._id) {
@@ -381,17 +489,17 @@ export class RequestsService {
     }
 
     const user = req.userId as any;
-    if (user?.telegramId) {
+    if (user?.telegramId)
       await this.notifications.notifyUserAnswerReady(
         String(user.telegramId),
         user.language || "ru",
         req.finalAnswerText
       );
-    }
+
     return req;
   }
 
-  async rejectAnswer(requestId: string, comment: string) {
+  async rejectAnswer(requestId: string, comment: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
       .populate("studentId");
@@ -399,9 +507,23 @@ export class RequestsService {
     if (req.status !== "answered")
       throw new BadRequestException("Request is not in answered status");
 
+    const prev = req.status;
     req.status = "assigned";
     req.adminComment = comment;
     await req.save();
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.ANSWER_REJECTED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: prev,
+      statusTo: "assigned",
+      // Snapshot of the rejected answer
+      answerText: req.answerText,
+      answerFiles: req.answerFiles ?? [],
+      comment,
+    });
 
     const student = req.studentId as any;
     if (student?._id) {
@@ -455,6 +577,7 @@ export class RequestsService {
     const student = await this.userModel.findById(studentId);
     if (!student) throw new NotFoundException();
 
+    const prev = req.status;
     const now = new Date();
     req.studentId = new Types.ObjectId(studentId) as any;
     req.status = "assigned";
@@ -473,7 +596,15 @@ export class RequestsService {
       requestId: req._id,
     });
 
-    // Edit the student chat announcement to mark as taken + remove the button
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.STUDENT_TOOK,
+      performedBy: studentId,
+      performedByRole: "student",
+      statusFrom: prev,
+      statusTo: "assigned",
+    });
+
     if (req.studentChatMessageId) {
       const cat = req.categoryId as any;
       await this.notifications.updateStudentChatTaken(
@@ -482,7 +613,6 @@ export class RequestsService {
         req.text.slice(0, 100),
         `${student.firstName} ${student.lastName || ""}`.trim()
       );
-      // Clear the stored message_id — message has been edited, no longer "active"
       await this.requestModel.updateOne(
         { _id: req._id },
         { studentChatMessageId: null }
@@ -509,19 +639,22 @@ export class RequestsService {
       ? Math.round((Date.now() - req.assignedAt.getTime()) / 60000)
       : null;
 
+    const prev = req.status;
     req.status = "answered";
     req.answerText = answer;
 
-    if (files?.length) {
-      req.answerFiles = files.map((f) => ({
-        filename: f.filename,
-        originalName: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size,
-        ref: f.filename,
-        source: "web",
-      }));
-    }
+    const answerFiles = files?.length
+      ? files.map((f) => ({
+          filename: f.filename,
+          originalName: f.originalname,
+          mimetype: f.mimetype,
+          size: f.size,
+          ref: f.filename,
+          source: "web" as const,
+        }))
+      : [];
+
+    if (answerFiles.length) req.answerFiles = answerFiles;
 
     await req.save();
 
@@ -530,6 +663,17 @@ export class RequestsService {
       action: StudentAction.SUBMITTED_ANSWER,
       requestId: req._id,
       timeSpentMinutes,
+    });
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.ANSWER_SUBMITTED,
+      performedBy: studentId,
+      performedByRole: "student",
+      statusFrom: prev,
+      statusTo: "answered",
+      answerText: answer,
+      answerFiles,
     });
 
     const student = await this.userModel.findById(studentId);
@@ -552,10 +696,21 @@ export class RequestsService {
     if (String(req.studentId) !== studentId)
       throw new ForbiddenException("Not your request");
 
+    const prev = req.status;
+
     await this.studentLogModel.create({
       studentId: new Types.ObjectId(studentId),
       action: StudentAction.DECLINED_REQUEST,
       requestId: req._id,
+    });
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.STUDENT_DECLINED,
+      performedBy: studentId,
+      performedByRole: "student",
+      statusFrom: prev,
+      statusTo: "approved",
     });
 
     req.status = "approved";
@@ -577,19 +732,17 @@ export class RequestsService {
       student ? `${student.firstName} ${student.lastName}`.trim() : ""
     );
 
-    // Republish to student chat so other students can take it
     const cat = req.categoryId as any;
     const messageId = await this.notifications.notifyStudentChatReturned(
       requestId,
       cat?.name || "",
       req.text.slice(0, 100)
     );
-    if (messageId) {
+    if (messageId)
       await this.requestModel.updateOne(
         { _id: req._id },
         { studentChatMessageId: messageId }
       );
-    }
 
     return req;
   }

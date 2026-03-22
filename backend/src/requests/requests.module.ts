@@ -8,6 +8,10 @@ import {
   StudentLog,
   StudentLogSchema,
 } from "../student-logs/schemas/student-log.schema";
+import {
+  RequestHistory,
+  RequestHistorySchema,
+} from "./schemas/request-history.schema";
 
 @Module({
   imports: [
@@ -15,6 +19,7 @@ import {
       { name: Request.name, schema: RequestSchema },
       { name: User.name, schema: UserSchema },
       { name: StudentLog.name, schema: StudentLogSchema },
+      { name: RequestHistory.name, schema: RequestHistorySchema },
     ]),
   ],
   controllers: [RequestsController],

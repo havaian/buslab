@@ -33,14 +33,19 @@ const uploadStorage = diskStorage({
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
-  // ── Shared ───────────────────────────────────────────────────────────────
+  // ── Shared ────────────────────────────────────────────────────────────────
 
   @Get(":id")
   findById(@Param("id") id: string) {
     return this.requestsService.findById(id);
   }
 
-  // ── Admin ────────────────────────────────────────────────────────────────
+  @Get(":id/history")
+  getHistory(@Param("id") id: string) {
+    return this.requestsService.getHistory(id);
+  }
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -68,36 +73,44 @@ export class RequestsController {
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/approve")
-  approve(@Param("id") id: string) {
-    return this.requestsService.approve(id);
+  approve(@Param("id") id: string, @CurrentUser() admin: any) {
+    return this.requestsService.approve(id, admin.sub);
   }
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/reject")
-  reject(@Param("id") id: string, @Body("reason") reason: string) {
-    return this.requestsService.reject(id, reason);
+  reject(
+    @Param("id") id: string,
+    @Body("reason") reason: string,
+    @CurrentUser() admin: any
+  ) {
+    return this.requestsService.reject(id, reason, admin.sub);
   }
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/assign")
-  assignStudent(@Param("id") id: string, @Body("studentId") studentId: string) {
-    return this.requestsService.assignStudent(id, studentId);
+  assignStudent(
+    @Param("id") id: string,
+    @Body("studentId") studentId: string,
+    @CurrentUser() admin: any
+  ) {
+    return this.requestsService.assignStudent(id, studentId, admin.sub);
   }
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/unassign")
-  unassign(@Param("id") id: string) {
-    return this.requestsService.unassign(id);
+  unassign(@Param("id") id: string, @CurrentUser() admin: any) {
+    return this.requestsService.unassign(id, admin.sub);
   }
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/return-to-queue")
-  returnToQueue(@Param("id") id: string) {
-    return this.requestsService.returnToQueue(id);
+  returnToQueue(@Param("id") id: string, @CurrentUser() admin: any) {
+    return this.requestsService.returnToQueue(id, admin.sub);
   }
 
   @UseGuards(RolesGuard)
@@ -105,16 +118,21 @@ export class RequestsController {
   @Patch(":id/approve-answer")
   approveAnswer(
     @Param("id") id: string,
-    @Body("finalAnswer") finalAnswer?: string
+    @Body("finalAnswer") finalAnswer: string,
+    @CurrentUser() admin: any
   ) {
-    return this.requestsService.approveAnswer(id, finalAnswer);
+    return this.requestsService.approveAnswer(id, finalAnswer, admin.sub);
   }
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/reject-answer")
-  rejectAnswer(@Param("id") id: string, @Body("comment") comment: string) {
-    return this.requestsService.rejectAnswer(id, comment);
+  rejectAnswer(
+    @Param("id") id: string,
+    @Body("comment") comment: string,
+    @CurrentUser() admin: any
+  ) {
+    return this.requestsService.rejectAnswer(id, comment, admin.sub);
   }
 
   @UseGuards(RolesGuard)
@@ -124,10 +142,8 @@ export class RequestsController {
     return this.requestsService.sendDirectMessage(id, text);
   }
 
-  // ── Student ──────────────────────────────────────────────────────────────
+  // ── Student — static routes BEFORE :id ───────────────────────────────────
 
-  // NOTE: static sub-routes MUST come before :id to avoid Express treating
-  // "student" as a request id
   @UseGuards(RolesGuard)
   @Roles(UserRole.STUDENT)
   @Get("student/available")

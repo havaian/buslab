@@ -10,12 +10,18 @@ import {
   CheckCheck,
   XCircle,
   UserCheck,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  User,
+  ShieldCheck,
 } from "lucide-react";
 import {
   requestsApi,
   adminUsersApi,
   type Request,
   type PanelUser,
+  type RequestHistoryEntry,
 } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +48,7 @@ export default function RequestDetailPage() {
   const dialog = useDialog();
 
   const [request, setRequest] = useState<Request | null>(null);
+  const [history, setHistory] = useState<RequestHistoryEntry[]>([]);
   const [freeStudents, setFreeStudents] = useState<PanelUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -50,15 +57,24 @@ export default function RequestDetailPage() {
   const [assignStudentId, setAssignStudentId] = useState("");
 
   const reload = async () => {
-    const r = await requestsApi.findById(id);
+    const [r, h] = await Promise.all([
+      requestsApi.findById(id),
+      requestsApi.getHistory(id),
+    ]);
     setRequest(r);
+    setHistory(h);
     setFinalAnswer(r.answerText || "");
   };
 
   useEffect(() => {
-    Promise.all([requestsApi.findById(id), adminUsersApi.freeStudents()])
-      .then(([r, s]) => {
+    Promise.all([
+      requestsApi.findById(id),
+      requestsApi.getHistory(id),
+      adminUsersApi.freeStudents(),
+    ])
+      .then(([r, h, s]) => {
         setRequest(r);
+        setHistory(h);
         setFreeStudents(s);
         setFinalAnswer(r.answerText || "");
       })
@@ -500,6 +516,141 @@ export default function RequestDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* ── History timeline ──────────────────────────────────────────── */}
+      {history.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold mb-3">История обращения</h2>
+          <div className="relative border-l-2 border-muted ml-3 space-y-0">
+            {history.map((entry, i) => (
+              <HistoryEntry
+                key={entry._id}
+                entry={entry}
+                last={i === history.length - 1}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </PageShell>
+  );
+}
+
+// ── History entry component ────────────────────────────────────────────────
+
+const ACTION_META: Record<string, { label: string; color: string }> = {
+  request_submitted: { label: "Обращение подано", color: "bg-blue-500" },
+  request_approved: { label: "Обращение одобрено", color: "bg-green-500" },
+  request_rejected: { label: "Обращение отклонено", color: "bg-red-500" },
+  student_took: { label: "Студент взял в работу", color: "bg-purple-500" },
+  student_assigned: { label: "Студент назначен", color: "bg-purple-500" },
+  student_unassigned: { label: "Студент снят", color: "bg-orange-500" },
+  student_declined: { label: "Студент отказался", color: "bg-orange-500" },
+  returned_to_queue: { label: "Возвращено в очередь", color: "bg-yellow-500" },
+  answer_submitted: {
+    label: "Ответ отправлен на проверку",
+    color: "bg-blue-500",
+  },
+  answer_approved: { label: "Ответ одобрен", color: "bg-green-500" },
+  answer_rejected: {
+    label: "Ответ отклонён на доработку",
+    color: "bg-red-500",
+  },
+  timer_expired: { label: "Таймер истёк", color: "bg-red-600" },
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Ожидает проверки",
+  approved: "Одобрено",
+  declined: "Отклонено",
+  assigned: "В работе",
+  answered: "Ответ на проверке",
+  closed: "Закрыто",
+};
+
+function HistoryEntry({
+  entry,
+  last,
+}: {
+  entry: RequestHistoryEntry;
+  last: boolean;
+}) {
+  const meta = ACTION_META[entry.action] ?? {
+    label: entry.action,
+    color: "bg-muted-foreground",
+  };
+  const performer = entry.performedBy;
+  const performerName = performer
+    ? `${performer.firstName} ${performer.lastName || ""}`.trim() ||
+      performer.username
+    : null;
+
+  return (
+    <div className={`relative pl-6 pb-5 ${last ? "" : ""}`}>
+      {/* Dot */}
+      <span
+        className={`absolute left-[-5px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background ${meta.color}`}
+      />
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1 min-w-0">
+          <p className="text-sm font-medium">{meta.label}</p>
+
+          {/* Status transition */}
+          {entry.statusFrom && entry.statusTo && (
+            <p className="text-xs text-muted-foreground">
+              {STATUS_LABELS[entry.statusFrom] ?? entry.statusFrom}
+              {" → "}
+              {STATUS_LABELS[entry.statusTo] ?? entry.statusTo}
+            </p>
+          )}
+
+          {/* Performer */}
+          {performerName && (
+            <p className="text-xs text-muted-foreground">
+              {entry.performedByRole === "admin" ? "Администратор" : "Студент"}:{" "}
+              {performerName}
+              {performer?.username ? ` (@${performer.username})` : ""}
+            </p>
+          )}
+
+          {/* Comment / decline reason */}
+          {entry.comment && (
+            <div className="mt-1 rounded-md border-l-2 border-orange-300 bg-orange-50 pl-3 pr-2 py-1.5 text-xs text-orange-800">
+              {entry.comment}
+            </div>
+          )}
+
+          {/* Answer snapshot */}
+          {entry.answerText && (
+            <details className="mt-1">
+              <summary className="text-xs text-muted-foreground cursor-pointer select-none">
+                Текст ответа (снимок)
+              </summary>
+              <p className="mt-1 text-xs whitespace-pre-wrap leading-relaxed bg-muted/30 rounded p-2 border">
+                {entry.answerText}
+              </p>
+            </details>
+          )}
+
+          {/* Answer files snapshot */}
+          {entry.answerFiles?.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Файлы: {entry.answerFiles.map((f) => f.originalName).join(", ")}
+            </p>
+          )}
+        </div>
+
+        <time className="text-xs text-muted-foreground whitespace-nowrap shrink-0 pt-0.5">
+          {new Date(entry.createdAt).toLocaleString("ru-RU", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </time>
+      </div>
+    </div>
   );
 }
