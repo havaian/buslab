@@ -13,12 +13,11 @@ import { authApi, type PanelUser } from "@/lib/api";
 interface AuthContextValue {
   user: PanelUser | null;
   loading: boolean;
-  login: (telegramData: Record<string, unknown>) => Promise<void>;
+  login: (idToken: string) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
 const PUBLIC_PATHS = ["/login"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -57,8 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (telegramData: Record<string, unknown>) => {
-      const res = await authApi.telegramLogin(telegramData);
+    async (idToken: string) => {
+      const res = await authApi.telegramLogin(idToken);
       localStorage.setItem("token", res.access_token);
       setUser(res.user);
       router.push(res.user.role === "admin" ? "/dashboard" : "/tasks");

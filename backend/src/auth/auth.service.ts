@@ -6,9 +6,25 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
-import * as crypto from "crypto";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { User, UserDocument } from "../users/schemas/user.schema";
-import { TelegramAuthDto } from "./dto/telegram-auth.dto";
+
+// Telegram OIDC JWKS endpoint
+const TELEGRAM_JWKS = createRemoteJWKSet(
+  new URL("https://oauth.telegram.org/.well-known/jwks.json")
+);
+
+interface TelegramIdTokenClaims {
+  iss: string;
+  aud: string;
+  sub: string;
+  iat: number;
+  exp: number;
+  id: number;
+  name?: string;
+  preferred_username?: string;
+  picture?: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -17,36 +33,35 @@ export class AuthService {
     private jwtService: JwtService
   ) {}
 
-  verifyTelegramHash(data: TelegramAuthDto): boolean {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const secret = crypto.createHash("sha256").update(botToken).digest();
+  private async verifyTelegramIdToken(
+    idToken: string
+  ): Promise<TelegramIdTokenClaims> {
+    const clientId = process.env.TELEGRAM_BOT_CLIENT_ID;
+    if (!clientId) throw new Error("TELEGRAM_BOT_CLIENT_ID not set");
 
-    const { hash, ...rest } = data;
-    const checkString = Object.keys(rest)
-      .sort()
-      .map((k) => `${k}=${rest[k]}`)
-      .join("\n");
+    const { payload } = await jwtVerify(idToken, TELEGRAM_JWKS, {
+      issuer: "https://oauth.telegram.org",
+      audience: clientId,
+    });
 
-    const computedHash = crypto
-      .createHmac("sha256", secret)
-      .update(checkString)
-      .digest("hex");
-
-    return computedHash === hash;
+    return payload as unknown as TelegramIdTokenClaims;
   }
 
-  async login(dto: TelegramAuthDto) {
-    if (!this.verifyTelegramHash(dto)) {
-      throw new UnauthorizedException("Invalid Telegram auth data");
+  async login(idToken: string) {
+    let claims: TelegramIdTokenClaims;
+
+    try {
+      claims = await this.verifyTelegramIdToken(idToken);
+    } catch {
+      throw new UnauthorizedException("Invalid Telegram auth token");
     }
 
-    const now = Math.floor(Date.now() / 1000);
-    if (now - dto.auth_date > 86400) {
-      throw new UnauthorizedException("Telegram auth data is expired");
+    if (!claims.id) {
+      throw new UnauthorizedException("Invalid token: missing user id");
     }
 
     const user = await this.userModel.findOne({
-      telegramId: Number(dto.id),
+      telegramId: claims.id,
       role: { $in: ["admin", "student"] },
     });
 
@@ -58,10 +73,15 @@ export class AuthService {
       throw new ForbiddenException("User is blocked");
     }
 
-    // Update profile from Telegram
-    user.firstName = dto.first_name;
-    user.lastName = dto.last_name || "";
-    user.username = dto.username || "";
+    // Update profile from token claims
+    if (claims.name) {
+      const [firstName, ...rest] = claims.name.split(" ");
+      user.firstName = firstName;
+      user.lastName = rest.join(" ") || "";
+    }
+    if (claims.preferred_username) {
+      user.username = claims.preferred_username;
+    }
     await user.save();
 
     const payload = {
