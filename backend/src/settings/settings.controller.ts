@@ -24,7 +24,7 @@ type AllowedLocale = (typeof ALLOWED_LOCALES)[number];
 // __dirname = .../settings/, locales are at ../bot/i18n/locales/
 const LOCALES_DIR = path.join(__dirname, "..", "bot", "i18n", "locales");
 
-@Controller("api/settings")
+@Controller("settings")
 @UseGuards(RolesGuard)
 @Roles(UserRole.ADMIN)
 export class SettingsController implements OnModuleInit {
