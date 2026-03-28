@@ -11,10 +11,10 @@ export class BotI18nService {
   private readonly defaultLocale = "ru";
 
   constructor() {
-    this.loadLocales();
+    this.reload();
   }
 
-  private loadLocales() {
+  reload() {
     const dir = path.join(__dirname, "i18n", "locales");
     if (!fs.existsSync(dir)) {
       this.logger.warn(`Locales directory not found: ${dir}`);

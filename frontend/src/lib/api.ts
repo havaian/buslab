@@ -180,6 +180,15 @@ export const settingsApi = {
     put<Record<string, string>>(`/settings/${key}`, { value }),
 };
 
+// ── Locales ───────────────────────────────────────────────────────────────
+
+export const localesApi = {
+  get: (locale: string) =>
+    get<Record<string, any>>(`/settings/locales/${locale}`),
+  set: (locale: string, content: Record<string, any>) =>
+    put<{ ok: boolean }>(`/settings/locales/${locale}`, { content }),
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function toQuery(params: object): string {
