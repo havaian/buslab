@@ -286,7 +286,8 @@ export class RequestsService {
   async reject(requestId: string, reason: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("userId", "telegramId language", "categoryId", "name");
+      .populate("userId", "telegramId language")
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "pending")
       throw new BadRequestException("Request is not pending");
