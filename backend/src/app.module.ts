@@ -17,6 +17,7 @@ import { FilesModule } from "./files/files.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { StudentLogsModule } from "./student-logs/student-logs.module";
+import { SettingsModule } from "./settings/settings.module";
 import { BotModule } from "./bot/bot.module";
 
 @Module({
@@ -51,6 +52,7 @@ import { BotModule } from "./bot/bot.module";
     SchedulerModule,
     StudentLogsModule,
     BotModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

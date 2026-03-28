@@ -45,6 +45,9 @@ export class Request {
   @Prop({ default: null, type: Number })
   studentChatMessageId: number | null;
 
+  @Prop({ default: null, type: Number })
+  adminChatMessageId: number | null;
+
   // Extended fields for web panel
   @Prop({ default: null })
   declineReason: string | null;

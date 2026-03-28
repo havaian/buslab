@@ -33,6 +33,10 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     this.registerMiddleware(this.bot);
     this.botUpdate.register(this.bot);
 
+    this.bot.catch((err) => {
+      this.logger.error("Bot handler error:", err);
+    });
+
     this.bot
       .start({
         onStart: (info) =>

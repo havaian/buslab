@@ -11,6 +11,7 @@ import { RequestsService } from "../requests/requests.service";
 import { AdminUsersService } from "../admin-users/admin-users.service";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { Faq, FaqDocument } from "../faq/schemas/faq.schema";
+import { Request, RequestDocument } from "../requests/schemas/request.schema";
 
 @Injectable()
 export class BotUpdate {
@@ -23,6 +24,7 @@ export class BotUpdate {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Faq.name) private readonly faqModel: Model<FaqDocument>,
+    @InjectModel(Request.name) private readonly requestModel: Model<RequestDocument>,
     private readonly requestsService: RequestsService,
     private readonly adminUsersService: AdminUsersService,
     private readonly i18n: BotI18nService,
@@ -544,9 +546,7 @@ export class BotUpdate {
     if (!ctx.from) return;
     const user = await this.getOrCreate(ctx);
 
-    const mongoose = await import("mongoose");
-    const requests = await mongoose.default
-      .model("Request")
+    const requests = await this.requestModel
       .find({ userId: user._id })
       .sort({ createdAt: -1 })
       .populate("categoryId", "name")

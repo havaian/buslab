@@ -14,6 +14,7 @@ import {
   BarChart2,
   LogOut,
   X,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/auth-context";
@@ -25,6 +26,7 @@ const adminNav = [
   { href: "/students", label: "Студенты", icon: GraduationCap },
   { href: "/categories", label: "Категории", icon: Tag },
   { href: "/faq", label: "FAQ", icon: HelpCircle },
+  { href: "/settings", label: "Настройки", icon: Settings },
 ];
 
 const studentNav = [

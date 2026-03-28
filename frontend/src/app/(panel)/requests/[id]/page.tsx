@@ -323,6 +323,7 @@ export default function RequestDetailPage() {
                   >
                     <CheckCheck size={13} /> Одобрить
                   </Button>
+
                   <Button
                     size="sm"
                     variant="destructive"
@@ -345,6 +346,30 @@ export default function RequestDetailPage() {
                     }}
                   >
                     <XCircle size={13} /> Отклонить
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={busy}
+                    onClick={async () => {
+                      const ok = await dialog.confirm(
+                        "Отклонить стандартной причиной отказа?",
+                        {
+                          title: "Стандартный отказ",
+                          variant: "destructive",
+                          confirmLabel: "Отклонить",
+                        }
+                      );
+                      if (!ok) return;
+                      run(
+                        () => requestsApi.rejectStandard(id),
+                        "Обращение отклонено"
+                      );
+                    }}
+                  >
+                    <XCircle size={13} /> Стандартный отказ
                   </Button>
                 </>
               )}

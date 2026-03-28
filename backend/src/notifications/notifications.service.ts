@@ -127,12 +127,12 @@ export class NotificationsService implements OnModuleInit {
   async notifyAdminNewRequest(
     requestId: string,
     category: string,
-    shortText: string
-  ) {
+    text: string
+  ): Promise<number | null> {
     const link = `${this.webPanelUrl}/requests/${requestId}`;
-    await this.send(
+    return this.sendWithResponse(
       this.adminChatId,
-      `📩 <b>Новое обращение</b>\nКатегория: ${category}\n${shortText}\n\n<a href="${link}">Открыть в панели →</a>`
+      `📩 <b>Новое обращение</b>\nКатегория: ${category}\n${text}\n\n<a href="${link}">Открыть в панели →</a>`
     );
   }
 
@@ -162,6 +162,18 @@ export class NotificationsService implements OnModuleInit {
       this.adminChatId,
       `↩️ <b>Студент отказался от обращения</b>\nСтудент: ${studentName}\n\n<a href="${link}">Открыть обращение →</a>`
     );
+  }
+
+  async editAdminRequestStatus(
+    messageId: number,
+    requestId: string,
+    category: string,
+    text: string,
+    statusLine: string
+  ): Promise<void> {
+    const link = `${this.webPanelUrl}/requests/${requestId}`;
+    const newText = `📩 <b>Новое обращение</b>\nКатегория: ${category}\n${text}\n\n<a href="${link}">Открыть в панели →</a>\n\n${statusLine}`;
+    await this.editMessage(this.adminChatId, messageId, newText);
   }
 
   // ── Student chat ──────────────────────────────────────────────────────────

@@ -324,11 +324,17 @@ export class SubmitRequestConversation {
         ? `\n📎 Прикреплено файлов: ${requestFiles.length}`
         : "";
 
-      await this.notifications.notifyAdminNewRequest(
+      const adminMsgId = await this.notifications.notifyAdminNewRequest(
         String(newRequest._id),
         state.categoryName,
-        state.requestText.slice(0, STUDENT_CHAT_PREVIEW_LENGTH) + filesNote
+        state.requestText + filesNote
       );
+      if (adminMsgId) {
+        await this.requestModel.updateOne(
+          { _id: newRequest._id },
+          { adminChatMessageId: adminMsgId }
+        );
+      }
 
       await ctx.reply(this.t(ctx, "success.request_sent"), {
         reply_markup: mainMenuKeyboard(),

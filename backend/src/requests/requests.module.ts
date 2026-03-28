@@ -4,6 +4,7 @@ import { RequestsController } from "./requests.controller";
 import { RequestsService } from "./requests.service";
 import { Request, RequestSchema } from "./schemas/request.schema";
 import { User, UserSchema } from "../users/schemas/user.schema";
+import { SettingsModule } from "../settings/settings.module";
 import {
   StudentLog,
   StudentLogSchema,
@@ -21,6 +22,7 @@ import {
       { name: StudentLog.name, schema: StudentLogSchema },
       { name: RequestHistory.name, schema: RequestHistorySchema },
     ]),
+    SettingsModule,
   ],
   controllers: [RequestsController],
   providers: [RequestsService],

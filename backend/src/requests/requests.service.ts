@@ -19,6 +19,7 @@ import {
 } from "./schemas/request-history.schema";
 import { StudentAction } from "../common/enums/student-action.enum";
 import { NotificationsService } from "../notifications/notifications.service";
+import { SettingsService } from "../settings/settings.service";
 
 const TIMER_DURATION_MS = 12 * 60 * 60 * 1000;
 
@@ -31,7 +32,8 @@ export class RequestsService {
     private studentLogModel: Model<StudentLogDocument>,
     @InjectModel(RequestHistory.name)
     private historyModel: Model<RequestHistoryDocument>,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly settingsService: SettingsService
   ) {}
 
   // ── Private helper ────────────────────────────────────────────────────────
@@ -208,11 +210,17 @@ export class RequestsService {
       .lean()
       .catch(() => null);
 
-    await this.notifications.notifyAdminNewRequest(
+    const adminMsgId = await this.notifications.notifyAdminNewRequest(
       String(req._id),
       cat?.name || "",
-      text.slice(0, 100)
+      text
     );
+    if (adminMsgId) {
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { adminChatMessageId: adminMsgId }
+      );
+    }
 
     return req;
   }
@@ -249,11 +257,23 @@ export class RequestsService {
       );
 
     const cat = req.categoryId as any;
+
+    if (req.adminChatMessageId) {
+      await this.notifications.editAdminRequestStatus(
+        req.adminChatMessageId,
+        requestId,
+        cat?.name || "",
+        req.text,
+        `✅ <b>Одобрено</b>`
+      );
+    }
+
     const messageId = await this.notifications.notifyStudentChatApproved(
       requestId,
       cat?.name || "",
-      req.text.slice(0, 100)
+      req.text
     );
+
     if (messageId)
       await this.requestModel.updateOne(
         { _id: req._id },
@@ -266,7 +286,7 @@ export class RequestsService {
   async reject(requestId: string, reason: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("userId", "telegramId language");
+      .populate("userId", "telegramId language", "categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "pending")
       throw new BadRequestException("Request is not pending");
@@ -293,6 +313,18 @@ export class RequestsService {
         user.language || "ru",
         reason
       );
+
+    // Edit the admin chat notification
+    if (req.adminChatMessageId) {
+      const cat = req.categoryId as any;
+      await this.notifications.editAdminRequestStatus(
+        req.adminChatMessageId,
+        requestId,
+        cat?.name || "",
+        req.text,
+        `❌ <b>Отклонено</b>\nПричина: ${reason}`
+      );
+    }
 
     return req;
   }
@@ -351,7 +383,7 @@ export class RequestsService {
       await this.notifications.updateStudentChatTaken(
         req.studentChatMessageId,
         cat?.name || "",
-        req.text.slice(0, 100),
+        req.text,
         `${student.firstName} ${student.lastName || ""}`.trim()
       );
       await this.requestModel.updateOne(
@@ -363,7 +395,7 @@ export class RequestsService {
     await this.notifications.notifyStudentAssigned(
       String(student.telegramId),
       requestId,
-      req.text.slice(0, 100)
+      req.text
     );
     return req;
   }
@@ -420,7 +452,7 @@ export class RequestsService {
     const messageId = await this.notifications.notifyStudentChatReturned(
       requestId,
       cat?.name || "",
-      req.text.slice(0, 100)
+      req.text
     );
     if (messageId)
       await this.requestModel.updateOne(
@@ -481,7 +513,7 @@ export class RequestsService {
     const messageId = await this.notifications.notifyStudentChatReturned(
       requestId,
       cat?.name || "",
-      req.text.slice(0, 100)
+      req.text
     );
     if (messageId)
       await this.requestModel.updateOne(
@@ -662,7 +694,7 @@ export class RequestsService {
       await this.notifications.updateStudentChatTaken(
         req.studentChatMessageId,
         cat?.name || "",
-        req.text.slice(0, 100),
+        req.text,
         `${student.firstName} ${student.lastName || ""}`.trim()
       );
       await this.requestModel.updateOne(
@@ -788,7 +820,7 @@ export class RequestsService {
     const messageId = await this.notifications.notifyStudentChatReturned(
       requestId,
       cat?.name || "",
-      req.text.slice(0, 100)
+      req.text
     );
     if (messageId)
       await this.requestModel.updateOne(
@@ -797,5 +829,20 @@ export class RequestsService {
       );
 
     return req;
+  }
+
+  async rejectStandard(requestId: string, adminId?: string) {
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("userId", "language");
+    if (!req) throw new NotFoundException();
+
+    const user = req.userId as any;
+    const language: string = user?.language || "ru";
+
+    const texts = await this.settingsService.get("standard_rejection_text");
+    const reason = texts[language] || texts["ru"] || "Обращение отклонено.";
+
+    return this.reject(requestId, reason, adminId);
   }
 }

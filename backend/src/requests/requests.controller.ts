@@ -103,6 +103,13 @@ export class RequestsController {
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
+  @Patch(":id/reject-standard")
+  rejectStandard(@Param("id") id: string, @CurrentUser() admin: any) {
+    return this.requestsService.rejectStandard(id, admin.sub);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
   @Patch(":id/assign")
   assignStudent(
     @Param("id") id: string,

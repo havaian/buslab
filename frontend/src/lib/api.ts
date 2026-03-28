@@ -41,6 +41,7 @@ const post = <T>(path: string, body?: unknown) =>
   request<T>("POST", path, body);
 const patch = <T>(path: string, body?: unknown) =>
   request<T>("PATCH", path, body);
+const put = <T>(path: string, body?: unknown) => request<T>("PUT", path, body);
 const del = <T>(path: string) => request<T>("DELETE", path);
 const patchForm = <T>(path: string, form: FormData) =>
   request<T>("PATCH", path, undefined, form);
@@ -64,6 +65,8 @@ export const requestsApi = {
   approve: (id: string) => patch<Request>(`/requests/${id}/approve`),
   reject: (id: string, reason: string) =>
     patch<Request>(`/requests/${id}/reject`, { reason }),
+  rejectStandard: (id: string) =>
+    patch<Request>(`/requests/${id}/reject-standard`),
   assign: (id: string, studentId: string) =>
     patch<Request>(`/requests/${id}/assign`, { studentId }),
   unassign: (id: string) => patch<Request>(`/requests/${id}/unassign`),
@@ -167,6 +170,14 @@ export const faqApi = {
 export const statsApi = {
   dashboard: () => get<DashboardStats>("/stats/dashboard"),
   students: () => get<StudentSummary[]>("/stats/students"),
+};
+
+// ── Settings ──────────────────────────────────────────────────────────────
+
+export const settingsApi = {
+  get: (key: string) => get<Record<string, string>>(`/settings/${key}`),
+  set: (key: string, value: Record<string, string>) =>
+    put<Record<string, string>>(`/settings/${key}`, { value }),
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
