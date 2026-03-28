@@ -15,6 +15,7 @@ import * as fs from "fs";
 import { SettingsService } from "./settings.service";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { UserRole } from "../common/enums/user-role.enum";
 
 const ALLOWED_LOCALES = ["ru", "uz", "en"] as const;
@@ -25,7 +26,7 @@ type AllowedLocale = (typeof ALLOWED_LOCALES)[number];
 const LOCALES_DIR = path.join(__dirname, "..", "bot", "i18n", "locales");
 
 @Controller("settings")
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class SettingsController implements OnModuleInit {
   // Resolved lazily after app is fully initialized to avoid circular deps
