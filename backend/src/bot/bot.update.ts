@@ -605,7 +605,18 @@ export class BotUpdate {
       message += "\n";
     }
 
-    await ctx.reply(message, { reply_markup: this.mainMenuKb(ctx) });
+    const miniAppUrl = process.env.WEB_PANEL_URL
+      ? `${process.env.WEB_PANEL_URL}/app`
+      : "";
+
+    await ctx.reply(message, {
+      reply_markup: miniAppUrl
+        ? new InlineKeyboard().webApp(
+            this.t(ctx, "buttons.open_app"),
+            miniAppUrl
+          )
+        : undefined,
+    });
   }
 
   // ── Citizen: help & language ──────────────────────────────────────────────
