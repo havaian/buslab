@@ -11,6 +11,8 @@ import {
   StudentLog,
   StudentLogSchema,
 } from "../student-logs/schemas/student-log.schema";
+import { University, UniversitySchema } from "../universities/schemas/university.schema";
+import { Faculty, FacultySchema } from "../universities/schemas/faculty.schema";
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import {
       { name: Request.name, schema: RequestSchema },
       { name: AdminUser.name, schema: AdminUserSchema },
       { name: StudentLog.name, schema: StudentLogSchema },
+      { name: University.name, schema: UniversitySchema },
+      { name: Faculty.name, schema: FacultySchema },
     ]),
   ],
   controllers: [StatsController],

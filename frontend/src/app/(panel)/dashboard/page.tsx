@@ -212,6 +212,84 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        {/* User segmentation */}
+        {stats.users && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-5">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">По университетам</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {stats.users.byUniversity.map((u) => (
+                    <div
+                      key={u._id}
+                      className="flex items-center justify-between px-4 py-2.5"
+                    >
+                      <span className="text-sm">{u.name}</span>
+                      <span className="text-sm font-semibold">{u.count}</span>
+                    </div>
+                  ))}
+                  {stats.users.byUniversity.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-4 py-3">
+                      Нет данных
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">По факультетам</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y max-h-48 overflow-y-auto">
+                  {stats.users.byFaculty.map((f) => (
+                    <div
+                      key={f._id}
+                      className="flex items-center justify-between px-4 py-2.5"
+                    >
+                      <span className="text-sm truncate pr-2">{f.name}</span>
+                      <span className="text-sm font-semibold shrink-0">
+                        {f.count}
+                      </span>
+                    </div>
+                  ))}
+                  {stats.users.byFaculty.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-4 py-3">
+                      Нет данных
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">По курсам</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {stats.users.byCourse.map((c) => (
+                    <div
+                      key={c.course}
+                      className="flex items-center justify-between px-4 py-2.5"
+                    >
+                      <span className="text-sm">{c.course} курс</span>
+                      <span className="text-sm font-semibold">{c.count}</span>
+                    </div>
+                  ))}
+                  {stats.users.byCourse.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-4 py-3">
+                      Нет данных
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Students table */}

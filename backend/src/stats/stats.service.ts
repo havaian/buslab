@@ -7,6 +7,14 @@ import {
   StudentLog,
   StudentLogDocument,
 } from "../student-logs/schemas/student-log.schema";
+import {
+  University,
+  UniversityDocument,
+} from "../universities/schemas/university.schema";
+import {
+  Faculty,
+  FacultyDocument,
+} from "../universities/schemas/faculty.schema";
 
 @Injectable()
 export class StatsService {
@@ -14,7 +22,9 @@ export class StatsService {
     @InjectModel(Request.name) private requestModel: Model<RequestDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(StudentLog.name)
-    private studentLogModel: Model<StudentLogDocument>
+    private studentLogModel: Model<StudentLogDocument>,
+    @InjectModel(University.name) private uniModel: Model<UniversityDocument>,
+    @InjectModel(Faculty.name) private facModel: Model<FacultyDocument>
   ) {}
 
   async getDashboard() {
@@ -39,6 +49,9 @@ export class StatsService {
       byCategory,
       byStatus,
       activeStudents,
+      byUniversityRaw,
+      byFacultyRaw,
+      byCourseRaw,
     ] = await Promise.all([
       this.requestModel.countDocuments(),
       this.requestModel.countDocuments({ status: "pending" }),
@@ -65,6 +78,19 @@ export class StatsService {
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
       this.requestModel.distinct("studentId", { status: "assigned" }),
+      this.userModel.aggregate([
+        { $match: { university: { $ne: null } } },
+        { $group: { _id: "$university", count: { $sum: 1 } } },
+      ]),
+      this.userModel.aggregate([
+        { $match: { faculty: { $ne: null } } },
+        { $group: { _id: "$faculty", count: { $sum: 1 } } },
+      ]),
+      this.userModel.aggregate([
+        { $match: { course: { $ne: null } } },
+        { $group: { _id: "$course", count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
     ]);
 
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -79,11 +105,47 @@ export class StatsService {
       { $sort: { _id: 1 } },
     ]);
 
+    // Resolve university names
+    const uniIds = byUniversityRaw.map((u: any) => u._id).filter(Boolean);
+    const unis = await this.uniModel
+      .find({ _id: { $in: uniIds } })
+      .select("names")
+      .lean();
+    const uniMap = Object.fromEntries(
+      unis.map((u) => [String(u._id), (u.names as any).ru ?? ""])
+    );
+    const byUniversity = byUniversityRaw.map((u: any) => ({
+      _id: String(u._id),
+      name: uniMap[String(u._id)] ?? "Неизвестно",
+      count: u.count,
+    }));
+
+    // Resolve faculty names
+    const facIds = byFacultyRaw.map((f: any) => f._id).filter(Boolean);
+    const facs = await this.facModel
+      .find({ _id: { $in: facIds } })
+      .select("names")
+      .lean();
+    const facMap = Object.fromEntries(
+      facs.map((f) => [String(f._id), (f.names as any).ru ?? ""])
+    );
+    const byFaculty = byFacultyRaw.map((f: any) => ({
+      _id: String(f._id),
+      name: facMap[String(f._id)] ?? "Неизвестно",
+      count: f.count,
+    }));
+
+    const byCourse = byCourseRaw.map((c: any) => ({
+      course: c._id as number,
+      count: c.count as number,
+    }));
+
     return {
       totals: { total, pending, inProgress, closed },
       periods: { today, week, month },
       activeStudents: activeStudents.length,
       charts: { byDay, byCategory, byStatus },
+      users: { byUniversity, byFaculty, byCourse },
     };
   }
 
@@ -92,7 +154,6 @@ export class StatsService {
 
     const summary = await Promise.all(
       students.map(async (s) => {
-        // Cast to ObjectId for proper MongoDB query
         const sid = new Types.ObjectId(String(s._id));
         const logs = await this.studentLogModel.find({ studentId: sid }).lean();
 

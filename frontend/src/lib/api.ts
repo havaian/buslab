@@ -455,6 +455,11 @@ export interface DashboardStats {
     byCategory: { _id: string; name: string; count: number }[];
     byStatus: { _id: string; count: number }[];
   };
+  users: {
+    byUniversity: { _id: string; name: string; count: number }[];
+    byFaculty: { _id: string; name: string; count: number }[];
+    byCourse: { course: number; count: number }[];
+  };
 }
 
 export interface UniversityFaculty {
