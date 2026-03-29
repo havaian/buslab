@@ -91,6 +91,7 @@ export const requestsApi = {
     return patchForm<Request>(`/requests/${id}/submit-answer`, form);
   },
   decline: (id: string) => patch<Request>(`/requests/${id}/decline`),
+  myUserHistory: () => get<Request[]>("/requests/my/history"),
 };
 
 // ── Admin users / Students ────────────────────────────────────────────────

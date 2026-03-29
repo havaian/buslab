@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MiniAppContext, MiniAppUser, useMiniApp } from "./miniapp-context";
-
-// ── Provider ──────────────────────────────────────────────────────────────────
+import { MiniAppContext, type MiniAppUser } from "./miniapp-context";
 
 function MiniAppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<MiniAppUser | null>(null);
@@ -19,9 +17,7 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
     script.onload = async () => {
       const twa = window.Telegram?.WebApp;
       if (!twa) {
-        setError(
-          "Telegram WebApp SDK не доступен. Откройте приложение через Telegram."
-        );
+        setError("Откройте приложение через Telegram.");
         setLoading(false);
         return;
       }
@@ -50,6 +46,8 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
         }
 
         const data = await res.json();
+        // Save to localStorage so existing api.ts helpers work unchanged
+        localStorage.setItem("token", data.access_token);
         setToken(data.access_token);
         setUser(data.user);
       } catch (e: unknown) {
@@ -72,56 +70,32 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <MiniAppContext.Provider value={{ user, token, loading, error }}>
-      {children}
+      {loading ? (
+        <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+          Загрузка...
+        </div>
+      ) : error ? (
+        <div className="flex h-screen items-center justify-center px-6 text-center">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-destructive">Ошибка</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        </div>
+      ) : !user ? (
+        <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+          Не удалось определить пользователя
+        </div>
+      ) : (
+        <>{children}</>
+      )}
     </MiniAppContext.Provider>
   );
 }
-
-// ── Gate — separate component so it can use the hook ─────────────────────────
-
-function MiniAppGate({ children }: { children: React.ReactNode }) {
-  const { loading, error, user } = useMiniApp();
-
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Загрузка...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex h-screen items-center justify-center px-6 text-center">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-destructive">Ошибка</p>
-          <p className="text-sm text-muted-foreground">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Не удалось определить пользователя
-      </div>
-    );
-  }
-
-  return <>{children}</>;
-}
-
-// ── Layout (default export only) ─────────────────────────────────────────────
 
 export default function MiniAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <MiniAppProvider>
-      <MiniAppGate>{children}</MiniAppGate>
-    </MiniAppProvider>
-  );
+  return <MiniAppProvider>{children}</MiniAppProvider>;
 }
