@@ -201,6 +201,22 @@ export const legalApi = {
   },
 };
 
+export const universitiesApi = {
+  list: (admin = false) =>
+    get<UniversityWithFaculties[]>(`/universities${admin ? "?admin=1" : ""}`),
+  create: (data: { code: string; names: LocalizedNames; courses?: number[] }) =>
+    post<UniversityWithFaculties>("/universities", data),
+  update: (id: string, data: Partial<{ code: string; names: LocalizedNames; courses: number[]; active: boolean }>) =>
+    patch<UniversityWithFaculties>(`/universities/${id}`, data),
+  remove: (id: string) => del<{ deleted: boolean }>(`/universities/${id}`),
+  createFaculty: (uniId: string, data: { code: string; names: LocalizedNames }) =>
+    post<UniversityFaculty>(`/universities/${uniId}/faculties`, data),
+  updateFaculty: (uniId: string, facId: string, data: Partial<{ code: string; names: LocalizedNames; active: boolean }>) =>
+    patch<UniversityFaculty>(`/universities/${uniId}/faculties/${facId}`, data),
+  deleteFaculty: (uniId: string, facId: string) =>
+    del<{ deleted: boolean }>(`/universities/${uniId}/faculties/${facId}`),
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function toQuery(params: object): string {
@@ -223,6 +239,9 @@ export interface PanelUser {
   username: string;
   role: "admin" | "student";
   isBanned?: boolean;
+  university?: string | null;
+  faculty?: string | null;
+  course?: number | null;
 }
 
 export interface CitizenUser {
@@ -234,6 +253,9 @@ export interface CitizenUser {
   language: string;
   isBanned: boolean;
   createdAt: string;
+  university?: string | null;
+  faculty?: string | null;
+  course?: number | null;
 }
 
 /** Any user from DB (role: user | student | admin) — used in search results */
@@ -433,4 +455,21 @@ export interface DashboardStats {
     byCategory: { _id: string; name: string; count: number }[];
     byStatus: { _id: string; count: number }[];
   };
+}
+
+export interface UniversityFaculty {
+  _id: string;
+  universityId: string;
+  code: string;
+  names: LocalizedNames;
+  active: boolean;
+}
+
+export interface UniversityWithFaculties {
+  _id: string;
+  code: string;
+  names: LocalizedNames;
+  courses: number[];
+  active: boolean;
+  faculties: UniversityFaculty[];
 }

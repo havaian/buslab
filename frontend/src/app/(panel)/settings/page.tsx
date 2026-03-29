@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
+import { UniversitiesTab } from "./_components/universities-tab";
 
-type MainTab = "texts" | "locales" | "documents";
+type MainTab = "texts" | "locales" | "documents" | "universities";
 type LocaleKey = "ru" | "uz" | "en";
 
 const REJECTION_LOCALES: { key: LocaleKey; label: string }[] = [
@@ -321,6 +322,7 @@ export default function SettingsPage() {
     { key: "texts", label: "Тексты" },
     { key: "locales", label: "Локализация" },
     { key: "documents", label: "Документы" },
+    { key: "universities", label: "Университеты" },
   ];
 
   return (
@@ -418,6 +420,9 @@ export default function SettingsPage() {
 
       {/* ── Документы ───────────────────────────────────────────────────────── */}
       {mainTab === "documents" && <DocumentsTab />}
+
+      {/* ── Университеты ────────────────────────────────────────────────────── */}
+      {mainTab === "universities" && <UniversitiesTab />}
     </PageShell>
   );
 }

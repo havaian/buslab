@@ -50,6 +50,32 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("token", data.access_token);
         setToken(data.access_token);
         setUser(data.user);
+
+        // Handle deep link routing from start_param
+        const startParam = twa.initDataUnsafe?.start_param;
+        if (startParam) {
+          const decoded = decodeURIComponent(startParam);
+          if (decoded.startsWith("r_")) {
+            const requestId = decoded.slice(2);
+            const role = data.user.role as string;
+            if (role === "admin") {
+              (
+                window as any
+              ).__miniAppStartPath = `/app/admin/requests/${requestId}`;
+            } else {
+              (window as any).__miniAppStartPath = `/app/user/${requestId}`;
+            }
+          } else if (decoded.startsWith("take_")) {
+            const requestId = decoded.slice(5);
+            (
+              window as any
+            ).__miniAppStartPath = `/app/student?take=${requestId}`;
+          } else if (decoded === "tasks") {
+            (window as any).__miniAppStartPath = `/app/student`;
+          } else if (decoded === "history") {
+            (window as any).__miniAppStartPath = `/app/student/history`;
+          }
+        }
       } catch (e: unknown) {
         setError((e as Error).message || "Ошибка авторизации");
       } finally {

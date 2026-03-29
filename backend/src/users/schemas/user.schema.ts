@@ -44,6 +44,15 @@ export class User {
   // Whether user has ever logged in via web panel
   @Prop({ default: false })
   hasUsedPanel: boolean;
+
+  @Prop({ default: null })
+  university: string | null;
+
+  @Prop({ default: null })
+  faculty: string | null;
+
+  @Prop({ default: null, type: Number })
+  course: number | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

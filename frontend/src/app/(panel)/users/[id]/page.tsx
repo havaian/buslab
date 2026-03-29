@@ -3,7 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { usersApi, type CitizenUserStats } from "@/lib/api";
+import {
+  usersApi,
+  universitiesApi,
+  type CitizenUserStats,
+  type UniversityWithFaculties,
+} from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,12 +24,18 @@ export default function UserDetailPage() {
   const dialog = useDialog();
 
   const [data, setData] = useState<CitizenUserStats | null>(null);
+  const [unis, setUnis] = useState<UniversityWithFaculties[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setData(await usersApi.stats(id));
+      const [stats, uniList] = await Promise.all([
+        usersApi.stats(id),
+        universitiesApi.list(),
+      ]);
+      setData(stats);
+      setUnis(uniList);
     } finally {
       setLoading(false);
     }
@@ -33,6 +44,20 @@ export default function UserDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const getUniName = (code: string | null | undefined) => {
+    if (!code) return null;
+    return unis.find((u) => u.code === code)?.names.ru ?? code;
+  };
+
+  const getFacName = (
+    uniCode: string | null | undefined,
+    facCode: string | null | undefined
+  ) => {
+    if (!uniCode || !facCode) return null;
+    const uni = unis.find((u) => u.code === uniCode);
+    return uni?.faculties.find((f) => f.code === facCode)?.names.ru ?? facCode;
+  };
 
   const toggleBlock = async () => {
     if (!data) return;
@@ -112,8 +137,34 @@ export default function UserDetailPage() {
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground shrink-0">Язык</span>
-                <span>{user.language.toUpperCase()}</span>
+                <span>{user.language?.toUpperCase()}</span>
               </div>
+              {user.university && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">
+                    Университет
+                  </span>
+                  <span className="text-right">
+                    {getUniName(user.university)}
+                  </span>
+                </div>
+              )}
+              {user.faculty && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">
+                    Факультет
+                  </span>
+                  <span className="text-right text-xs">
+                    {getFacName(user.university, user.faculty)}
+                  </span>
+                </div>
+              )}
+              {user.course && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Курс</span>
+                  <span>{user.course}</span>
+                </div>
+              )}
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground shrink-0">Статус</span>
                 <span

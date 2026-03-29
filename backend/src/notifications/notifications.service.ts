@@ -10,6 +10,18 @@ export class NotificationsService implements OnModuleInit {
   private readonly studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
   private readonly webPanelUrl = process.env.WEB_PANEL_URL || "";
 
+  private readonly botName = process.env.TELEGRAM_BOT_USERNAME || "";
+  private readonly appName = process.env.TELEGRAM_APP_NAME || "";
+
+  // Генерирует Mini App deep link если бот/апп настроены,
+  // иначе fallback на веб-панель
+  private appLink(param: string): string {
+    if (this.botName && this.appName) {
+      return `https://t.me/${this.botName}/${this.appName}?startapp=${encodeURIComponent(param)}`;
+    }
+    return `${this.webPanelUrl}`;
+  }
+
   onModuleInit() {
     this.logger.log(`TELEGRAM_BOT_TOKEN: ${this.token ? "SET" : "⚠️ MISSING"}`);
     this.logger.log(
@@ -129,7 +141,7 @@ export class NotificationsService implements OnModuleInit {
     category: string,
     text: string
   ): Promise<number | null> {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
+    const link = this.appLink(`r_${requestId}`);
     return this.sendWithResponse(
       this.adminChatId,
       `📩 <b>Новое обращение</b>\nКатегория: ${category}\n${text}\n\n<a href="${link}">Открыть в панели →</a>`
@@ -140,16 +152,16 @@ export class NotificationsService implements OnModuleInit {
     requestId: string,
     studentName: string,
     category: string
-  ) {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
-    await this.send(
+  ): Promise<number | null> {
+    const link = this.appLink(`r_${requestId}`);
+    return this.sendWithResponse(
       this.adminChatId,
-      `✅ <b>Студент отправил ответ</b>\nСтудент: ${studentName}\nКатегория: ${category}\n\n<a href="${link}">Проверить →</a>`
+      `⚠️ <b>Студент отправил ответ</b>\nСтудент: ${studentName}\nКатегория: ${category}\n\n<a href="${link}">Проверить →</a>`
     );
   }
 
   async notifyAdminTimerExpired(requestId: string, studentName: string) {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
+    const link = this.appLink(`r_${requestId}`);
     await this.send(
       this.adminChatId,
       `⏰ <b>Таймер истёк</b>\nСтудент: ${studentName} не уложился в срок\n\n<a href="${link}">Открыть обращение →</a>`
@@ -157,7 +169,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async notifyAdminStudentDeclined(requestId: string, studentName: string) {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
+    const link = this.appLink(`r_${requestId}`);
     await this.send(
       this.adminChatId,
       `↩️ <b>Студент отказался от обращения</b>\nСтудент: ${studentName}\n\n<a href="${link}">Открыть обращение →</a>`
@@ -171,8 +183,20 @@ export class NotificationsService implements OnModuleInit {
     text: string,
     statusLine: string
   ): Promise<void> {
-    const link = `${this.webPanelUrl}/requests/${requestId}`;
+    const link = this.appLink(`r_${requestId}`);
     const newText = `📩 <b>Новое обращение</b>\nКатегория: ${category}\n${text}\n\n<a href="${link}">Открыть в панели →</a>\n\n${statusLine}`;
+    await this.editMessage(this.adminChatId, messageId, newText);
+  }
+
+  async editAdminAnswerStatus(
+    messageId: number,
+    requestId: string,
+    studentName: string,
+    category: string,
+    statusLine: string
+  ): Promise<void> {
+    const link = this.appLink(`r_${requestId}`);
+    const newText = `⚠️ <b>Студент отправил ответ</b>\nСтудент: ${studentName}\nКатегория: ${category}\n\n<a href="${link}">Проверить →</a>\n\n${statusLine}`;
     await this.editMessage(this.adminChatId, messageId, newText);
   }
 
@@ -188,7 +212,7 @@ export class NotificationsService implements OnModuleInit {
     category: string,
     shortText: string
   ): Promise<number | null> {
-    const link = `${this.webPanelUrl}/tasks?take=${requestId}`;
+    const link = this.appLink(`take_${requestId}`);
     const text = `📋 <b>Новое обращение доступно</b>\nКатегория: ${category}\n${shortText}`;
     return this.sendWithResponse(this.studentChatId, text, {
       inline_keyboard: [[{ text: "🔄 Взять в работу", url: link }]],
@@ -204,7 +228,7 @@ export class NotificationsService implements OnModuleInit {
     category: string,
     shortText: string
   ): Promise<number | null> {
-    const link = `${this.webPanelUrl}/tasks?take=${requestId}`;
+    const link = this.appLink(`take_${requestId}`);
     const text = `🔄 <b>Обращение возвращено в очередь</b>\nКатегория: ${category}\n${shortText}`;
     return this.sendWithResponse(this.studentChatId, text, {
       inline_keyboard: [[{ text: "🔄 Взять в работу", url: link }]],
@@ -235,7 +259,7 @@ export class NotificationsService implements OnModuleInit {
     requestId: string,
     shortText: string
   ) {
-    const link = `${this.webPanelUrl}/tasks`;
+    const link = this.appLink(`tasks`);
     await this.send(
       telegramId,
       `📌 <b>Вам назначено обращение</b>\n${shortText}\n\n<a href="${link}">Открыть задание →</a>`
@@ -243,7 +267,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async notifyStudentAnswerApproved(telegramId: string, requestId: string) {
-    const link = `${this.webPanelUrl}/history`;
+    const link = this.appLink(`history`);
     await this.send(
       telegramId,
       `✅ Ваш ответ одобрен и отправлен пользователю\n\n<a href="${link}">История →</a>`
@@ -255,7 +279,7 @@ export class NotificationsService implements OnModuleInit {
     requestId: string,
     comment: string
   ) {
-    const link = `${this.webPanelUrl}/tasks`;
+    const link = this.appLink(`tasks`);
     await this.send(
       telegramId,
       `❌ <b>Ваш ответ отклонён</b>\nКомментарий: ${comment}\n\n<a href="${link}">Исправить →</a>`
@@ -274,7 +298,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async notifyStudentTimerWarning(telegramId: string, requestId: string) {
-    const link = `${this.webPanelUrl}/tasks`;
+    const link = this.appLink(`tasks`);
     await this.send(
       telegramId,
       `⚠️ До истечения срока выполнения осталось <b>2 часа</b>\n\n<a href="${link}">Открыть задание →</a>`
@@ -282,7 +306,7 @@ export class NotificationsService implements OnModuleInit {
   }
 
   async notifyStudentTimerExpired(telegramId: string, requestId: string) {
-    const link = `${this.webPanelUrl}/tasks`;
+    const link = this.appLink(`tasks`);
     await this.send(
       telegramId,
       `⏰ Срок выполнения задания истёк\n\n<a href="${link}">Открыть задание →</a>`

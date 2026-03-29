@@ -13,6 +13,8 @@ import { Faq, FaqSchema } from "../faq/schemas/faq.schema";
 import { Request, RequestSchema } from "../requests/schemas/request.schema";
 import { RequestsModule } from "../requests/requests.module";
 import { AdminUsersModule } from "../admin-users/admin-users.module";
+import { University, UniversitySchema } from "../universities/schemas/university.schema";
+import { Faculty, FacultySchema } from "../universities/schemas/faculty.schema";
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { AdminUsersModule } from "../admin-users/admin-users.module";
       { name: Category.name, schema: CategorySchema },
       { name: Faq.name, schema: FaqSchema },
       { name: Request.name, schema: RequestSchema },
+      { name: University.name, schema: UniversitySchema },
+      { name: Faculty.name, schema: FacultySchema },
     ]),
     RequestsModule,
     AdminUsersModule,

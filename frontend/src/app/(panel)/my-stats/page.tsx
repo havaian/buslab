@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   CheckCircle,
   XCircle,
   Clock,
   AlertTriangle,
   TrendingUp,
+  ChevronDown,
 } from "lucide-react";
 import {
   adminUsersApi,
+  universitiesApi,
   type StudentStats,
   type StudentLogEntry,
+  type UniversityWithFaculties,
 } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 import { formatDate } from "@/lib/utils";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -27,19 +32,87 @@ const ACTION_LABELS: Record<string, string> = {
   timer_expired: "⏰ Таймер истёк",
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
 export default function MyStatsPage() {
+  const { toast } = useToast();
+
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [logs, setLogs] = useState<StudentLogEntry[]>([]);
+  const [unis, setUnis] = useState<UniversityWithFaculties[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([adminUsersApi.myStats(), adminUsersApi.myLogs()])
-      .then(([s, l]) => {
-        setStats(s);
-        setLogs(l);
-      })
-      .finally(() => setLoading(false));
+  // Editable profile state
+  const [university, setUniversity] = useState("");
+  const [faculty, setFaculty] = useState("");
+  const [course, setCourse] = useState<number | "">("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [s, l, uniList] = await Promise.all([
+        adminUsersApi.myStats(),
+        adminUsersApi.myLogs(),
+        universitiesApi.list(),
+      ]);
+      setStats(s);
+      setLogs(l);
+      setUnis(uniList);
+
+      // Load current profile values
+      const token = localStorage.getItem("token");
+      const meRes = await fetch(`${API_BASE}/miniapp/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        setUniversity(me.university ?? "");
+        setFaculty(me.faculty ?? "");
+        setCourse(me.course ?? "");
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const selectedUni = unis.find((u) => u._id === university);
+  const faculties = selectedUni?.faculties ?? [];
+  const courses = selectedUni?.courses ?? [1, 2, 3, 4];
+
+  const handleUniChange = (id: string) => {
+    setUniversity(id);
+    setFaculty("");
+    setCourse("");
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/miniapp/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          university: university || null,
+          faculty: faculty || null,
+          course: course || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Ошибка сохранения");
+      toast("Сохранено", "success");
+    } catch (e: unknown) {
+      toast((e as Error).message || "Ошибка", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading || !stats) {
     return (
@@ -100,6 +173,98 @@ export default function MyStatsPage() {
               </Card>
             ))}
           </div>
+
+          {/* University / faculty / course */}
+          <Card>
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm">Учебная информация</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pb-4">
+              {/* University */}
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">
+                  Университет
+                </label>
+                <div className="relative">
+                  <select
+                    value={university}
+                    onChange={(e) => handleUniChange(e.target.value)}
+                    className="w-full appearance-none rounded-lg border bg-background px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">— не указан —</option>
+                    {unis.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        {u.names.ru}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={14}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                </div>
+              </div>
+
+              {/* Faculty — only if selected university has faculties */}
+              {faculties.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">
+                    Факультет
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={faculty}
+                      onChange={(e) => setFaculty(e.target.value)}
+                      className="w-full appearance-none rounded-lg border bg-background px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">— не указан —</option>
+                      {faculties.map((f) => (
+                        <option key={f._id} value={f._id}>
+                          {f.names.ru}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Course */}
+              {university && (
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Курс</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {courses.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCourse(c === course ? "" : c)}
+                        className={`h-9 w-9 rounded-lg text-sm font-medium border transition-colors ${
+                          course === c
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-input text-muted-foreground hover:border-primary"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Button
+                size="sm"
+                onClick={save}
+                disabled={saving}
+                className="w-full"
+              >
+                {saving ? "Сохранение..." : "Сохранить"}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Action log */}

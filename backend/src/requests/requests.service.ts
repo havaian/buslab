@@ -533,7 +533,8 @@ export class RequestsService {
     const req = await this.requestModel
       .findById(requestId)
       .populate("studentId")
-      .populate("userId", "telegramId language");
+      .populate("userId", "telegramId language")
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "answered")
       throw new BadRequestException("Request is not in answered status");
@@ -542,6 +543,18 @@ export class RequestsService {
     req.status = "closed";
     req.finalAnswerText = finalAnswer ?? req.answerText;
     await req.save();
+
+    if (req.adminAnswerMessageId) {
+      const cat = req.categoryId as any;
+      const student = req.studentId as any;
+      await this.notifications.editAdminAnswerStatus(
+        req.adminAnswerMessageId,
+        requestId,
+        student ? `${student.firstName} ${student.lastName || ""}`.trim() : "",
+        cat?.name || "",
+        `✅ <b>Ответ одобрен</b>`
+      );
+    }
 
     await this.log({
       requestId: req._id as any,
@@ -587,7 +600,8 @@ export class RequestsService {
   async rejectAnswer(requestId: string, comment: string, adminId?: string) {
     const req = await this.requestModel
       .findById(requestId)
-      .populate("studentId");
+      .populate("studentId")
+      .populate("categoryId", "name");
     if (!req) throw new NotFoundException();
     if (req.status !== "answered")
       throw new BadRequestException("Request is not in answered status");
@@ -625,6 +639,19 @@ export class RequestsService {
           comment
         );
     }
+
+    if (req.adminAnswerMessageId) {
+      const cat = req.categoryId as any;
+      const student = req.studentId as any;
+      await this.notifications.editAdminAnswerStatus(
+        req.adminAnswerMessageId,
+        requestId,
+        student ? `${student.firstName} ${student.lastName || ""}`.trim() : "",
+        cat?.name || "",
+        `🔄 <b>Возвращено на доработку</b>\nКомментарий: ${comment}`
+      );
+    }
+    
     return req;
   }
 
@@ -763,11 +790,17 @@ export class RequestsService {
 
     const student = await this.userModel.findById(studentId);
     const cat = req.categoryId as any;
-    await this.notifications.notifyAdminAnswerSubmitted(
+    const adminAnswerMsgId = await this.notifications.notifyAdminAnswerSubmitted(
       requestId,
       student ? `${student.firstName} ${student.lastName}`.trim() : "",
       cat?.name || ""
     );
+    if (adminAnswerMsgId) {
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { adminAnswerMessageId: adminAnswerMsgId }
+      );
+    }
     return req;
   }
 

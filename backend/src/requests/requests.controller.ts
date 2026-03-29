@@ -91,6 +91,22 @@ export class RequestsController {
   }
 
   @UseGuards(RolesGuard)
+  @Roles(UserRole.USER)   // нужно добавить USER в UserRole enum
+  @Post()
+  @UseInterceptors(FilesInterceptor("files", 5, {
+    storage: uploadStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+  }))
+  submitRequest(
+    @CurrentUser() user: any,
+    @Body("categoryId") categoryId: string,
+    @Body("text") text: string,
+    @UploadedFiles() files?: Express.Multer.File[]
+  ) {
+    return this.requestsService.submitRequest(user.sub, categoryId, text, files);
+  }
+
+  @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(":id/approve")
   approve(@Param("id") id: string, @CurrentUser() admin: any) {

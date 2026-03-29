@@ -11,9 +11,11 @@ import {
 } from "lucide-react";
 import {
   adminUsersApi,
+  universitiesApi,
   type StudentStats,
   type StudentLogEntry,
   type PanelUser,
+  type UniversityWithFaculties,
 } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +49,7 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState<PanelUser | null>(null);
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [logs, setLogs] = useState<StudentLogEntry[]>([]);
+  const [unis, setUnis] = useState<UniversityWithFaculties[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,14 +57,30 @@ export default function StudentDetailPage() {
       adminUsersApi.studentById(id),
       adminUsersApi.studentStats(id),
       adminUsersApi.studentLogs(id),
+      universitiesApi.list(),
     ])
-      .then(([s, st, l]) => {
+      .then(([s, st, l, uniList]) => {
         setStudent(s);
         setStats(st);
         setLogs(l);
+        setUnis(uniList);
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const getUniName = (code: string | null | undefined) => {
+    if (!code) return null;
+    return unis.find((u) => u.code === code)?.names.ru ?? code;
+  };
+
+  const getFacName = (
+    uniCode: string | null | undefined,
+    facCode: string | null | undefined
+  ) => {
+    if (!uniCode || !facCode) return null;
+    const uni = unis.find((u) => u.code === uniCode);
+    return uni?.faculties.find((f) => f.code === facCode)?.names.ru ?? facCode;
+  };
 
   if (loading || !stats) {
     return (
@@ -115,6 +134,32 @@ export default function StudentDetailPage() {
                     {student.telegramId}
                   </span>
                 </div>
+                {student.university && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">
+                      Университет
+                    </span>
+                    <span className="text-right">
+                      {getUniName(student.university)}
+                    </span>
+                  </div>
+                )}
+                {student.faculty && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">
+                      Факультет
+                    </span>
+                    <span className="text-right text-xs">
+                      {getFacName(student.university, student.faculty)}
+                    </span>
+                  </div>
+                )}
+                {student.course && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Курс</span>
+                    <span>{student.course}</span>
+                  </div>
+                )}
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">Статус</span>
                   <span

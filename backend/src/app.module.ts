@@ -20,6 +20,7 @@ import { StudentLogsModule } from "./student-logs/student-logs.module";
 import { SettingsModule } from "./settings/settings.module";
 import { LegalModule } from "./legal/legal.module";
 import { MiniappModule } from "./miniapp/miniapp.module";
+import { UniversitiesModule } from "./universities/universities.module";
 import { BotModule } from "./bot/bot.module";
 
 @Module({
@@ -56,6 +57,7 @@ import { BotModule } from "./bot/bot.module";
     SettingsModule,
     LegalModule,
     MiniappModule,
+    UniversitiesModule,
     BotModule,
   ],
 })

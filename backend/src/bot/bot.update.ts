@@ -1,10 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { Bot, InlineKeyboard, Keyboard } from "grammy";
 import { BotContext } from "./context.type";
 import { UserState, AdminState } from "./states.type";
-import { CB, CBRegex, STUDENT_CHAT_PREVIEW_LENGTH } from "./bot.constants";
+import { CB, CBRegex } from "./bot.constants";
 import { BotI18nService } from "./bot-i18n.service";
 import { SubmitRequestConversation } from "./conversations/submit-request.conversation";
 import { RequestsService } from "../requests/requests.service";
@@ -12,6 +12,16 @@ import { AdminUsersService } from "../admin-users/admin-users.service";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { Faq, FaqDocument } from "../faq/schemas/faq.schema";
 import { Request, RequestDocument } from "../requests/schemas/request.schema";
+import {
+  University,
+  UniversityDocument,
+} from "../universities/schemas/university.schema";
+import {
+  Faculty,
+  FacultyDocument,
+} from "../universities/schemas/faculty.schema";
+
+type Locale = "ru" | "uz" | "en";
 
 @Injectable()
 export class BotUpdate {
@@ -24,7 +34,12 @@ export class BotUpdate {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     @InjectModel(Faq.name) private readonly faqModel: Model<FaqDocument>,
-    @InjectModel(Request.name) private readonly requestModel: Model<RequestDocument>,
+    @InjectModel(Request.name)
+    private readonly requestModel: Model<RequestDocument>,
+    @InjectModel(University.name)
+    private readonly uniModel: Model<UniversityDocument>,
+    @InjectModel(Faculty.name)
+    private readonly facModel: Model<FacultyDocument>,
     private readonly requestsService: RequestsService,
     private readonly adminUsersService: AdminUsersService,
     private readonly i18n: BotI18nService,
@@ -35,7 +50,7 @@ export class BotUpdate {
 
   /** Called by BotService.onModuleInit() — registers all handlers on the bot instance. */
   register(bot: Bot<BotContext>): void {
-    // Commands — /start with optional deep-link parameter
+    // Commands
     bot.command("start", (ctx) => this.handleStart(ctx));
 
     // Onboarding
@@ -44,6 +59,11 @@ export class BotUpdate {
     );
     bot.callbackQuery(CB.OFFER_ACCEPT, (ctx) => this.handleOfferAccept(ctx));
     bot.callbackQuery(CB.OFFER_DECLINE, (ctx) => this.handleOfferDecline(ctx));
+
+    // University / faculty / course selection (onboarding steps 2-4)
+    bot.callbackQuery(/^uni:(.+)$/, (ctx) => this.handleUniSelect(ctx));
+    bot.callbackQuery(/^fac:(.+)$/, (ctx) => this.handleFacSelect(ctx));
+    bot.callbackQuery(/^course:(\d+)$/, (ctx) => this.handleCourseSelect(ctx));
 
     // Language
     bot.callbackQuery(CBRegex.LANG, (ctx) => this.handleLangChange(ctx));
@@ -91,8 +111,7 @@ export class BotUpdate {
     if (!ctx.from) return;
     const user = await this.getOrCreate(ctx);
 
-    // ── Invite token flow: /start ref_<token> ──────────────────────────────
-    // In Grammy, ctx.match for bot.command() is the argument string after /start
+    // ── Invite token flow: /start ref_<token> ─────────────────────────────
     const param: string = (ctx.match as string) ?? "";
     if (param.startsWith("ref_")) {
       const token = param.slice(4);
@@ -186,21 +205,9 @@ export class BotUpdate {
     await ctx.editMessageText(this.t(ctx, "onboarding.offer_accepted"), {
       reply_markup: { inline_keyboard: [] },
     });
-    await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
-      reply_markup: this.mainMenuKb(ctx),
-    });
 
-    const miniAppUrl = process.env.WEB_PANEL_URL
-      ? `${process.env.WEB_PANEL_URL}/app`
-      : "";
-    if (miniAppUrl) {
-      await ctx.reply(this.t(ctx, "commands.start.open_app"), {
-        reply_markup: new InlineKeyboard().webApp(
-          "📱 Открыть приложение",
-          miniAppUrl
-        ),
-      });
-    }
+    // Proceed to university selection
+    await this.finishOnboarding(ctx);
   }
 
   private async handleOfferDecline(ctx: BotContext): Promise<void> {
@@ -216,6 +223,144 @@ export class BotUpdate {
       // @ts-ignore
       disable_web_page_preview: true,
     });
+  }
+
+  // ── University / faculty / course selection ──────────────────────────────
+
+  private async sendUniSelect(ctx: BotContext): Promise<void> {
+    const locale = (ctx.locale || "ru") as Locale;
+    const unis = await this.uniModel
+      .find({ active: true })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    if (!unis.length) {
+      // No universities configured — skip straight to main menu
+      await this.finishOnboarding(ctx);
+      return;
+    }
+
+    const kb = new InlineKeyboard();
+    for (const uni of unis) {
+      const name = uni.names[locale] || uni.names.ru;
+      kb.text(name, `uni:${uni._id}`).row();
+    }
+
+    const prompts: Record<Locale, string> = {
+      ru: "🎓 Укажите ваш университет:",
+      uz: "🎓 Universitetingizni tanlang:",
+      en: "🎓 Select your university:",
+    };
+    await ctx.reply(prompts[locale], { reply_markup: kb });
+  }
+
+  private async handleUniSelect(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+    const uniId = ctx.match![1];
+
+    await this.userModel.updateOne(
+      { telegramId: ctx.from.id },
+      { university: uniId, faculty: null, course: null }
+    );
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+
+    // Check if this university has faculties
+    const faculties = await this.facModel
+      .find({ universityId: new Types.ObjectId(uniId), active: true })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    if (faculties.length) {
+      const locale = (ctx.locale || "ru") as Locale;
+      const kb = new InlineKeyboard();
+      for (const fac of faculties) {
+        const name = fac.names[locale] || fac.names.ru;
+        kb.text(name, `fac:${fac._id}`).row();
+      }
+      const prompts: Record<Locale, string> = {
+        ru: "📚 Укажите ваш факультет:",
+        uz: "📚 Fakultetingizni tanlang:",
+        en: "📚 Select your faculty:",
+      };
+      await ctx.reply(prompts[locale], { reply_markup: kb });
+    } else {
+      // No faculties — ask for course
+      await this.sendCourseSelect(ctx, uniId);
+    }
+  }
+
+  private async handleFacSelect(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+    const facId = ctx.match![1];
+
+    const fac = await this.facModel.findById(facId).lean();
+    if (!fac) {
+      await ctx.answerCallbackQuery("Факультет не найден");
+      return;
+    }
+
+    await this.userModel.updateOne(
+      { telegramId: ctx.from.id },
+      { faculty: facId }
+    );
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+
+    // Ask for course
+    await this.sendCourseSelect(ctx, String(fac.universityId));
+  }
+
+  private async sendCourseSelect(
+    ctx: BotContext,
+    uniId: string
+  ): Promise<void> {
+    const locale = (ctx.locale || "ru") as Locale;
+    const uni = await this.uniModel.findById(uniId).lean();
+    const courses = uni?.courses ?? [1, 2, 3, 4];
+
+    const kb = new InlineKeyboard();
+    for (const c of courses) {
+      kb.text(String(c), `course:${c}`);
+    }
+
+    const prompts: Record<Locale, string> = {
+      ru: "📖 Укажите ваш курс:",
+      uz: "📖 Kursingizni tanlang:",
+      en: "📖 Select your course:",
+    };
+    await ctx.reply(prompts[locale], { reply_markup: kb });
+  }
+
+  private async handleCourseSelect(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+    const course = Number(ctx.match![1]);
+
+    await this.userModel.updateOne({ telegramId: ctx.from.id }, { course });
+
+    await ctx.answerCallbackQuery();
+    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } });
+    await this.finishOnboarding(ctx);
+  }
+
+  private async finishOnboarding(ctx: BotContext): Promise<void> {
+    await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
+      reply_markup: this.mainMenuKb(ctx),
+    });
+
+    const miniAppUrl = process.env.WEB_PANEL_URL
+      ? `${process.env.WEB_PANEL_URL}/app`
+      : "";
+    if (miniAppUrl) {
+      await ctx.reply(this.t(ctx, "commands.start.open_app"), {
+        reply_markup: new InlineKeyboard().webApp(
+          "📱 Открыть приложение",
+          miniAppUrl
+        ),
+      });
+    }
   }
 
   // ── Language change ──────────────────────────────────────────────────────
@@ -404,7 +549,6 @@ export class BotUpdate {
     }
 
     // ── Submit request conversation ───────────────────────────────────────
-
     if (text === this.t(ctx, "buttons.ask_question")) {
       await this.submitRequest.start(ctx, this.userStates);
       return;
@@ -434,7 +578,6 @@ export class BotUpdate {
         await this.submitRequest.onContinue(ctx, userState, this.userStates);
         return;
       }
-      // Any other text while in this state — remind to continue
       await ctx.reply("Отправьте файл или нажмите кнопку «Продолжить».", {
         reply_markup: new Keyboard()
           .text(continueLabel)
@@ -464,7 +607,6 @@ export class BotUpdate {
     }
 
     // ── Other main menu buttons ───────────────────────────────────────────
-
     if (text === this.t(ctx, "buttons.my_requests")) {
       await this.handleMyRequests(ctx);
       return;
@@ -510,7 +652,6 @@ export class BotUpdate {
     const studentChatId = process.env.TELEGRAM_STUDENT_CHAT_ID;
     const chatId = ctx.chat?.id?.toString();
 
-    // Only handle in private chats
     if (chatId === adminChatId || chatId === studentChatId) return;
 
     const userState = this.userStates.get(ctx.from.id);

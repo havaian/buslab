@@ -14,11 +14,19 @@ interface NavItem {
 export function BottomNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
 
+  // Find the most specific matching nav item — prevents parent tabs
+  // from lighting up when a child tab is the active route
+  const activeHref = items
+    .filter(
+      (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+    )
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background">
       <div className="flex">
         {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+          const active = activeHref === href;
           return (
             <Link
               key={href}

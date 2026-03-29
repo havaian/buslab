@@ -49,3 +49,56 @@ export const TIMER_DURATION_MS = 12 * 60 * 60 * 1000;
 
 export const REQUEST_MIN_LENGTH = 150;
 export const STUDENT_CHAT_PREVIEW_LENGTH = 100;
+
+// ── Universities & faculties ───────────────────────────────────────────────
+
+export const UNIVERSITIES = [
+  { id: "tsul", name: { ru: "ТГЮУ", uz: "TDYU", en: "TSUL" } },
+  { id: "uwed", name: { ru: "УМЭД", uz: "XHIMU", en: "UWED" } },
+  { id: "wiut", name: { ru: "МУИТ", uz: "WIUT", en: "WIUT" } },
+  { id: "other", name: { ru: "Другой", uz: "Boshqa", en: "Other" } },
+] as const;
+
+export const TSUL_FACULTIES = [
+  {
+    id: "public_law",
+    name: { ru: "Публичное право", uz: "Ommaviy huquq", en: "Public law" },
+  },
+  {
+    id: "business_law",
+    name: {
+      ru: "Бизнес-право и судебная защита",
+      uz: "Biznes huquqi va sud himoyasi",
+      en: "Business law and judicial protection",
+    },
+  },
+  {
+    id: "criminal_justice",
+    name: {
+      ru: "Уголовное правосудие",
+      uz: "Jinoiy odil sudlov",
+      en: "Criminal justice",
+    },
+  },
+  {
+    id: "international_law",
+    name: {
+      ru: "Международное право и сравнительное правоведение",
+      uz: "Xalqaro huquq va qiyosiy huquqshunoslik",
+      en: "International law and comparative law",
+    },
+  },
+  {
+    id: "interdisciplinary",
+    name: {
+      ru: "Междисциплинарное изучение права",
+      uz: "Huquqni sohalararo o'rganish",
+      en: "Interdisciplinary study of law",
+    },
+  },
+] as const;
+
+export const CB_UNI = "uni";
+export const CB_FAC = "fac";
+export const CBRegex_UNI = /^uni:(.+)$/;
+export const CBRegex_FAC = /^fac:(.+)$/;

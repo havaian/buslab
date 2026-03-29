@@ -4,6 +4,7 @@ import {
   Body,
   UnauthorizedException,
   Get,
+  Patch,
   UseGuards,
 } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
@@ -157,7 +158,27 @@ export class MiniappController {
           lastName: u.lastName,
           username: u.username,
           role: u.role,
+          university: u.university ?? null,
+          faculty: u.faculty ?? null,
+          course: u.course ?? null,
         };
       });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch("profile")
+  async updateProfile(
+    @CurrentUser() user: any,
+    @Body("university") university?: string,
+    @Body("faculty") faculty?: string,
+    @Body("course") course?: number
+  ) {
+    const update: Record<string, any> = {};
+    if (university !== undefined) update.university = university;
+    if (faculty !== undefined) update.faculty = faculty;
+    if (course !== undefined) update.course = course;
+
+    await this.userModel.updateOne({ _id: user.sub }, { $set: update });
+    return { ok: true };
   }
 }

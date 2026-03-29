@@ -32,6 +32,7 @@ declare global {
             username?: string;
             language_code?: string;
           };
+          start_param?: string;
         };
         colorScheme: "light" | "dark";
         themeParams: Record<string, string>;
