@@ -92,7 +92,7 @@ export default function MyStatsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("miniapp_token");
       const res = await fetch(`${API_BASE}/miniapp/profile`, {
         method: "PATCH",
         headers: {

@@ -47,7 +47,7 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
 
         const data = await res.json();
         // Save to localStorage so existing api.ts helpers work unchanged
-        localStorage.setItem("token", data.access_token);
+        localStorage.setItem("miniapp_token", data.access_token);
         setToken(data.access_token);
         setUser(data.user);
 

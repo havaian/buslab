@@ -2,6 +2,10 @@ const BASE = "/api";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
+  // miniapp routes use a separate token to avoid conflicts with panel auth
+  if (window.location.pathname.startsWith("/app/")) {
+    return localStorage.getItem("miniapp_token");
+  }
   return localStorage.getItem("token");
 }
 
@@ -23,8 +27,9 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
+    const isMiniApp = window.location.pathname.startsWith("/app/");
+    localStorage.removeItem(isMiniApp ? "miniapp_token" : "token");
+    if (!isMiniApp) window.location.href = "/login";
     throw new Error("Unauthorized");
   }
 

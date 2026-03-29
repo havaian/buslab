@@ -45,7 +45,7 @@ export default function UserNewRequestPage() {
 
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("miniapp_token");
       const form = new FormData();
       form.append("categoryId", categoryId);
       form.append("text", text);

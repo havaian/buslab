@@ -21,7 +21,11 @@ async function downloadFile(file: FileEntry) {
   if (!file.ref) return;
 
   const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    typeof window !== "undefined"
+      ? window.location.pathname.startsWith("/app/")
+        ? localStorage.getItem("miniapp_token")
+        : localStorage.getItem("token")
+      : null;
   const res = await fetch(`/api/files/${file.ref}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

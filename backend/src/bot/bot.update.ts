@@ -360,7 +360,7 @@ export class BotUpdate {
       ? `${process.env.WEB_PANEL_URL}/app`
       : "";
     if (miniAppUrl) {
-      await ctx.reply(this.t(ctx, "commands.start.open_app"), {
+      await ctx.reply(this.t(ctx, "buttons.open_app"), {
         reply_markup: new InlineKeyboard().webApp(
           "📱 Открыть приложение",
           miniAppUrl
