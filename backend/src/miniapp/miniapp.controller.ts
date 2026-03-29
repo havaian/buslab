@@ -101,12 +101,19 @@ export class MiniappController {
         lastName: tgUser.last_name ?? "",
         username: tgUser.username ?? "",
         language: tgUser.language_code?.split("-")[0] ?? "ru",
+        lastSeenSource: "miniapp",
+        hasUsedMiniapp: true,
       });
     } else {
       // Refresh profile fields
       user.firstName = tgUser.first_name ?? user.firstName;
       user.lastName = tgUser.last_name ?? user.lastName ?? "";
       user.username = tgUser.username ?? user.username ?? "";
+
+      // Track miniapp usage
+      user.lastSeenSource = "miniapp";
+      user.hasUsedMiniapp = true;
+
       await user.save();
     }
 

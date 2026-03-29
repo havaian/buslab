@@ -3,23 +3,18 @@ import {
   UnauthorizedException,
   ForbiddenException,
 } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
+import { JwtService } from "@nestjs/jwt";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { User, UserDocument } from "../users/schemas/user.schema";
 
-// Telegram OIDC JWKS endpoint
 const TELEGRAM_JWKS = createRemoteJWKSet(
-  new URL("https://oauth.telegram.org/.well-known/jwks.json")
+  new URL("https://oauth.telegram.org/jwks")
 );
 
 interface TelegramIdTokenClaims {
-  iss: string;
-  aud: string;
   sub: string;
-  iat: number;
-  exp: number;
   id: number;
   name?: string;
   preferred_username?: string;
@@ -82,6 +77,11 @@ export class AuthService {
     if (claims.preferred_username) {
       user.username = claims.preferred_username;
     }
+
+    // Track panel usage
+    user.lastSeenSource = "panel";
+    user.hasUsedPanel = true;
+
     await user.save();
 
     const payload = {

@@ -18,7 +18,13 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const PUBLIC_PATHS = ["/login", "/privacy", "/app"];
+
+// Paths where auth-context should not redirect to /login and should not
+// redirect away after successful token check — miniapp handles its own auth
+const isPublicPath = (pathname: string) =>
+  pathname === "/login" ||
+  pathname === "/privacy" ||
+  pathname.startsWith("/app");
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PanelUser | null>(null);
@@ -36,20 +42,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem("token");
     if (!token) {
       setLoading(false);
-      if (!PUBLIC_PATHS.includes(pathname)) router.push("/login");
+      if (!isPublicPath(pathname)) router.push("/login");
       return;
     }
     authApi
       .me()
       .then((u) => {
         setUser(u);
-        if (PUBLIC_PATHS.includes(pathname)) {
+        // Only redirect panel users away from /login — miniapp routes handle themselves
+        if (pathname === "/login") {
           router.push(u.role === "admin" ? "/dashboard" : "/tasks");
         }
       })
       .catch(() => {
         localStorage.removeItem("token");
-        if (!PUBLIC_PATHS.includes(pathname)) router.push("/login");
+        if (!isPublicPath(pathname)) router.push("/login");
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps

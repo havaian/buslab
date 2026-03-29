@@ -32,6 +32,18 @@ export class User {
 
   @Prop({ type: Types.ObjectId, ref: "Request", default: null })
   currentAssignmentId: Types.ObjectId | null;
+
+  // Source tracking — last seen source
+  @Prop({ enum: ["miniapp", "panel", "bot"], default: null })
+  lastSeenSource: string | null;
+
+  // Whether user has ever logged in via miniapp
+  @Prop({ default: false })
+  hasUsedMiniapp: boolean;
+
+  // Whether user has ever logged in via web panel
+  @Prop({ default: false })
+  hasUsedPanel: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

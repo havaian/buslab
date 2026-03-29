@@ -10,8 +10,10 @@ export default function MiniAppIndexPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role === "admin") router.replace("/app/admin");
-    else if (user.role === "student") router.replace("/app/student");
+    // Admin and student use the existing panel pages
+    if (user.role === "admin") router.replace("/dashboard");
+    else if (user.role === "student") router.replace("/tasks");
+    // Citizens stay in miniapp routes
     else router.replace("/app/user");
   }, [user, router]);
 
