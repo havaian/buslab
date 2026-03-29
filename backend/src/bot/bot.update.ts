@@ -144,7 +144,10 @@ export class BotUpdate {
     }
 
     await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
+      parse_mode: "Markdown",
       reply_markup: this.mainMenuKb(ctx),
+      // @ts-ignore
+      disable_web_page_preview: true,
     });
   }
 
@@ -347,7 +350,10 @@ export class BotUpdate {
 
   private async finishOnboarding(ctx: BotContext): Promise<void> {
     await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
+      parse_mode: "Markdown",
       reply_markup: this.mainMenuKb(ctx),
+      // @ts-ignore
+      disable_web_page_preview: true,
     });
 
     const miniAppUrl = process.env.WEB_PANEL_URL
