@@ -189,6 +189,18 @@ export class BotUpdate {
     await ctx.reply(this.t(ctx, "commands.start.welcome_user"), {
       reply_markup: this.mainMenuKb(ctx),
     });
+
+    const miniAppUrl = process.env.WEB_PANEL_URL
+      ? `${process.env.WEB_PANEL_URL}/app`
+      : "";
+    if (miniAppUrl) {
+      await ctx.reply(this.t(ctx, "commands.start.open_app"), {
+        reply_markup: new InlineKeyboard().webApp(
+          "📱 Открыть приложение",
+          miniAppUrl
+        ),
+      });
+    }
   }
 
   private async handleOfferDecline(ctx: BotContext): Promise<void> {

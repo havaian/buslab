@@ -11,20 +11,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
-declare global {
-  interface Window {
-    Telegram?: {
-      Login: {
-        init: (
-          options: TelegramLoginOptions,
-          callback: TelegramCallback
-        ) => void;
-        open: (callback?: TelegramCallback) => void;
-      };
-    };
-  }
-}
-
 interface TelegramLoginOptions {
   client_id: string | number;
   request_access?: ("phone" | "write")[];

@@ -189,6 +189,17 @@ export const localesApi = {
     put<{ ok: boolean }>(`/settings/locales/${locale}`, { content }),
 };
 
+// ── Legal documents ───────────────────────────────────────────────────────
+
+export const legalApi = {
+  info: () => get<Record<string, boolean>>("/legal"),
+  upload: (locale: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ ok: boolean }>("POST", `/legal/${locale}`, undefined, form);
+  },
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function toQuery(params: object): string {

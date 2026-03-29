@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { settingsApi, localesApi } from "@/lib/api";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { settingsApi, localesApi, legalApi } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
 
-type MainTab = "texts" | "locales";
+type MainTab = "texts" | "locales" | "documents";
 type LocaleKey = "ru" | "uz" | "en";
 
 const REJECTION_LOCALES: { key: LocaleKey; label: string }[] = [
@@ -21,6 +21,12 @@ const LOCALE_TABS: { key: LocaleKey; label: string }[] = [
   { key: "ru", label: "RU — Русский" },
   { key: "uz", label: "UZ — O'zbek" },
   { key: "en", label: "EN — English" },
+];
+
+const DOC_LOCALES: { key: LocaleKey; label: string }[] = [
+  { key: "ru", label: "Русский" },
+  { key: "uz", label: "O'zbek" },
+  { key: "en", label: "English" },
 ];
 
 // ── JSON flatten / unflatten ─────────────────────────────────────────────────
@@ -55,8 +61,6 @@ function unflatten(flat: Record<string, string>): Record<string, any> {
   return result;
 }
 
-// ── Section label map ─────────────────────────────────────────────────────────
-
 const SECTION_LABELS: Record<string, string> = {
   commands: "Команды",
   buttons: "Кнопки",
@@ -70,7 +74,7 @@ const SECTION_LABELS: Record<string, string> = {
   help: "Помощь",
 };
 
-// ── Locale editor component ───────────────────────────────────────────────────
+// ── Locale editor ─────────────────────────────────────────────────────────────
 
 function LocaleEditor({ locale }: { locale: LocaleKey }) {
   const { toast } = useToast();
@@ -107,13 +111,10 @@ function LocaleEditor({ locale }: { locale: LocaleKey }) {
     }
   };
 
-  if (loading) {
+  if (loading)
     return <p className="text-sm text-muted-foreground py-4">Загрузка...</p>;
-  }
-
   if (!flat) return null;
 
-  // Group flat keys by first segment
   const groups: Record<string, string[]> = {};
   for (const key of Object.keys(flat)) {
     const section = key.split(".")[0];
@@ -159,10 +160,125 @@ function LocaleEditor({ locale }: { locale: LocaleKey }) {
           </CardContent>
         </Card>
       ))}
-
       <Button size="sm" onClick={save} disabled={saving} className="mt-2">
         {saving ? "Сохранение..." : "Сохранить"}
       </Button>
+    </div>
+  );
+}
+
+// ── Documents tab ─────────────────────────────────────────────────────────────
+
+function DocumentsTab() {
+  const { toast } = useToast();
+  const [available, setAvailable] = useState<Record<LocaleKey, boolean>>({
+    ru: false,
+    uz: false,
+    en: false,
+  });
+  const [uploading, setUploading] = useState<LocaleKey | null>(null);
+  const fileRefs = {
+    ru: useRef<HTMLInputElement>(null),
+    uz: useRef<HTMLInputElement>(null),
+    en: useRef<HTMLInputElement>(null),
+  };
+
+  const loadInfo = useCallback(async () => {
+    try {
+      const data = await legalApi.info();
+      setAvailable(data);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInfo();
+  }, [loadInfo]);
+
+  const handleUpload = async (locale: LocaleKey, file: File) => {
+    setUploading(locale);
+    try {
+      await legalApi.upload(locale, file);
+      toast(`Документ (${locale.toUpperCase()}) загружен`, "success");
+      setAvailable((prev) => ({ ...prev, [locale]: true }));
+    } catch (e: unknown) {
+      toast((e as Error).message || "Ошибка загрузки", "error");
+    } finally {
+      setUploading(null);
+      // reset input
+      if (fileRefs[locale].current) fileRefs[locale].current.value = "";
+    }
+  };
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <Card>
+        <CardHeader className="pb-1 pt-4 px-4">
+          <CardTitle className="text-sm">
+            Политика и условия использования
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 pt-2 space-y-1">
+          <p className="text-xs text-muted-foreground mb-4">
+            Один PDF-файл на каждый язык. Содержит оба документа — политику
+            конфиденциальности и условия использования. Отображается на странице{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              className="underline hover:no-underline"
+            >
+              /privacy
+            </a>
+            .
+          </p>
+          {DOC_LOCALES.map(({ key, label }) => (
+            <div
+              key={key}
+              className="flex items-center gap-3 py-2.5 border-b last:border-0"
+            >
+              <span className="text-sm font-medium w-24 shrink-0">{label}</span>
+              <span className="text-xs text-muted-foreground flex-1">
+                {available[key] ? (
+                  <a
+                    href={`${apiBase}/legal/${key}/file`}
+                    target="_blank"
+                    className="text-primary underline hover:no-underline"
+                  >
+                    Посмотреть файл
+                  </a>
+                ) : (
+                  "Не загружен"
+                )}
+              </span>
+              <input
+                ref={fileRefs[key]}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(key, file);
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={uploading !== null}
+                onClick={() => fileRefs[key].current?.click()}
+              >
+                {uploading === key
+                  ? "Загрузка..."
+                  : available[key]
+                  ? "Заменить"
+                  : "Загрузить"}
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -174,7 +290,6 @@ export default function SettingsPage() {
   const [mainTab, setMainTab] = useState<MainTab>("texts");
   const [localeTab, setLocaleTab] = useState<LocaleKey>("ru");
 
-  // Standard rejection text
   const [rejectionTexts, setRejectionTexts] = useState<Record<string, string>>({
     ru: "",
     uz: "",
@@ -202,16 +317,17 @@ export default function SettingsPage() {
     }
   };
 
+  const MAIN_TABS: { key: MainTab; label: string }[] = [
+    { key: "texts", label: "Тексты" },
+    { key: "locales", label: "Локализация" },
+    { key: "documents", label: "Документы" },
+  ];
+
   return (
     <PageShell title="Настройки">
       {/* Main tabs */}
       <div className="flex gap-1 border-b mb-5">
-        {(
-          [
-            { key: "texts", label: "Тексты" },
-            { key: "locales", label: "Локализация" },
-          ] as { key: MainTab; label: string }[]
-        ).map(({ key, label }) => (
+        {MAIN_TABS.map(({ key, label }) => (
           <button
             key={key}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
@@ -226,7 +342,7 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {/* ── Тексты tab ─────────────────────────────────────────────────── */}
+      {/* ── Тексты ─────────────────────────────────────────────────────────── */}
       {mainTab === "texts" && (
         <div className="max-w-2xl space-y-4">
           <Card>
@@ -278,10 +394,9 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── Локализация tab ─────────────────────────────────────────────── */}
+      {/* ── Локализация ─────────────────────────────────────────────────────── */}
       {mainTab === "locales" && (
         <div className="max-w-2xl">
-          {/* Locale sub-tabs */}
           <div className="flex gap-1 border-b mb-4">
             {LOCALE_TABS.map(({ key, label }) => (
               <button
@@ -297,10 +412,12 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-
           <LocaleEditor key={localeTab} locale={localeTab} />
         </div>
       )}
+
+      {/* ── Документы ───────────────────────────────────────────────────────── */}
+      {mainTab === "documents" && <DocumentsTab />}
     </PageShell>
   );
 }

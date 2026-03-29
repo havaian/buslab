@@ -18,6 +18,8 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { StudentLogsModule } from "./student-logs/student-logs.module";
 import { SettingsModule } from "./settings/settings.module";
+import { LegalModule } from "./legal/legal.module";
+import { MiniappModule } from "./miniapp/miniapp.module";
 import { BotModule } from "./bot/bot.module";
 
 @Module({
@@ -51,8 +53,10 @@ import { BotModule } from "./bot/bot.module";
     FilesModule,
     SchedulerModule,
     StudentLogsModule,
-    BotModule,
     SettingsModule,
+    LegalModule,
+    MiniappModule,
+    BotModule,
   ],
 })
 export class AppModule {}

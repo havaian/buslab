@@ -58,6 +58,13 @@ export class RequestsController {
     return this.requestsService.findById(id);
   }
 
+  // ── Miniapp — citizen request history ────────────────────────────────────
+
+  @Get("my/history")
+  myHistory(@CurrentUser() user: any) {
+    return this.requestsService.findUserHistory(user.sub);
+  }
+
   // ── Admin ─────────────────────────────────────────────────────────────────
 
   @UseGuards(RolesGuard)

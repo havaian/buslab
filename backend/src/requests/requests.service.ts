@@ -846,4 +846,12 @@ export class RequestsService {
 
     return this.reject(requestId, reason, adminId);
   }
+
+  async findUserHistory(userId: string) {
+    return this.requestModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .populate("categoryId", "name hashtag")
+      .lean();
+  }
 }
