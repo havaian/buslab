@@ -55,25 +55,25 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
         const startParam = twa.initDataUnsafe?.start_param;
         if (startParam) {
           const decoded = decodeURIComponent(startParam);
+          const role = data.user.role as string;
+
           if (decoded.startsWith("r_")) {
+            // Link to a specific request — admin and student use panel routes,
+            // citizen uses miniapp routes
             const requestId = decoded.slice(2);
-            const role = data.user.role as string;
-            if (role === "admin") {
-              (
-                window as any
-              ).__miniAppStartPath = `/app/admin/requests/${requestId}`;
-            } else {
+            if (role === "user") {
               (window as any).__miniAppStartPath = `/app/user/${requestId}`;
+            } else {
+              // admin and student both use the panel request detail page
+              (window as any).__miniAppStartPath = `/requests/${requestId}`;
             }
           } else if (decoded.startsWith("take_")) {
             const requestId = decoded.slice(5);
-            (
-              window as any
-            ).__miniAppStartPath = `/app/student?take=${requestId}`;
+            (window as any).__miniAppStartPath = `/tasks?take=${requestId}`;
           } else if (decoded === "tasks") {
-            (window as any).__miniAppStartPath = `/app/student`;
+            (window as any).__miniAppStartPath = `/tasks`;
           } else if (decoded === "history") {
-            (window as any).__miniAppStartPath = `/app/student/history`;
+            (window as any).__miniAppStartPath = `/history`;
           }
         }
       } catch (e: unknown) {
