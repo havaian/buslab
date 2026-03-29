@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Search, FileText, Users, GraduationCap } from "lucide-react";
 import { usersApi, type CitizenUser } from "@/lib/api";
-import { BottomNav } from "../../_components/bottom-nav";
-import { MobileHeader } from "../../_components/mobile-header";
+import { BottomNav } from "../../../_components/bottom-nav";
+import { MobileHeader } from "../../../_components/mobile-header";
 import { getUserDisplayName } from "@/lib/utils";
 
 const NAV = [

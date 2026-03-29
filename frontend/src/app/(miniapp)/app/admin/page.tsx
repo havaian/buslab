@@ -15,8 +15,8 @@ import {
   type Request,
   type Category,
 } from "@/lib/api";
-import { BottomNav } from "../_components/bottom-nav";
-import { MobileHeader } from "../_components/mobile-header";
+import { BottomNav } from "../../_components/bottom-nav";
+import { MobileHeader } from "../../_components/mobile-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
   formatDateShort,

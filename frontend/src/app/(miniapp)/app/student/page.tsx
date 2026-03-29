@@ -9,8 +9,8 @@ import {
   type Request,
   type StudentStats,
 } from "@/lib/api";
-import { BottomNav } from "../_components/bottom-nav";
-import { MobileHeader } from "../_components/mobile-header";
+import { BottomNav } from "../../_components/bottom-nav";
+import { MobileHeader } from "../../_components/mobile-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Timer } from "@/components/shared/timer";
 import { FileList } from "@/components/shared/file-list";

@@ -9,8 +9,8 @@ import {
   User,
 } from "lucide-react";
 import { requestsApi, type Request } from "@/lib/api";
-import { BottomNav } from "../../_components/bottom-nav";
-import { MobileHeader } from "../../_components/mobile-header";
+import { BottomNav } from "../../../_components/bottom-nav";
+import { MobileHeader } from "../../../_components/mobile-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDateShort, getCategoryName } from "@/lib/utils";
 

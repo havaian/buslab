@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { ClipboardList, History, User } from "lucide-react";
 import { adminUsersApi, type StudentStats } from "@/lib/api";
-import { BottomNav } from "../../_components/bottom-nav";
-import { MobileHeader } from "../../_components/mobile-header";
-import { useMiniApp } from "../../miniapp-context";
+import { BottomNav } from "../../../_components/bottom-nav";
+import { MobileHeader } from "../../../_components/mobile-header";
+import { useMiniApp } from "../../../miniapp-context";
 
 const NAV = [
   { href: "/app/student", label: "Задание", icon: ClipboardList },

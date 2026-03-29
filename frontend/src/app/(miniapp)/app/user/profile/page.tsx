@@ -1,8 +1,8 @@
 "use client";
 
-import { useMiniApp } from "../../miniapp-context";
-import { MobileHeader } from "../../_components/mobile-header";
-import { BottomNav } from "../../_components/bottom-nav";
+import { useMiniApp } from "../../../miniapp-context";
+import { MobileHeader } from "../../../_components/mobile-header";
+import { BottomNav } from "../../../_components/bottom-nav";
 import { FileText, Plus, User } from "lucide-react";
 
 const NAV = [

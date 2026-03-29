@@ -8,7 +8,7 @@ import {
   type Request,
   type PanelUser,
 } from "@/lib/api";
-import { MobileHeader } from "../../../_components/mobile-header";
+import { MobileHeader } from "../../../../_components/mobile-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { FileList } from "@/components/shared/file-list";
 import { Timer } from "@/components/shared/timer";
