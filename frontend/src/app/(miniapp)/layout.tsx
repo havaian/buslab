@@ -1,33 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface MiniAppUser {
-  id: string;
-  telegramId: number;
-  firstName: string;
-  lastName: string;
-  username: string;
-  role: "user" | "student" | "admin";
-}
-
-interface MiniAppContextValue {
-  user: MiniAppUser | null;
-  token: string | null;
-  loading: boolean;
-  error: string | null;
-}
-
-const MiniAppContext = createContext<MiniAppContextValue>({
-  user: null,
-  token: null,
-  loading: true,
-  error: null,
-});
-
-export const useMiniApp = () => useContext(MiniAppContext);
+import { useEffect, useState } from "react";
+import { MiniAppContext, MiniAppUser, useMiniApp } from "./miniapp-context";
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -103,19 +77,7 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Layout ────────────────────────────────────────────────────────────────────
-
-export default function MiniAppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <MiniAppProvider>
-      <MiniAppGate>{children}</MiniAppGate>
-    </MiniAppProvider>
-  );
-}
+// ── Gate — separate component so it can use the hook ─────────────────────────
 
 function MiniAppGate({ children }: { children: React.ReactNode }) {
   const { loading, error, user } = useMiniApp();
@@ -148,4 +110,18 @@ function MiniAppGate({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+// ── Layout (default export only) ─────────────────────────────────────────────
+
+export default function MiniAppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <MiniAppProvider>
+      <MiniAppGate>{children}</MiniAppGate>
+    </MiniAppProvider>
+  );
 }

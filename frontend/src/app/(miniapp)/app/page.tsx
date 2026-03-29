@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMiniApp } from "../layout";
+import { useMiniApp } from "../miniapp-context";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

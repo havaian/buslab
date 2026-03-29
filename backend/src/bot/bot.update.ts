@@ -479,7 +479,12 @@ export class BotUpdate {
       return;
     }
 
-    if (text === "🌐 Language") {
+    if (
+      text === "🇷🇺 Русский" ||
+      text === "🇺🇿 O'zbek" ||
+      text === "🇺🇸 English" ||
+      text === "🌐 Language" // fallback для старых сессий
+    ) {
       await this.handleLanguageMenu(ctx);
       return;
     }
@@ -687,13 +692,20 @@ export class BotUpdate {
   }
 
   mainMenuKb(ctx: BotContext) {
+    const LOCALE_FLAGS: Record<string, string> = {
+      ru: "🇷🇺 Русский",
+      uz: "🇺🇿 O'zbek",
+      en: "🇺🇸 English",
+    };
+    const langLabel = LOCALE_FLAGS[ctx.locale ?? "ru"] ?? "🌐 Language";
+
     return new Keyboard()
       .text(this.t(ctx, "buttons.ask_question"))
       .row()
       .text(this.t(ctx, "buttons.my_requests"))
       .row()
       .text(this.t(ctx, "buttons.help"))
-      .text("🌐 Language")
+      .text(langLabel)
       .resized();
   }
 
