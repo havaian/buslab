@@ -2,8 +2,7 @@
   "commands": {
     "start": {
       "welcome_user": "Welcome to the Legal Clinic Bot!\n\nHere you can:\n- Ask legal questions\n- Browse frequently asked questions (FAQ)\n- Track the status of your requests\n\nSelect an action from the menu below:",
-      "welcome_student": "Welcome!\n\nYou will receive notifications about new requests. Use the web panel to manage your work.",
-      "open_app": "Open the app:"
+      "welcome_student": "Welcome!\n\nYou will receive notifications about new requests. Use the web panel to manage your work."
     }
   },
   "buttons": {
@@ -20,7 +19,8 @@
     "statistics": "Statistics",
     "confirm_answer": "Confirm Answer Submission",
     "edit_answer": "Edit Answer",
-    "reject_assignment": "Reject Assignment"
+    "reject_assignment": "Reject Assignment",
+    "open_app": "Open the app:"
   },
   "onboarding": {
     "offer_text": "Please review the [public offer agreement](https://teletype.in/@businesslaw/publicoffer_en).\n\nBy pressing «Accept», you agree to the terms of service.",
