@@ -356,9 +356,7 @@ export class BotUpdate {
       disable_web_page_preview: true,
     });
 
-    const miniAppUrl = process.env.WEB_PANEL_URL
-      ? `${process.env.WEB_PANEL_URL}/app`
-      : "";
+    const miniAppUrl = process.env.WEB_PANEL_URL ?? "";
     if (miniAppUrl) {
       await ctx.reply(this.t(ctx, "buttons.open_app"), {
         reply_markup: new InlineKeyboard().webApp(
@@ -752,9 +750,7 @@ export class BotUpdate {
       message += "\n";
     }
 
-    const miniAppUrl = process.env.WEB_PANEL_URL
-      ? `${process.env.WEB_PANEL_URL}/app`
-      : "";
+    const miniAppUrl = process.env.WEB_PANEL_URL ?? "";
 
     await ctx.reply(message, {
       reply_markup: miniAppUrl

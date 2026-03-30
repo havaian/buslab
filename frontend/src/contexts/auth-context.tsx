@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Paths where auth-context should not redirect to /login and should not
 // redirect away after successful token check — miniapp handles its own auth
-const isPublicPath = (pathname: string) =>
+const isPanelAuthExcluded = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/privacy" ||
   pathname.startsWith("/user");
@@ -40,9 +40,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
+
     if (!token) {
+      // Try Telegram WebApp initData before redirecting to login
+      const twa = (window as any).Telegram?.WebApp;
+      if (twa?.initData) {
+        twa.ready();
+        twa.expand();
+        const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+        fetch(`${apiBase}/miniapp/auth`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData: twa.initData }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            localStorage.setItem("token", data.access_token);
+            setUser(data.user);
+            const startParam = twa.initDataUnsafe?.start_param;
+            if (startParam) {
+              const decoded = decodeURIComponent(startParam);
+              const role = data.user.role as string;
+              if (decoded.startsWith("r_")) {
+                const requestId = decoded.slice(2);
+                router.push(role === "user" ? `/user/${requestId}` : `/requests/${requestId}`);
+                return;
+              }
+              if (decoded.startsWith("take_")) {
+                router.push(`/tasks?take=${decoded.slice(5)}`);
+                return;
+              }
+              if (decoded === "tasks") { router.push("/tasks"); return; }
+              if (decoded === "history") { router.push("/history"); return; }
+            }
+            if (pathname === "/login") {
+              router.push(
+                data.user.role === "admin"
+                  ? "/dashboard"
+                  : data.user.role === "student"
+                  ? "/tasks"
+                  : "/user"
+              );
+            }
+          })
+          .catch(() => {
+            if (!isPanelAuthExcluded(pathname)) router.push("/login");
+          })
+          .finally(() => setLoading(false));
+        return;
+      }
+
       setLoading(false);
-      if (!isPublicPath(pathname)) router.push("/login");
+      if (!isPanelAuthExcluded(pathname)) router.push("/login");
       return;
     }
     authApi
@@ -56,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         localStorage.removeItem("token");
-        if (!isPublicPath(pathname)) router.push("/login");
+        if (!isPanelAuthExcluded(pathname)) router.push("/login");
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
