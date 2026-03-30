@@ -237,7 +237,7 @@ export interface PanelUser {
   firstName: string;
   lastName: string;
   username: string;
-  role: "admin" | "student";
+  role: "admin" | "student" | "user";
   isBanned?: boolean;
   university?: string | null;
   faculty?: string | null;

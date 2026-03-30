@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { requestsApi, type Request } from "@/lib/api";
-import { MobileHeader } from "../../_components/mobile-header";
+import { PageShell } from "@/components/layout/page-shell";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { FileList } from "@/components/shared/file-list";
 import { formatDate, getCategoryName } from "@/lib/utils";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export default function UserRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [request, setRequest] = useState<Request | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -23,17 +25,22 @@ export default function UserRequestDetailPage() {
 
   if (loading || !request) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Загрузка...
-      </div>
+      <PageShell title="Обращение">
+        <p className="text-sm text-muted-foreground">Загрузка...</p>
+      </PageShell>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <MobileHeader title="Обращение" back="/app/user" />
-
-      <div className="px-4 py-4 space-y-4">
+    <PageShell
+      title="Обращение"
+      actions={
+        <Button variant="outline" size="sm" onClick={() => router.back()}>
+          <ArrowLeft size={14} /> Назад
+        </Button>
+      }
+    >
+      <div className="space-y-4 max-w-2xl">
         {/* Status + meta */}
         <div className="rounded-xl border bg-card px-4 py-3 space-y-2">
           <div className="flex items-center justify-between">
@@ -53,27 +60,8 @@ export default function UserRequestDetailPage() {
             Текст обращения
           </p>
           <p className="text-sm whitespace-pre-wrap">{request.text}</p>
+          <FileList files={request.requestFiles} />
         </div>
-
-        {/* Request files */}
-        {request.requestFiles?.length > 0 && (
-          <div className="rounded-xl border bg-card px-4 py-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">
-              Прикреплённые файлы
-            </p>
-            {request.requestFiles.map((f) => (
-              <a
-                key={f.filename}
-                href={`${API_BASE}/files/${f.filename}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2 text-sm text-primary"
-              >
-                📎 {f.originalName}
-              </a>
-            ))}
-          </div>
-        )}
 
         {/* Decline reason */}
         {request.status === "declined" && request.declineReason && (
@@ -92,25 +80,11 @@ export default function UserRequestDetailPage() {
             <p className="text-sm whitespace-pre-wrap text-green-900">
               {request.finalAnswerText}
             </p>
-            {request.answerFiles?.length > 0 && (
-              <div className="space-y-1 pt-1">
-                {request.answerFiles.map((f) => (
-                  <a
-                    key={f.filename}
-                    href={`${API_BASE}/files/${f.filename}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 text-sm text-green-700"
-                  >
-                    📎 {f.originalName}
-                  </a>
-                ))}
-              </div>
-            )}
+            <FileList files={request.answerFiles} />
           </div>
         )}
 
-        {/* Admin comment (answered/assigned) */}
+        {/* Admin comment */}
         {request.adminComment && (
           <div className="rounded-xl border bg-card px-4 py-3 space-y-1">
             <p className="text-xs font-medium text-muted-foreground">
@@ -120,6 +94,6 @@ export default function UserRequestDetailPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

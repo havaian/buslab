@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, X } from "lucide-react";
+import { ArrowLeft, Paperclip, X } from "lucide-react";
 import { categoriesApi, type Category } from "@/lib/api";
-import { MobileHeader } from "../../_components/mobile-header";
+import { PageShell } from "@/components/layout/page-shell";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -63,7 +64,7 @@ export default function UserNewRequestPage() {
       }
 
       toast("Обращение отправлено", "success");
-      router.push("/app/user");
+      router.push("/user");
     } catch (e: unknown) {
       toast((e as Error).message || "Ошибка", "error");
     } finally {
@@ -72,10 +73,15 @@ export default function UserNewRequestPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <MobileHeader title="Новое обращение" back="/app/user" />
-
-      <div className="flex-1 px-4 py-4 space-y-4">
+    <PageShell
+      title="Новое обращение"
+      actions={
+        <Button variant="outline" size="sm" onClick={() => router.back()}>
+          <ArrowLeft size={14} /> Назад
+        </Button>
+      }
+    >
+      <div className="space-y-4 max-w-2xl">
         {/* Category */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">
@@ -157,18 +163,15 @@ export default function UserNewRequestPage() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Submit */}
-      <div className="px-4 pb-6 pt-2">
-        <button
+        <Button
           onClick={submit}
           disabled={submitting || text.length < MIN_LENGTH || !categoryId}
-          className="w-full rounded-xl bg-primary py-3.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          className="w-full"
         >
           {submitting ? "Отправка..." : "Отправить обращение"}
-        </button>
+        </Button>
       </div>
-    </div>
+    </PageShell>
   );
 }
