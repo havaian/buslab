@@ -327,21 +327,23 @@ export default function SettingsPage() {
 
   return (
     <PageShell title="Настройки">
-      {/* Main tabs */}
-      <div className="flex gap-1 border-b mb-5">
-        {MAIN_TABS.map(({ key, label }) => (
-          <button
-            key={key}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              mainTab === key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => setMainTab(key)}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Main tabs — horizontally scrollable on narrow screens */}
+      <div className="overflow-x-auto mb-5">
+        <div className="flex gap-1 border-b min-w-max">
+          {MAIN_TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                mainTab === key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setMainTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Тексты ─────────────────────────────────────────────────────────── */}

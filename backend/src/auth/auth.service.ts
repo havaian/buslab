@@ -48,6 +48,7 @@ export class AuthService {
     try {
       claims = await this.verifyTelegramIdToken(idToken);
     } catch {
+      console.error("[Auth] JWKS verification failed:", err);
       throw new UnauthorizedException("Invalid Telegram auth token");
     }
 

@@ -24,12 +24,14 @@ type TelegramCallback = (result: {
 }) => void;
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, loading, user } = useAuth();
   const dialog = useDialog();
   const containerRef = useRef<HTMLDivElement>(null);
   const initDone = useRef(false);
 
   useEffect(() => {
+    // Don't mount login widget while auth is still being checked
+    if (loading || user) return;
     if (initDone.current) return;
     initDone.current = true;
 
@@ -85,7 +87,22 @@ export default function LoginPage() {
     return () => {
       if (document.head.contains(script)) document.head.removeChild(script);
     };
-  }, [login, dialog]);
+  }, [login, dialog, loading, user]);
+
+  // While auth context is initialising — show spinner so login form never briefly flashes
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <div className="flex flex-col items-center gap-3">
+          <img src="/logo.svg" alt="Логотип" className="h-10 w-10 opacity-70" />
+          <p className="text-sm text-muted-foreground">Загрузка...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Already authenticated — auth context will redirect, render nothing
+  if (user) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">

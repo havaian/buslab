@@ -540,6 +540,22 @@ export class RequestsService {
       throw new BadRequestException("Request is not in answered status");
 
     const prev = req.status;
+
+    // Лог: если администратор изменил ответ студента перед отправкой
+    if (finalAnswer !== undefined && finalAnswer !== req.answerText) {
+      await this.log({
+        requestId: req._id as any,
+        action: RequestHistoryAction.ANSWER_EDITED_BY_ADMIN,
+        performedBy: adminId,
+        performedByRole: "admin",
+        statusFrom: prev,
+        statusTo: prev, // статус ещё не изменился
+        answerText: req.answerText, // оригинальный ответ студента
+        answerFiles: req.answerFiles ?? [],
+        comment: "Администратор изменил текст ответа перед отправкой",
+      });
+    }
+
     req.status = "closed";
     req.finalAnswerText = finalAnswer ?? req.answerText;
     await req.save();
@@ -651,7 +667,7 @@ export class RequestsService {
         `🔄 <b>Возвращено на доработку</b>\nКомментарий: ${comment}`
       );
     }
-    
+
     return req;
   }
 
@@ -790,11 +806,12 @@ export class RequestsService {
 
     const student = await this.userModel.findById(studentId);
     const cat = req.categoryId as any;
-    const adminAnswerMsgId = await this.notifications.notifyAdminAnswerSubmitted(
-      requestId,
-      student ? `${student.firstName} ${student.lastName}`.trim() : "",
-      cat?.name || ""
-    );
+    const adminAnswerMsgId =
+      await this.notifications.notifyAdminAnswerSubmitted(
+        requestId,
+        student ? `${student.firstName} ${student.lastName}`.trim() : "",
+        cat?.name || ""
+      );
     if (adminAnswerMsgId) {
       await this.requestModel.updateOne(
         { _id: req._id },

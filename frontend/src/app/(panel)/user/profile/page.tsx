@@ -1,177 +1,150 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Paperclip, X } from "lucide-react";
-import { categoriesApi, type Category } from "@/lib/api";
-import { PageShell } from "@/components/layout/page-shell";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast-provider";
+import { useEffect, useState } from "react";
+import { FileText, CheckCircle, XCircle, Clock, User } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { requestsApi, type Request } from "@/lib/api";
+import { MobileHeader } from "@/components/layout/mobile-header";
+import { Card, CardContent } from "@/components/ui/card";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
-const MIN_LENGTH = 150;
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Ожидает",
+  approved: "Одобрено",
+  declined: "Отклонено",
+  assigned: "В работе",
+  answered: "На проверке",
+  closed: "Закрыто",
+};
 
-export default function UserNewRequestPage() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryId, setCategoryId] = useState("");
-  const [text, setText] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+export default function UserProfilePage() {
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    categoriesApi.list().then((cats) => {
-      setCategories(cats);
-      if (cats.length) setCategoryId(cats[0]._id);
-    });
+    requestsApi
+      .myUserHistory()
+      .then(setRequests)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const addFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const incoming = Array.from(e.target.files);
-    setFiles((prev) => {
-      const names = new Set(prev.map((f) => f.name));
-      return [...prev, ...incoming.filter((f) => !names.has(f.name))];
-    });
-    e.target.value = "";
-  };
+  const total = requests.length;
+  const closed = requests.filter((r) => r.status === "closed").length;
+  const declined = requests.filter((r) => r.status === "declined").length;
+  const active = requests.filter(
+    (r) =>
+      r.status === "assigned" ||
+      r.status === "answered" ||
+      r.status === "pending" ||
+      r.status === "approved"
+  ).length;
 
-  const submit = async () => {
-    if (!categoryId) return toast("Выберите категорию", "error");
-    if (text.length < MIN_LENGTH)
-      return toast(`Минимум ${MIN_LENGTH} символов`, "error");
-
-    setSubmitting(true);
-    try {
-      const token = localStorage.getItem("token");
-      const form = new FormData();
-      form.append("categoryId", categoryId);
-      form.append("text", text);
-      files.forEach((f) => form.append("files", f));
-
-      const res = await fetch(`${API_BASE}/requests`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Ошибка отправки");
-      }
-
-      toast("Обращение отправлено", "success");
-      router.push("/user");
-    } catch (e: unknown) {
-      toast((e as Error).message || "Ошибка", "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const displayName = [user?.firstName, user?.lastName]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <PageShell
-      title="Новое обращение"
-      actions={
-        <Button variant="outline" size="sm" onClick={() => router.back()}>
-          <ArrowLeft size={14} /> Назад
-        </Button>
-      }
-    >
-      <div className="space-y-4 max-w-2xl">
-        {/* Category */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
-            Категория
-          </label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full rounded-lg border bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {categories.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.names?.ru || c.name}
-              </option>
-            ))}
-          </select>
-        </div>
+    <div className="flex flex-col min-h-full">
+      <MobileHeader title="Профиль" />
 
-        {/* Text */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
-            Текст обращения
-          </label>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={`Опишите вашу ситуацию подробно (минимум ${MIN_LENGTH} символов)`}
-            rows={8}
-            className="w-full rounded-lg border bg-card px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <p
-            className={`text-xs text-right ${
-              text.length < MIN_LENGTH
-                ? "text-muted-foreground"
-                : "text-green-600"
-            }`}
-          >
-            {text.length} / {MIN_LENGTH}
+      <div className="flex-1 p-4 space-y-4">
+        {/* User info card */}
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User size={22} className="text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-sm truncate">
+                  {displayName || "—"}
+                </p>
+                {user?.username && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    @{user.username}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Request stats */}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2 px-0.5">
+            Мои обращения
           </p>
-        </div>
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              Загрузка...
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Card>
+                <CardContent className="pt-3 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <FileText size={16} className="text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none">{total}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Всего
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* Files */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">
-            Файлы (необязательно)
-          </label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf,image/*"
-            multiple
-            className="hidden"
-            onChange={addFiles}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 rounded-lg border border-dashed px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground w-full"
-          >
-            <Paperclip size={15} />
-            Прикрепить файлы
-          </button>
-          {files.length > 0 && (
-            <div className="space-y-1">
-              {files.map((f) => (
-                <div
-                  key={f.name}
-                  className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2"
-                >
-                  <span className="text-xs truncate">{f.name}</span>
-                  <button
-                    onClick={() =>
-                      setFiles((prev) => prev.filter((x) => x.name !== f.name))
-                    }
-                  >
-                    <X size={14} className="text-muted-foreground" />
-                  </button>
-                </div>
-              ))}
+              <Card>
+                <CardContent className="pt-3 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle
+                      size={16}
+                      className="text-green-500 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none">{closed}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Закрыто
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-3 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <Clock size={16} className="text-blue-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none">{active}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        В процессе
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-3 pb-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <XCircle size={16} className="text-red-500 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none">
+                        {declined}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Отклонено
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
-
-        <Button
-          onClick={submit}
-          disabled={submitting || text.length < MIN_LENGTH || !categoryId}
-          className="w-full"
-        >
-          {submitting ? "Отправка..." : "Отправить обращение"}
-        </Button>
       </div>
-    </PageShell>
+    </div>
   );
 }

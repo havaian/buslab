@@ -584,6 +584,10 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
     color: "bg-red-500",
   },
   timer_expired: { label: "Таймер истёк", color: "bg-red-600" },
+  answer_edited_by_admin: {
+    label: "Ответ изменён администратором",
+    color: "bg-yellow-500",
+  },
 };
 
 const STATUS_LABELS: Record<string, string> = {

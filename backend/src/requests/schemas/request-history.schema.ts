@@ -15,6 +15,7 @@ export enum RequestHistoryAction {
   ANSWER_SUBMITTED = "answer_submitted", // student submitted answer
   ANSWER_APPROVED = "answer_approved", // admin approved answer
   ANSWER_REJECTED = "answer_rejected", // admin rejected answer
+  ANSWER_EDITED_BY_ADMIN = "answer_edited_by_admin", // admin modified student answer before approving
   TIMER_EXPIRED = "timer_expired", // deadline exceeded
 }
 
