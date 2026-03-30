@@ -11,6 +11,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+
 export default function LoginPage() {
   const { login, loading, user } = useAuth();
   const dialog = useDialog();
@@ -23,19 +25,22 @@ export default function LoginPage() {
     initDone.current = true;
 
     const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME;
-    if (!botUsername) {
-      console.error("NEXT_PUBLIC_TELEGRAM_BOT_NAME is not set");
-      return;
-    }
+    if (!botUsername || !containerRef.current) return;
 
-    // Classic Telegram Login Widget — sends {id, first_name, last_name,
-    // username, photo_url, auth_date, hash} verified server-side via
-    // HMAC-SHA256(SHA256(bot_token), data_check_string). No JWKS needed.
+    // Global callback — Telegram widget calls this after user confirms login.
+    // We forward raw widget data to the backend via POST, backend verifies hash.
     (window as any).onTelegramAuth = async (
-      userData: Record<string, unknown>
+      widgetData: Record<string, unknown>
     ) => {
       try {
-        await login(userData);
+        const res = await fetch(`${API_BASE}/auth/telegram`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(widgetData),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || "Ошибка авторизации");
+        await login(data.access_token, data.user);
       } catch (e: unknown) {
         dialog.alert((e as Error).message || "Ошибка входа", {
           title: "Ошибка",
@@ -51,14 +56,10 @@ export default function LoginPage() {
     script.setAttribute("data-size", "large");
     script.setAttribute("data-onauth", "onTelegramAuth(user)");
     script.setAttribute("data-request-access", "write");
-
-    containerRef.current?.appendChild(script);
+    containerRef.current.appendChild(script);
 
     return () => {
       delete (window as any).onTelegramAuth;
-      if (containerRef.current?.contains(script)) {
-        containerRef.current.removeChild(script);
-      }
     };
   }, [login, dialog, loading, user]);
 

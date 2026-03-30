@@ -13,23 +13,20 @@ import { User, UserDocument } from "../users/schemas/user.schema";
 //
 // Spec: https://core.telegram.org/widgets/login#checking-authorization
 //
-// 1. Take all fields from callback data except "hash"
-// 2. Sort alphabetically, join as "key=value\n"
-// 3. secret_key = SHA256(bot_token)   ← raw digest, NOT hmac
-// 4. expected   = HEX(HMAC-SHA256(secret_key, data_check_string))
-// 5. Compare expected with hash
-//
-// NOTE: intentionally different from Mini App verification which uses
-// HMAC-SHA256("WebAppData", bot_token) as secret key.
+// 1. Take all query params except "hash", sort alphabetically, join as "key=value\n"
+// 2. secret_key = SHA256(bot_token)   ← raw digest, NOT hmac
+// 3. expected   = HEX(HMAC-SHA256(secret_key, data_check_string))
+// 4. Compare expected with hash
 
-export interface TelegramWidgetUser {
-  id: number | string;
+export interface TelegramWidgetData {
+  id: string | number;
   first_name?: string;
   last_name?: string;
   username?: string;
   photo_url?: string;
-  auth_date: number | string;
+  auth_date: string | number;
   hash: string;
+  [key: string]: unknown;
 }
 
 @Injectable()
@@ -41,20 +38,21 @@ export class AuthService {
 
   // ── Private ───────────────────────────────────────────────────────────────
 
-  private verifyWidgetHash(data: TelegramWidgetUser): boolean {
+  private verifyWidgetHash(data: TelegramWidgetData): boolean {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN not set");
 
     const { hash, ...rest } = data;
     if (!hash) return false;
 
+    // Build data_check_string: sorted "key=value" pairs joined by \n
     const checkEntries = Object.entries(rest)
       .filter(([, v]) => v !== undefined && v !== null && v !== "")
       .map(([k, v]) => `${k}=${v}`)
       .sort();
     const dataCheckString = checkEntries.join("\n");
 
-    // secret_key = SHA256(bot_token) — raw bytes
+    // secret_key = SHA256(bot_token) — raw bytes, not HMAC
     const secretKey = crypto.createHash("sha256").update(botToken).digest();
 
     const expectedHash = crypto
@@ -67,8 +65,8 @@ export class AuthService {
 
   // ── Public ────────────────────────────────────────────────────────────────
 
-  async login(data: TelegramWidgetUser) {
-    console.log("[Auth] login data:", JSON.stringify(data));
+  /** Called from the redirect callback — verifies hash, returns JWT + user */
+  async loginFromWidget(data: TelegramWidgetData) {
     if (!this.verifyWidgetHash(data)) {
       throw new UnauthorizedException("Invalid Telegram auth signature");
     }
@@ -98,14 +96,13 @@ export class AuthService {
     }
 
     // Update profile from widget data
-    if (data.first_name) user.firstName = data.first_name;
-    if (data.last_name !== undefined) user.lastName = data.last_name ?? "";
-    if (data.username) user.username = data.username;
+    if (data.first_name) user.firstName = String(data.first_name);
+    if (data.last_name !== undefined)
+      user.lastName = String(data.last_name ?? "");
+    if (data.username) user.username = String(data.username);
 
-    // Track panel usage
     user.lastSeenSource = "panel";
     user.hasUsedPanel = true;
-
     await user.save();
 
     const payload = {
