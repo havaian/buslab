@@ -51,7 +51,7 @@ export default function PanelLayout({
       </div>
 
       {/* Mobile bottom nav — all roles */}
-      <BottomNav />
+      <BottomNav role={user.role} />
     </div>
   );
 }

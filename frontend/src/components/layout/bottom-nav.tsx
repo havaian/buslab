@@ -20,7 +20,6 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/auth-context";
 
 interface NavItem {
   href: string;
@@ -74,12 +73,9 @@ function NavLink({ href, label, icon: Icon }: NavItem) {
   );
 }
 
-export function BottomNav() {
-  const { user } = useAuth();
+export function BottomNav({ role }: { role: string }) {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
-
-  if (!user) return null;
 
   const moreActive = adminMore.some(
     (item) => pathname === item.href || pathname.startsWith(item.href + "/")
@@ -89,12 +85,11 @@ export function BottomNav() {
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background lg:hidden">
         <div className="flex h-16 items-stretch">
-          {user.role === "admin" && (
+          {role === "admin" && (
             <>
               {adminMain.map((item) => (
                 <NavLink key={item.href} {...item} />
               ))}
-              {/* More button */}
               <button
                 onClick={() => setSheetOpen(true)}
                 className={cn(
@@ -111,10 +106,10 @@ export function BottomNav() {
             </>
           )}
 
-          {user.role === "student" &&
+          {role === "student" &&
             studentNav.map((item) => <NavLink key={item.href} {...item} />)}
 
-          {user.role === "user" &&
+          {role === "user" &&
             citizenNav.map((item) => <NavLink key={item.href} {...item} />)}
         </div>
       </nav>

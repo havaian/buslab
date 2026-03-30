@@ -45,7 +45,7 @@ export default function PanelLayout({
         {/* pb-16 on mobile to avoid content hiding behind bottom nav */}
         <div className="flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</div>
       </div>
-      <BottomNav />
+      <BottomNav role={user.role} />
     </div>
   );
 }
