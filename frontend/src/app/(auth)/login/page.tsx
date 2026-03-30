@@ -11,7 +11,17 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+interface TelegramLoginOptions {
+  client_id: string | number;
+  request_access?: ("phone" | "write")[];
+  lang?: string;
+}
+
+type TelegramCallback = (result: {
+  id_token?: string;
+  user?: Record<string, unknown>;
+  error?: string;
+}) => void;
 
 export default function LoginPage() {
   const { login, loading, user } = useAuth();
@@ -24,23 +34,22 @@ export default function LoginPage() {
     if (initDone.current) return;
     initDone.current = true;
 
-    const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME;
-    if (!botUsername || !containerRef.current) return;
+    const clientId = process.env.NEXT_PUBLIC_TELEGRAM_BOT_CLIENT_ID;
+    if (!clientId) {
+      console.error("NEXT_PUBLIC_TELEGRAM_BOT_CLIENT_ID is not set");
+      return;
+    }
 
-    // Global callback — Telegram widget calls this after user confirms login.
-    // We forward raw widget data to the backend via POST, backend verifies hash.
-    (window as any).onTelegramAuth = async (
-      widgetData: Record<string, unknown>
-    ) => {
-      try {
-        const res = await fetch(`${API_BASE}/auth/telegram`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(widgetData),
+    const handleAuth: TelegramCallback = async (result) => {
+      if (result.error || !result.id_token) {
+        dialog.alert(result.error || "Не получен токен авторизации", {
+          title: "Ошибка",
+          variant: "destructive",
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || "Ошибка авторизации");
-        await login(data.access_token, data.user);
+        return;
+      }
+      try {
+        await login(result.id_token);
       } catch (e: unknown) {
         dialog.alert((e as Error).message || "Ошибка входа", {
           title: "Ошибка",
@@ -50,16 +59,32 @@ export default function LoginPage() {
     };
 
     const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.src = "https://telegram.org/js/telegram-login.js";
     script.async = true;
-    script.setAttribute("data-telegram-login", botUsername);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-onauth", "onTelegramAuth(user)");
-    script.setAttribute("data-request-access", "write");
-    containerRef.current.appendChild(script);
+    script.onload = () => {
+      if (!window.Telegram?.Login || !containerRef.current) return;
+
+      window.Telegram.Login.init(
+        { client_id: clientId, lang: "ru" },
+        handleAuth
+      );
+
+      const btn = document.createElement("button");
+      btn.className =
+        "flex items-center justify-center gap-2 w-full rounded-md bg-[#2AABEE] hover:bg-[#229ED9] text-white font-medium py-2.5 px-4 text-sm transition-colors cursor-pointer";
+      btn.innerHTML =
+        `<svg width="20" height="20" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="120" cy="120" r="120" fill="white" fill-opacity="0.2"/>
+          <path d="M175 65L52 113c-8 3-8 8-1 10l31 10 12 37c2 5 3 7 7 7s5-2 8-5l16-16 33 24c6 4 10 2 12-5l21-101c2-9-3-13-11-9z" fill="white"/>
+        </svg>` + "Войти через Telegram";
+      btn.onclick = () => window.Telegram?.Login.open();
+      containerRef.current.appendChild(btn);
+    };
+
+    document.head.appendChild(script);
 
     return () => {
-      delete (window as any).onTelegramAuth;
+      if (document.head.contains(script)) document.head.removeChild(script);
     };
   }, [login, dialog, loading, user]);
 
@@ -87,7 +112,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
-          <div ref={containerRef} />
+          <div ref={containerRef} className="w-full" />
         </CardContent>
       </Card>
     </div>

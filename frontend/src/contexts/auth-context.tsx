@@ -13,7 +13,7 @@ import { authApi, type PanelUser } from "@/lib/api";
 interface AuthContextValue {
   user: PanelUser | null;
   loading: boolean;
-  login: (token: string, userData: PanelUser) => void;
+  login: (idToken: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -170,10 +170,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(
-    (token: string, userData: PanelUser) => {
-      localStorage.setItem("token", token);
-      setUser(userData);
-      redirectByRole(userData.role);
+    async (idToken: string) => {
+      const res = await authApi.telegramLogin(idToken);
+      localStorage.setItem("token", res.access_token);
+      setUser(res.user);
+      redirectByRole(res.user.role);
     },
     [redirectByRole]
   );

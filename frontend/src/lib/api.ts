@@ -49,8 +49,10 @@ const patchForm = <T>(path: string, form: FormData) =>
 // ── Auth ──────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  telegramLogin: (userData: Record<string, unknown>) =>
-    post<{ access_token: string; user: PanelUser }>("/auth/telegram", userData),
+  telegramLogin: (idToken: string) =>
+    post<{ access_token: string; user: PanelUser }>("/auth/telegram", {
+      id_token: idToken,
+    }),
   me: () => get<PanelUser>("/auth/me"),
 };
 
