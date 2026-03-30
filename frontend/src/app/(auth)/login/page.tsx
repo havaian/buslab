@@ -17,9 +17,18 @@ interface TelegramLoginOptions {
   lang?: string;
 }
 
+type TelegramWidgetUser = {
+  id: number | string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number | string;
+  hash: string;
+};
+
 type TelegramCallback = (result: {
-  id_token?: string;
-  user?: Record<string, unknown>;
+  user?: TelegramWidgetUser;
   error?: string;
 }) => void;
 
@@ -30,7 +39,6 @@ export default function LoginPage() {
   const initDone = useRef(false);
 
   useEffect(() => {
-    // Don't mount login widget while auth is still being checked
     if (loading || user) return;
     if (initDone.current) return;
     initDone.current = true;
@@ -42,15 +50,15 @@ export default function LoginPage() {
     }
 
     const handleAuth: TelegramCallback = async (result) => {
-      if (result.error || !result.id_token) {
-        dialog.alert(result.error || "Не получен токен авторизации", {
+      if (result.error || !result.user) {
+        dialog.alert(result.error || "Не получены данные авторизации", {
           title: "Ошибка",
           variant: "destructive",
         });
         return;
       }
       try {
-        await login(result.id_token);
+        await login(result.user);
       } catch (e: unknown) {
         dialog.alert((e as Error).message || "Ошибка входа", {
           title: "Ошибка",
@@ -67,7 +75,7 @@ export default function LoginPage() {
 
       window.Telegram.Login.init(
         { client_id: clientId, lang: "ru" },
-        handleAuth
+        handleAuth as any
       );
 
       const btn = document.createElement("button");
@@ -89,7 +97,6 @@ export default function LoginPage() {
     };
   }, [login, dialog, loading, user]);
 
-  // While auth context is initialising — show spinner so login form never briefly flashes
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
@@ -101,7 +108,6 @@ export default function LoginPage() {
     );
   }
 
-  // Already authenticated — auth context will redirect, render nothing
   if (user) return null;
 
   return (

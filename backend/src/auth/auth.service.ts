@@ -6,19 +6,30 @@ import {
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { JwtService } from "@nestjs/jwt";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import * as crypto from "crypto";
 import { User, UserDocument } from "../users/schemas/user.schema";
 
-const TELEGRAM_JWKS = createRemoteJWKSet(
-  new URL("https://oauth.telegram.org/jwks")
-);
+// ── Telegram Login Widget hash verification ───────────────────────────────
+//
+// Spec: https://core.telegram.org/widgets/login#checking-authorization
+//
+// 1. Take all fields from callback data except "hash"
+// 2. Sort alphabetically, join as "key=value\n"
+// 3. secret_key = SHA256(bot_token)   ← raw digest, NOT hmac
+// 4. expected   = HEX(HMAC-SHA256(secret_key, data_check_string))
+// 5. Compare expected with hash
+//
+// NOTE: intentionally different from Mini App verification which uses
+// HMAC-SHA256("WebAppData", bot_token) as secret key.
 
-interface TelegramIdTokenClaims {
-  sub: string;
-  id: number;
-  name?: string;
-  preferred_username?: string;
-  picture?: string;
+export interface TelegramWidgetUser {
+  id: number | string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number | string;
+  hash: string;
 }
 
 @Injectable()
@@ -28,36 +39,52 @@ export class AuthService {
     private jwtService: JwtService
   ) {}
 
-  private async verifyTelegramIdToken(
-    idToken: string
-  ): Promise<TelegramIdTokenClaims> {
-    const clientId = process.env.TELEGRAM_BOT_CLIENT_ID;
-    if (!clientId) throw new Error("TELEGRAM_BOT_CLIENT_ID not set");
+  // ── Private ───────────────────────────────────────────────────────────────
 
-    const { payload } = await jwtVerify(idToken, TELEGRAM_JWKS, {
-      issuer: "https://oauth.telegram.org",
-      audience: clientId,
-    });
+  private verifyWidgetHash(data: TelegramWidgetUser): boolean {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) throw new Error("TELEGRAM_BOT_TOKEN not set");
 
-    return payload as unknown as TelegramIdTokenClaims;
+    const { hash, ...rest } = data;
+    if (!hash) return false;
+
+    const checkEntries = Object.entries(rest)
+      .filter(([, v]) => v !== undefined && v !== null && v !== "")
+      .map(([k, v]) => `${k}=${v}`)
+      .sort();
+    const dataCheckString = checkEntries.join("\n");
+
+    // secret_key = SHA256(bot_token) — raw bytes
+    const secretKey = crypto.createHash("sha256").update(botToken).digest();
+
+    const expectedHash = crypto
+      .createHmac("sha256", secretKey)
+      .update(dataCheckString)
+      .digest("hex");
+
+    return expectedHash === hash;
   }
 
-  async login(idToken: string) {
-    let claims: TelegramIdTokenClaims;
+  // ── Public ────────────────────────────────────────────────────────────────
 
-    try {
-      claims = await this.verifyTelegramIdToken(idToken);
-    } catch (err) {
-      console.error("[Auth] JWKS verification failed:", err);
-      throw new UnauthorizedException("Invalid Telegram auth token");
+  async login(data: TelegramWidgetUser) {
+    if (!this.verifyWidgetHash(data)) {
+      throw new UnauthorizedException("Invalid Telegram auth signature");
     }
 
-    if (!claims.id) {
-      throw new UnauthorizedException("Invalid token: missing user id");
+    // auth_date freshness check — max 1 hour
+    const authDate = Number(data.auth_date);
+    if (!authDate || Date.now() / 1000 - authDate > 3600) {
+      throw new UnauthorizedException("Auth data expired");
+    }
+
+    const telegramId = Number(data.id);
+    if (!telegramId) {
+      throw new UnauthorizedException("Invalid Telegram ID");
     }
 
     const user = await this.userModel.findOne({
-      telegramId: claims.id,
+      telegramId,
       role: { $in: ["admin", "student"] },
     });
 
@@ -69,15 +96,10 @@ export class AuthService {
       throw new ForbiddenException("User is blocked");
     }
 
-    // Update profile from token claims
-    if (claims.name) {
-      const [firstName, ...rest] = claims.name.split(" ");
-      user.firstName = firstName;
-      user.lastName = rest.join(" ") || "";
-    }
-    if (claims.preferred_username) {
-      user.username = claims.preferred_username;
-    }
+    // Update profile from widget data
+    if (data.first_name) user.firstName = data.first_name;
+    if (data.last_name !== undefined) user.lastName = data.last_name ?? "";
+    if (data.username) user.username = data.username;
 
     // Track panel usage
     user.lastSeenSource = "panel";
