@@ -22,7 +22,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const isPanelAuthExcluded = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/privacy" ||
-  pathname.startsWith("/user");
+  pathname.startsWith("/user") ||
+  pathname === "/auth/done";
 
 function loadTelegramWebAppSdk(): Promise<void> {
   return new Promise((resolve) => {

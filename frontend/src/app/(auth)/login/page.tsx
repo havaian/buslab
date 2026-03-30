@@ -11,12 +11,6 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 
-interface TelegramLoginOptions {
-  client_id: string | number;
-  request_access?: ("phone" | "write")[];
-  lang?: string;
-}
-
 export default function LoginPage() {
   const { login, loading, user } = useAuth();
   const dialog = useDialog();
@@ -28,26 +22,20 @@ export default function LoginPage() {
     if (initDone.current) return;
     initDone.current = true;
 
-    const clientId = process.env.NEXT_PUBLIC_TELEGRAM_BOT_CLIENT_ID;
-    if (!clientId) {
-      console.error("NEXT_PUBLIC_TELEGRAM_BOT_CLIENT_ID is not set");
+    const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME;
+    if (!botUsername) {
+      console.error("NEXT_PUBLIC_TELEGRAM_BOT_NAME is not set");
       return;
     }
 
-    const handleAuth = async (result: any) => {
-      console.log("[TG Login] callback result:", JSON.stringify(result));
-
-      // User closed the dialog without logging in
-      if (!result) return;
-
-      // Widget signals an error
-      if (result.error) {
-        dialog.alert(result.error, { title: "Ошибка", variant: "destructive" });
-        return;
-      }
-
+    // Classic Telegram Login Widget — sends {id, first_name, last_name,
+    // username, photo_url, auth_date, hash} verified server-side via
+    // HMAC-SHA256(SHA256(bot_token), data_check_string). No JWKS needed.
+    (window as any).onTelegramAuth = async (
+      userData: Record<string, unknown>
+    ) => {
       try {
-        await login(result);
+        await login(userData);
       } catch (e: unknown) {
         dialog.alert((e as Error).message || "Ошибка входа", {
           title: "Ошибка",
@@ -57,32 +45,20 @@ export default function LoginPage() {
     };
 
     const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-login.js";
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.async = true;
-    script.onload = () => {
-      if (!window.Telegram?.Login || !containerRef.current) return;
+    script.setAttribute("data-telegram-login", botUsername);
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+    script.setAttribute("data-request-access", "write");
 
-      window.Telegram.Login.init(
-        { client_id: clientId, lang: "ru" } as TelegramLoginOptions,
-        handleAuth
-      );
-
-      const btn = document.createElement("button");
-      btn.className =
-        "flex items-center justify-center gap-2 w-full rounded-md bg-[#2AABEE] hover:bg-[#229ED9] text-white font-medium py-2.5 px-4 text-sm transition-colors cursor-pointer";
-      btn.innerHTML =
-        `<svg width="20" height="20" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="120" cy="120" r="120" fill="white" fill-opacity="0.2"/>
-          <path d="M175 65L52 113c-8 3-8 8-1 10l31 10 12 37c2 5 3 7 7 7s5-2 8-5l16-16 33 24c6 4 10 2 12-5l21-101c2-9-3-13-11-9z" fill="white"/>
-        </svg>` + "Войти через Telegram";
-      btn.onclick = () => window.Telegram?.Login.open();
-      containerRef.current.appendChild(btn);
-    };
-
-    document.head.appendChild(script);
+    containerRef.current?.appendChild(script);
 
     return () => {
-      if (document.head.contains(script)) document.head.removeChild(script);
+      delete (window as any).onTelegramAuth;
+      if (containerRef.current?.contains(script)) {
+        containerRef.current.removeChild(script);
+      }
     };
   }, [login, dialog, loading, user]);
 
@@ -110,7 +86,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
-          <div ref={containerRef} className="w-full" />
+          <div ref={containerRef} />
         </CardContent>
       </Card>
     </div>
