@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { requestsApi, type Request } from "@/lib/api";
-import { MobileHeader } from "../../../_components/mobile-header";
+import { MobileHeader } from "../../_components/mobile-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDate, getCategoryName } from "@/lib/utils";
 

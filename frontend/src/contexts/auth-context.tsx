@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const isPublicPath = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/privacy" ||
-  pathname.startsWith("/app");
+  pathname.startsWith("/user");
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PanelUser | null>(null);

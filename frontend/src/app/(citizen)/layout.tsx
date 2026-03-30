@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MiniAppContext, type MiniAppUser } from "./miniapp-context";
+import { MiniAppContext, type CitizenAuthUser } from "./miniapp-context";
 
 function MiniAppProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<MiniAppUser | null>(null);
+  const [user, setUser] = useState<CitizenAuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ function MiniAppProvider({ children }: { children: React.ReactNode }) {
 
         const data = await res.json();
         // Save to localStorage so existing api.ts helpers work unchanged
-        localStorage.setItem("miniapp_token", data.access_token);
+        localStorage.setItem("token", data.access_token);
         setToken(data.access_token);
         setUser(data.user);
 

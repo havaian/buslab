@@ -2,10 +2,10 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMiniApp } from "../miniapp-context";
+import { useCitizen } from "../miniapp-context";
 
 export default function MiniAppIndexPage() {
-  const { user } = useMiniApp();
+  const { user } = useCitizen();
   const router = useRouter();
 
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from "react";
 
-export interface MiniAppUser {
+export interface CitizenAuthUser {
   id: string;
   telegramId: number;
   firstName: string;
@@ -12,7 +12,7 @@ export interface MiniAppUser {
 }
 
 export interface MiniAppContextValue {
-  user: MiniAppUser | null;
+  user: CitizenAuthUser | null;
   token: string | null;
   loading: boolean;
   error: string | null;
@@ -25,4 +25,4 @@ export const MiniAppContext = createContext<MiniAppContextValue>({
   error: null,
 });
 
-export const useMiniApp = () => useContext(MiniAppContext);
+export const useCitizen = () => useContext(MiniAppContext);

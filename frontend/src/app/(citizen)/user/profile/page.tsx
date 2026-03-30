@@ -1,8 +1,8 @@
 "use client";
 
-import { useMiniApp } from "../../../miniapp-context";
-import { MobileHeader } from "../../../_components/mobile-header";
-import { BottomNav } from "../../../_components/bottom-nav";
+import { useCitizen } from "../../miniapp-context";
+import { MobileHeader } from "../../_components/mobile-header";
+import { BottomNav } from "../../_components/bottom-nav";
 import { FileText, Plus, User } from "lucide-react";
 
 const NAV = [
@@ -12,7 +12,7 @@ const NAV = [
 ];
 
 export default function UserProfilePage() {
-  const { user } = useMiniApp();
+  const { user } = useCitizen();
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">

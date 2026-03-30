@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, FileText, User } from "lucide-react";
 import { requestsApi, type Request } from "@/lib/api";
-import { BottomNav } from "../../_components/bottom-nav";
-import { MobileHeader } from "../../_components/mobile-header";
+import { BottomNav } from "../_components/bottom-nav";
+import { MobileHeader } from "../_components/mobile-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDateShort, getCategoryName } from "@/lib/utils";
-import { useMiniApp } from "../../miniapp-context";
+import { useCitizen } from "../miniapp-context";
 
 const NAV = [
   { href: "/app/user", label: "Обращения", icon: FileText },
@@ -18,7 +18,7 @@ const NAV = [
 
 export default function UserRequestsPage() {
   const router = useRouter();
-  const { user } = useMiniApp();
+  const { user } = useCitizen();
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, X } from "lucide-react";
 import { categoriesApi, type Category } from "@/lib/api";
-import { MobileHeader } from "../../../_components/mobile-header";
+import { MobileHeader } from "../../_components/mobile-header";
 import { useToast } from "@/components/ui/toast-provider";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -45,7 +45,7 @@ export default function UserNewRequestPage() {
 
     setSubmitting(true);
     try {
-      const token = localStorage.getItem("miniapp_token");
+      const token = localStorage.getItem("token");
       const form = new FormData();
       form.append("categoryId", categoryId);
       form.append("text", text);
