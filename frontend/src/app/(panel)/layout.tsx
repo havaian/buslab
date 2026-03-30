@@ -43,7 +43,8 @@ export default function PanelLayout({
       <div className="flex flex-1 flex-col min-w-0">
         {/* Mobile top bar — admin and student only, citizen pages have their own headers */}
         {!isCitizen && (
-          <div className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:hidden">
+          <div className="flex shrink-0 items-center gap-3 border-b px-4 lg:hidden"
+            style={{ paddingTop: "env(safe-area-inset-top)", height: "calc(3.5rem + env(safe-area-inset-top))" }}>
             <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
             <span className="font-semibold text-sm truncate">
               Юридическая клиника

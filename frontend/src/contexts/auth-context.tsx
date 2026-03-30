@@ -19,12 +19,31 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Paths where auth-context should not redirect to /login and should not
-// redirect away after successful token check — miniapp handles its own auth
 const isPanelAuthExcluded = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/privacy" ||
   pathname.startsWith("/user");
+
+function loadTelegramWebAppSdk(): Promise<void> {
+  return new Promise((resolve) => {
+    if ((window as any).Telegram?.WebApp?.initData !== undefined) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector(
+      'script[src="https://telegram.org/js/telegram-web-app.js"]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-web-app.js";
+    script.onload = () => resolve();
+    script.onerror = () => resolve(); // resolve anyway, initData will just be empty
+    document.head.appendChild(script);
+  });
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PanelUser | null>(null);
@@ -38,76 +57,114 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+  const redirectByRole = useCallback(
+    (role: string) => {
+      if (role === "admin") router.push("/dashboard");
+      else if (role === "student") router.push("/tasks");
+      else router.push("/user");
+    },
+    [router]
+  );
 
-    if (!token) {
-      // Try Telegram WebApp initData before redirecting to login
+  useEffect(() => {
+    const init = async () => {
+      // Load TG SDK first so we can check initData
+      await loadTelegramWebAppSdk();
+
       const twa = (window as any).Telegram?.WebApp;
+
+      // initData present — we're inside Telegram Mini App
+      // Always prefer initData over stored token to handle account switching
       if (twa?.initData) {
         twa.ready();
         twa.expand();
-        const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-        fetch(`${apiBase}/miniapp/auth`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData: twa.initData }),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            localStorage.setItem("token", data.access_token);
-            setUser(data.user);
-            const startParam = twa.initDataUnsafe?.start_param;
-            if (startParam) {
-              const decoded = decodeURIComponent(startParam);
-              const role = data.user.role as string;
-              if (decoded.startsWith("r_")) {
-                const requestId = decoded.slice(2);
-                router.push(role === "user" ? `/user/${requestId}` : `/requests/${requestId}`);
-                return;
-              }
-              if (decoded.startsWith("take_")) {
-                router.push(`/tasks?take=${decoded.slice(5)}`);
-                return;
-              }
-              if (decoded === "tasks") { router.push("/tasks"); return; }
-              if (decoded === "history") { router.push("/history"); return; }
-            }
-            if (pathname === "/login") {
+        try {
+          const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+          const res = await fetch(`${apiBase}/miniapp/auth`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initData: twa.initData }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || "Auth failed");
+
+          localStorage.setItem("token", data.access_token);
+          setUser(data.user);
+
+          // Handle deep link start_param
+          const startParam = twa.initDataUnsafe?.start_param;
+          if (startParam) {
+            const decoded = decodeURIComponent(startParam);
+            const role = data.user.role as string;
+            if (decoded.startsWith("r_")) {
+              const requestId = decoded.slice(2);
               router.push(
-                data.user.role === "admin"
-                  ? "/dashboard"
-                  : data.user.role === "student"
-                  ? "/tasks"
-                  : "/user"
+                role === "user"
+                  ? `/user/${requestId}`
+                  : `/requests/${requestId}`
               );
+              return;
             }
-          })
-          .catch(() => {
+            if (decoded.startsWith("take_")) {
+              router.push(`/tasks?take=${decoded.slice(5)}`);
+              return;
+            }
+            if (decoded === "tasks") {
+              router.push("/tasks");
+              return;
+            }
+            if (decoded === "history") {
+              router.push("/history");
+              return;
+            }
+          }
+
+          if (pathname === "/login" || pathname === "/") {
+            redirectByRole(data.user.role);
+          }
+        } catch {
+          // initData auth failed — fall back to stored token below
+          const token = localStorage.getItem("token");
+          if (!token) {
             if (!isPanelAuthExcluded(pathname)) router.push("/login");
-          })
-          .finally(() => setLoading(false));
+          } else {
+            try {
+              const u = await authApi.me();
+              setUser(u);
+            } catch {
+              localStorage.removeItem("token");
+              if (!isPanelAuthExcluded(pathname)) router.push("/login");
+            }
+          }
+        } finally {
+          setLoading(false);
+        }
         return;
       }
 
-      setLoading(false);
-      if (!isPanelAuthExcluded(pathname)) router.push("/login");
-      return;
-    }
-    authApi
-      .me()
-      .then((u) => {
+      // No initData — regular browser, use stored token
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        if (!isPanelAuthExcluded(pathname)) router.push("/login");
+        return;
+      }
+
+      try {
+        const u = await authApi.me();
         setUser(u);
-        // Only redirect panel users away from /login — miniapp routes handle themselves
         if (pathname === "/login") {
-          router.push(u.role === "admin" ? "/dashboard" : "/tasks");
+          redirectByRole(u.role);
         }
-      })
-      .catch(() => {
+      } catch {
         localStorage.removeItem("token");
         if (!isPanelAuthExcluded(pathname)) router.push("/login");
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -116,9 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authApi.telegramLogin(idToken);
       localStorage.setItem("token", res.access_token);
       setUser(res.user);
-      router.push(res.user.role === "admin" ? "/dashboard" : "/tasks");
+      redirectByRole(res.user.role);
     },
-    [router]
+    [redirectByRole]
   );
 
   return (
