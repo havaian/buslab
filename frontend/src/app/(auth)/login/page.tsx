@@ -17,7 +17,8 @@ interface TelegramLoginOptions {
   lang?: string;
 }
 
-type TelegramWidgetUser = {
+// Telegram Login Widget callback receives user data at top level, not nested
+type TelegramWidgetResult = {
   id: number | string;
   first_name?: string;
   last_name?: string;
@@ -25,12 +26,10 @@ type TelegramWidgetUser = {
   photo_url?: string;
   auth_date: number | string;
   hash: string;
+  error?: string;
 };
 
-type TelegramCallback = (result: {
-  user?: TelegramWidgetUser;
-  error?: string;
-}) => void;
+type TelegramCallback = (result: TelegramWidgetResult) => void;
 
 export default function LoginPage() {
   const { login, loading, user } = useAuth();
@@ -50,7 +49,7 @@ export default function LoginPage() {
     }
 
     const handleAuth: TelegramCallback = async (result) => {
-      if (result.error || !result.user) {
+      if (result.error || !result.id || !result.hash) {
         dialog.alert(result.error || "Не получены данные авторизации", {
           title: "Ошибка",
           variant: "destructive",
@@ -58,7 +57,8 @@ export default function LoginPage() {
         return;
       }
       try {
-        await login(result.user);
+        // Pass the whole result object — it contains id, hash, auth_date, etc.
+        await login(result as unknown as Record<string, unknown>);
       } catch (e: unknown) {
         dialog.alert((e as Error).message || "Ошибка входа", {
           title: "Ошибка",
