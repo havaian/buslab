@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Menu } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/layout/sidebar";
+import { BottomNav } from "@/components/layout/bottom-nav";
 
 export default function PanelLayout({
   children,
@@ -13,7 +13,6 @@ export default function PanelLayout({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -29,25 +28,24 @@ export default function PanelLayout({
 
   if (!user) return null;
 
+  const isCitizen = user.role === "user";
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Mobile top bar — replaces the floating fixed hamburger */}
-        <div className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Открыть меню"
-          >
-            <Menu size={20} />
-          </button>
-          <span className="font-semibold text-sm truncate">
-            Юридическая клиника
-          </span>
-        </div>
-        {children}
+        {/* Mobile top bar — citizen has PageShell header, others need this */}
+        {!isCitizen && (
+          <div className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:hidden">
+            <span className="font-semibold text-sm truncate">
+              Юридическая клиника
+            </span>
+          </div>
+        )}
+        {/* pb-16 on mobile to avoid content hiding behind bottom nav */}
+        <div className="flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</div>
       </div>
+      <BottomNav />
     </div>
   );
 }
