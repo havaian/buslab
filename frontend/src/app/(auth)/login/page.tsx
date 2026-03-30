@@ -17,20 +17,6 @@ interface TelegramLoginOptions {
   lang?: string;
 }
 
-// Telegram Login Widget callback receives user data at top level, not nested
-type TelegramWidgetResult = {
-  id: number | string;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date: number | string;
-  hash: string;
-  error?: string;
-};
-
-type TelegramCallback = (result: TelegramWidgetResult) => void;
-
 export default function LoginPage() {
   const { login, loading, user } = useAuth();
   const dialog = useDialog();
@@ -48,17 +34,20 @@ export default function LoginPage() {
       return;
     }
 
-    const handleAuth: TelegramCallback = async (result) => {
-      if (result.error || !result.id || !result.hash) {
-        dialog.alert(result.error || "Не получены данные авторизации", {
-          title: "Ошибка",
-          variant: "destructive",
-        });
+    const handleAuth = async (result: any) => {
+      console.log("[TG Login] callback result:", JSON.stringify(result));
+
+      // User closed the dialog without logging in
+      if (!result) return;
+
+      // Widget signals an error
+      if (result.error) {
+        dialog.alert(result.error, { title: "Ошибка", variant: "destructive" });
         return;
       }
+
       try {
-        // Pass the whole result object — it contains id, hash, auth_date, etc.
-        await login(result as unknown as Record<string, unknown>);
+        await login(result);
       } catch (e: unknown) {
         dialog.alert((e as Error).message || "Ошибка входа", {
           title: "Ошибка",
@@ -74,8 +63,8 @@ export default function LoginPage() {
       if (!window.Telegram?.Login || !containerRef.current) return;
 
       window.Telegram.Login.init(
-        { client_id: clientId, lang: "ru" },
-        handleAuth as any
+        { client_id: clientId, lang: "ru" } as TelegramLoginOptions,
+        handleAuth
       );
 
       const btn = document.createElement("button");

@@ -68,6 +68,7 @@ export class AuthService {
   // ── Public ────────────────────────────────────────────────────────────────
 
   async login(data: TelegramWidgetUser) {
+    console.log("[Auth] login data:", JSON.stringify(data));
     if (!this.verifyWidgetHash(data)) {
       throw new UnauthorizedException("Invalid Telegram auth signature");
     }
