@@ -31,7 +31,7 @@ export default function PanelLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar />
       <div className="flex flex-1 flex-col min-w-0">
         {/* Mobile top bar — replaces the floating fixed hamburger */}
         <div className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:hidden">
