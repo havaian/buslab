@@ -16,7 +16,6 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/auth-context";
 
 const adminNav = [
   { href: "/dashboard", label: "Дашборд", icon: LayoutDashboard },
@@ -34,14 +33,20 @@ const studentNav = [
   { href: "/my-stats", label: "Статистика", icon: BarChart2 },
 ];
 
-export function Sidebar() {
-  const { user, logout } = useAuth();
+interface SidebarProps {
+  role: string;
+  firstName: string;
+  lastName: string;
+  logout: () => void;
+}
+
+export function Sidebar({ role, firstName, lastName, logout }: SidebarProps) {
   const pathname = usePathname();
 
   // Citizen role has no sidebar — they use bottom nav only
-  if (!user || user.role === "user") return null;
+  if (role === "user") return null;
 
-  const nav = user.role === "admin" ? adminNav : studentNav;
+  const nav = role === "admin" ? adminNav : studentNav;
 
   return (
     // Desktop only — hidden on mobile, bottom nav takes over
@@ -75,16 +80,14 @@ export function Sidebar() {
 
       {/* User + logout */}
       <div className="border-t p-4">
-        {user && (
-          <div className="mb-3">
-            <p className="text-xs font-medium truncate">
-              {user.firstName} {user.lastName}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {user.role === "admin" ? "Администратор" : "Студент"}
-            </p>
-          </div>
-        )}
+        <div className="mb-3">
+          <p className="text-xs font-medium truncate">
+            {firstName} {lastName}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {role === "admin" ? "Администратор" : "Студент"}
+          </p>
+        </div>
         <button
           onClick={logout}
           className="flex w-full items-center gap-2 text-xs text-muted-foreground hover:text-foreground"

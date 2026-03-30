@@ -11,7 +11,7 @@ export default function PanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -33,7 +33,12 @@ export default function PanelLayout({
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop sidebar — hidden for citizen, hidden on mobile for all */}
-      <Sidebar />
+      <Sidebar
+        role={user.role}
+        firstName={user.firstName}
+        lastName={user.lastName}
+        logout={logout}
+      />
 
       <div className="flex flex-1 flex-col min-w-0">
         {/* Mobile top bar — admin and student only, citizen pages have their own headers */}
