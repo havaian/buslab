@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Upload,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import {
   requestsApi,
@@ -75,19 +76,25 @@ export default function RequestDetailPage() {
   };
 
   useEffect(() => {
-    Promise.all([
+    const fetches: Promise<any>[] = [
       requestsApi.findById(id),
       requestsApi.getHistory(id),
-      adminUsersApi.freeStudents(),
-    ])
+    ];
+    // freeStudents — только для admin, студентам недоступен (403)
+    if (isAdmin) {
+      fetches.push(adminUsersApi.freeStudents());
+    }
+
+    Promise.all(fetches)
       .then(([r, h, s]) => {
         setRequest(r);
         setHistory(h);
-        setFreeStudents(s);
+        if (s) setFreeStudents(s);
         setFinalAnswer(r.answerText || "");
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, isAdmin]);
 
   const run = async (fn: () => Promise<unknown>, successMsg: string) => {
     setBusy(true);
@@ -151,10 +158,18 @@ export default function RequestDetailPage() {
     }
   };
 
-  if (loading || !request) {
+  if (loading) {
     return (
       <PageShell title="Обращение">
         <p className="text-sm text-muted-foreground">Загрузка...</p>
+      </PageShell>
+    );
+  }
+
+  if (!request) {
+    return (
+      <PageShell title="Обращение">
+        <p className="text-sm text-muted-foreground">Обращение не найдено</p>
       </PageShell>
     );
   }
@@ -408,6 +423,18 @@ export default function RequestDetailPage() {
                 </span>
                 {student.username && (
                   <p className="text-muted-foreground">@{student.username}</p>
+                )}
+                {student.username && isAdmin && (
+                  <a
+                    href={`https://t.me/${student.username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-2 flex items-center gap-1.5 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLink size={12} />
+                    Написать в Telegram
+                  </a>
                 )}
               </CardContent>
             </Card>
@@ -703,6 +730,9 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
     label: "Ответ изменён администратором",
     color: "bg-yellow-500",
   },
+  answer_draft_saved: { label: "Черновик ответа сохранён", color: "bg-gray-400" },
+  answer_file_added: { label: "Файл добавлен администратором", color: "bg-blue-400" },
+  answer_file_removed: { label: "Файл удалён администратором", color: "bg-orange-400" },
 };
 
 const STATUS_LABELS: Record<string, string> = {

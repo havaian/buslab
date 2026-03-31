@@ -21,7 +21,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // "/" исключён — root page.tsx показывает spinner, auth-context сам редиректит
 const isPanelAuthExcluded = (pathname: string) =>
-  pathname === "/" ||
   pathname === "/login" ||
   pathname === "/privacy" ||
   pathname.startsWith("/user") ||

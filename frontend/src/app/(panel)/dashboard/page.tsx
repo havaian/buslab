@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -30,13 +30,14 @@ const PIE_COLORS = [
   "#06b6d4",
 ];
 
+// Исправленные ключи — совпадают с реальными статусами в БД
 const STATUS_RU: Record<string, string> = {
   pending: "Ожидает",
   approved: "Одобрено",
-  in_progress: "В работе",
-  answer_review: "На проверке",
+  declined: "Отклонено",
+  assigned: "В работе",
+  answered: "На проверке",
   closed: "Закрыто",
-  rejected: "Отклонено",
 };
 
 function StatCard({
@@ -44,14 +45,21 @@ function StatCard({
   value,
   icon: Icon,
   color,
+  onClick,
 }: {
   label: string;
   value: number;
   icon: React.ElementType;
   color: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card>
+    <Card
+      className={
+        onClick ? "cursor-pointer hover:bg-muted/30 transition-colors" : ""
+      }
+      onClick={onClick}
+    >
       <CardContent className="flex items-center gap-3 pt-5 pb-5">
         <div className={`rounded-lg p-2.5 shrink-0 ${color}`}>
           <Icon size={16} className="text-white" />
@@ -65,7 +73,31 @@ function StatCard({
   );
 }
 
-export default function DashboardPage() {
+function PeriodCard({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  onClick?: () => void;
+}) {
+  return (
+    <Card
+      className={
+        onClick ? "cursor-pointer hover:bg-muted/30 transition-colors" : ""
+      }
+      onClick={onClick}
+    >
+      <CardContent className="pt-4 pb-4">
+        <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+        <p className="text-2xl font-bold">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -98,51 +130,64 @@ export default function DashboardPage() {
     value: s.count,
   }));
 
+  // Вспомогательная: сегодняшняя дата в ISO для фильтров
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const weekAgoISO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
   return (
     <PageShell title="Дашборд">
-      {/* Main stat cards — 1 col on mobile, 2 on sm, 4 on lg */}
+      {/* Main stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatCard
           label="Всего обращений"
           value={stats.totals.total}
           icon={FileText}
           color="bg-blue-500"
+          onClick={() => router.push("/requests")}
         />
         <StatCard
           label="Ожидают проверки"
           value={stats.totals.pending}
           icon={Clock}
           color="bg-yellow-500"
+          onClick={() => router.push("/requests?status=pending")}
         />
         <StatCard
           label="В работе"
           value={stats.totals.inProgress}
           icon={AlertCircle}
           color="bg-purple-500"
+          onClick={() => router.push("/requests?status=assigned")}
         />
         <StatCard
           label="Закрыто"
           value={stats.totals.closed}
           icon={CheckCircle}
           color="bg-green-500"
+          onClick={() => router.push("/requests?status=closed")}
         />
       </div>
 
-      {/* Period / active students — 3 cols always, small cards */}
+      {/* Period cards */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground mb-0.5">За сегодня</p>
-            <p className="text-2xl font-bold">{stats.periods.today}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground mb-0.5">За неделю</p>
-            <p className="text-2xl font-bold">{stats.periods.week}</p>
-          </CardContent>
-        </Card>
-        <Card>
+        <PeriodCard
+          label="За сегодня"
+          value={stats.periods.today}
+          onClick={() =>
+            router.push(`/requests?dateFrom=${todayISO}&dateTo=${todayISO}`)
+          }
+        />
+        <PeriodCard
+          label="За неделю"
+          value={stats.periods.week}
+          onClick={() => router.push(`/requests?dateFrom=${weekAgoISO}`)}
+        />
+        <Card
+          className="cursor-pointer hover:bg-muted/30 transition-colors"
+          onClick={() => router.push("/students")}
+        >
           <CardContent className="flex items-center gap-2 pt-4 pb-4">
             <Users size={14} className="text-muted-foreground shrink-0" />
             <div className="min-w-0">
@@ -155,7 +200,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts — stacked on mobile, side-by-side on lg */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
         <Card>
           <CardHeader className="pb-2">
@@ -212,85 +257,90 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-        {/* User segmentation */}
-        {stats.users && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-5">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">По университетам</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {stats.users.byUniversity.map((u) => (
-                    <div
-                      key={u._id}
-                      className="flex items-center justify-between px-4 py-2.5"
-                    >
-                      <span className="text-sm">{u.name}</span>
-                      <span className="text-sm font-semibold">{u.count}</span>
-                    </div>
-                  ))}
-                  {stats.users.byUniversity.length === 0 && (
-                    <p className="text-xs text-muted-foreground px-4 py-3">
-                      Нет данных
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">По факультетам</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y max-h-48 overflow-y-auto">
-                  {stats.users.byFaculty.map((f) => (
-                    <div
-                      key={f._id}
-                      className="flex items-center justify-between px-4 py-2.5"
-                    >
-                      <span className="text-sm truncate pr-2">{f.name}</span>
-                      <span className="text-sm font-semibold shrink-0">
-                        {f.count}
-                      </span>
-                    </div>
-                  ))}
-                  {stats.users.byFaculty.length === 0 && (
-                    <p className="text-xs text-muted-foreground px-4 py-3">
-                      Нет данных
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">По курсам</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {stats.users.byCourse.map((c) => (
-                    <div
-                      key={c.course}
-                      className="flex items-center justify-between px-4 py-2.5"
-                    >
-                      <span className="text-sm">{c.course} курс</span>
-                      <span className="text-sm font-semibold">{c.count}</span>
-                    </div>
-                  ))}
-                  {stats.users.byCourse.length === 0 && (
-                    <p className="text-xs text-muted-foreground px-4 py-3">
-                      Нет данных
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
+
+      {/* University/Faculty/Course breakdown */}
+      {(stats.users.byUniversity.length > 0 ||
+        stats.users.byFaculty.length > 0 ||
+        stats.users.byCourse.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">По университетам</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {stats.users.byUniversity.map((u) => (
+                  <div
+                    key={u._id}
+                    className="flex items-center justify-between px-4 py-2.5"
+                  >
+                    <span className="text-sm truncate">{u.name}</span>
+                    <span className="text-sm font-semibold shrink-0 ml-2">
+                      {u.count}
+                    </span>
+                  </div>
+                ))}
+                {stats.users.byUniversity.length === 0 && (
+                  <p className="text-xs text-muted-foreground px-4 py-3">
+                    Нет данных
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">По факультетам</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {stats.users.byFaculty.map((f) => (
+                  <div
+                    key={f._id}
+                    className="flex items-center justify-between px-4 py-2.5"
+                  >
+                    <span className="text-sm truncate">{f.name}</span>
+                    <span className="text-sm font-semibold shrink-0 ml-2">
+                      {f.count}
+                    </span>
+                  </div>
+                ))}
+                {stats.users.byFaculty.length === 0 && (
+                  <p className="text-xs text-muted-foreground px-4 py-3">
+                    Нет данных
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">По курсам</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {stats.users.byCourse.map((c) => (
+                  <div
+                    key={c.course}
+                    className="flex items-center justify-between px-4 py-2.5"
+                  >
+                    <span className="text-sm">{c.course} курс</span>
+                    <span className="text-sm font-semibold">{c.count}</span>
+                  </div>
+                ))}
+                {stats.users.byCourse.length === 0 && (
+                  <p className="text-xs text-muted-foreground px-4 py-3">
+                    Нет данных
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Students table */}
       <Card>
@@ -383,5 +433,19 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
     </PageShell>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell title="Дашборд">
+          <p className="text-sm text-muted-foreground">Загрузка...</p>
+        </PageShell>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   );
 }

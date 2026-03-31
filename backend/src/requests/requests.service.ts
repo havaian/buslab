@@ -21,7 +21,7 @@ import { StudentAction } from "../common/enums/student-action.enum";
 import { NotificationsService } from "../notifications/notifications.service";
 import { SettingsService } from "../settings/settings.service";
 
-const TIMER_DURATION_MS = 12 * 60 * 60 * 1000;
+const TIMER_DURATION_MS = 12 * 60 * 60 * 1000; // 12 часов
 
 @Injectable()
 export class RequestsService {
@@ -631,6 +631,12 @@ export class RequestsService {
     const prev = req.status;
     req.status = "assigned";
     req.adminComment = comment;
+    // Сбрасываем таймер — выдаём новый срок с момента возврата в работу
+    req.assignedAt = new Date();
+    req.timerDeadline = new Date(Date.now() + TIMER_DURATION_MS);
+    req.timerWarningSent = false;
+    req.timerHalfWarningSent = false;
+    req.timerExpiredNotified = false;
     await req.save();
 
     await this.log({
@@ -693,6 +699,17 @@ export class RequestsService {
     if (adminComment !== undefined) req.adminComment = adminComment;
     await req.save();
 
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.ANSWER_DRAFT_SAVED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: req.status,
+      statusTo: req.status,
+      answerText: req.answerText,
+      comment: adminComment ?? null,
+    });
+
     return req;
   }
 
@@ -717,6 +734,17 @@ export class RequestsService {
       },
     ];
     await req.save();
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.ANSWER_FILE_ADDED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: req.status,
+      statusTo: req.status,
+      comment: file.originalname,
+    });
+
     return req;
   }
 
@@ -733,6 +761,16 @@ export class RequestsService {
       (f) => f.filename !== filename
     );
     await req.save();
+
+    await this.log({
+      requestId: req._id as any,
+      action: RequestHistoryAction.ANSWER_FILE_REMOVED,
+      performedBy: adminId,
+      performedByRole: "admin",
+      statusFrom: req.status,
+      statusTo: req.status,
+      comment: filename,
+    });
 
     // Удалить физический файл
     try {
@@ -846,6 +884,11 @@ export class RequestsService {
     const prev = req.status;
     req.status = "answered";
     req.answerText = answer;
+    // Аннулируем таймер — ответ уже отправлен, уведомления о просрочке не нужны
+    req.timerDeadline = null;
+    req.timerWarningSent = true;
+    req.timerHalfWarningSent = true;
+    req.timerExpiredNotified = true;
 
     const answerFiles = files?.length
       ? files.map((f) => ({

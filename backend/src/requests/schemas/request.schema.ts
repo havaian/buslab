@@ -64,6 +64,10 @@ export class Request {
   @Prop({ default: false })
   timerWarningSent: boolean;
 
+  // Отправлено ли предупреждение на 50% оставшегося времени
+  @Prop({ default: false })
+  timerHalfWarningSent: boolean;
+
   @Prop({ default: false })
   timerExpiredNotified: boolean;
 

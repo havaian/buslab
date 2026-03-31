@@ -17,6 +17,9 @@ export enum RequestHistoryAction {
   ANSWER_REJECTED = "answer_rejected", // admin rejected answer
   ANSWER_EDITED_BY_ADMIN = "answer_edited_by_admin", // admin modified student answer before approving
   TIMER_EXPIRED = "timer_expired", // deadline exceeded
+  ANSWER_FILE_ADDED = "answer_file_added", // admin added file to student's answer
+  ANSWER_FILE_REMOVED = "answer_file_removed", // admin removed file from student's answer
+  ANSWER_DRAFT_SAVED = "answer_draft_saved", // admin saved student's updated answer
 }
 
 @Schema({ timestamps: true, collection: "request_history" })

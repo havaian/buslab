@@ -311,6 +311,18 @@ export class NotificationsService implements OnModuleInit {
     );
   }
 
+  async notifyStudentTimerHalfWarning(
+    telegramId: string,
+    requestId: string,
+    hoursLeft: number
+  ) {
+    const link = this.appLink(`tasks`);
+    await this.send(
+      telegramId,
+      `⏳ Истекла половина срока выполнения задания. Осталось примерно <b>${hoursLeft} ч.</b>\n\n<a href="${link}">Открыть задание →</a>`
+    );
+  }
+
   async notifyStudentTimerWarning(telegramId: string, requestId: string) {
     const link = this.appLink(`tasks`);
     await this.send(
