@@ -21,12 +21,11 @@ const API_HASH = String(process.env.TELEGRAM_API_HASH ?? "");
 const SESSION = String(process.env.TELEGRAM_SESSION ?? "");
 const MONGO = String(process.env.MONGO_URL ?? process.env.MONGO_URI ?? "");
 
-// Chat ID: из ссылки t.me/c/2637443124/... → строка с префиксом -100
 const CHAT_ID = "-1002637443124";
 const POLL_UNI_FAC_MSG = 560;
 const POLL_COURSE_MSG = 561;
 
-// Telegram ID'ы исключённые из импорта
+// Telegram ID которые нужно исключить из импорта
 const SKIP_IDS = new Set([8252936317]);
 
 // ── Маппинг вариантов опроса → ObjectId'ы из БД ───────────────────────────────
@@ -100,7 +99,6 @@ function ask(q: string): Promise<string> {
   );
 }
 
-// Матчинг по первым двум словам — защита от различий в кавычках/апострофах
 function matchMapping(
   text: string
 ): { uniId: string; facId: string | null } | undefined {
@@ -159,9 +157,10 @@ async function getPollMsg(
 async function main() {
   if (!API_ID || !API_HASH)
     throw new Error("TELEGRAM_API_ID / TELEGRAM_API_HASH не заданы");
-  if (!MONGO) throw new Error("MONGO_URL / MONGO_URI не заданы");
 
+  console.log(`MongoDB: ${MONGO}`);
   console.log("Подключаемся к Telegram...");
+
   const client = new TelegramClient(
     new StringSession(SESSION),
     API_ID,
@@ -176,7 +175,7 @@ async function main() {
   });
 
   if (!SESSION) {
-    console.log("\n✅ Добавь в .env и пересобери контейнер:");
+    console.log("\n✅ Сессия создана. Добавь в .env:");
     console.log(`TELEGRAM_SESSION=${String(client.session.save())}\n`);
   }
 
@@ -191,7 +190,6 @@ async function main() {
   if (!pollUniFac?.poll || !pollCourse?.poll)
     throw new Error("Не удалось получить опросы");
 
-  // Опрос 1: универ / факультет
   const uniFacMap = new Map<
     number,
     {
@@ -215,6 +213,7 @@ async function main() {
     );
     const voters = await getVoters(client, POLL_UNI_FAC_MSG, answer.option);
     for (const u of voters) {
+      if (SKIP_IDS.has(Number(u.id))) continue;
       uniFacMap.set(Number(u.id), {
         uniId: mapping.uniId,
         facId: mapping.facId,
@@ -226,7 +225,6 @@ async function main() {
     console.log(`    └─ ${voters.length} голосов`);
   }
 
-  // Опрос 2: курс
   const courseMap = new Map<number, number>();
   console.log("\nПарсим опрос 2 (курс)...");
   for (const answer of pollCourse.poll.answers) {
@@ -237,27 +235,23 @@ async function main() {
       continue;
     }
     const voters = await getVoters(client, POLL_COURSE_MSG, answer.option);
-    for (const u of voters) courseMap.set(Number(u.id), course);
+    for (const u of voters) {
+      if (SKIP_IDS.has(Number(u.id))) continue;
+      courseMap.set(Number(u.id), course);
+    }
     console.log(`  Курс ${course}: ${voters.length} голосов`);
   }
 
   await client.destroy();
   console.log("\nTelegram отключён.");
 
-  // MongoDB upsert — при повторном запуске обновляет все поля включая role
   await mongoose.connect(MONGO);
   const allIds = new Set([...uniFacMap.keys(), ...courseMap.keys()]);
   console.log(`\nВсего telegramId из опросов: ${allIds.size}`);
 
-  let created = 0,
-    updated = 0,
+  let upserted = 0,
     skipped = 0;
   for (const tgId of allIds) {
-    if (SKIP_IDS.has(tgId)) {
-      skipped++;
-      continue;
-    }
-
     const uniFac = uniFacMap.get(tgId);
     const course = courseMap.get(tgId) ?? null;
 
@@ -269,7 +263,7 @@ async function main() {
       continue;
     }
 
-    const result = await UserModel.updateOne(
+    await UserModel.findOneAndUpdate(
       { telegramId: tgId },
       {
         $set: {
@@ -284,20 +278,17 @@ async function main() {
           username: uniFac.username,
         },
       },
-      { upsert: true }
+      { upsert: true, new: true }
     );
-
-    if (result.upsertedCount > 0) created++;
-    else updated++;
+    upserted++;
   }
 
   await mongoose.disconnect();
 
   console.log("\n═══════════════════════════════════");
   console.log("✅ Готово!");
-  console.log(`   Создано:   ${created}`);
-  console.log(`   Обновлено: ${updated}`);
-  console.log(`   Пропущено: ${skipped}`);
+  console.log(`   Обновлено/создано: ${upserted}`);
+  console.log(`   Пропущено:         ${skipped}`);
   console.log("═══════════════════════════════════");
 }
 
