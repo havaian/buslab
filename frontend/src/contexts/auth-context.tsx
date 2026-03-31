@@ -19,8 +19,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// "/" добавлен в исключения — root страница сама показывает loading spinner,
-// auth-context не должен редиректить на /login пока находится на ней
+// "/" исключён — root page.tsx показывает spinner, auth-context сам редиректит
 const isPanelAuthExcluded = (pathname: string) =>
   pathname === "/" ||
   pathname === "/login" ||
@@ -44,7 +43,7 @@ function loadTelegramWebAppSdk(): Promise<void> {
     const script = document.createElement("script");
     script.src = "https://telegram.org/js/telegram-web-app.js";
     script.onload = () => resolve();
-    script.onerror = () => resolve(); // resolve anyway, initData will just be empty
+    script.onerror = () => resolve();
     document.head.appendChild(script);
   });
 }
@@ -52,6 +51,11 @@ function loadTelegramWebAppSdk(): Promise<void> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PanelUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Цель редиректа после auth — навигация происходит в отдельном useEffect
+  // ПОСЛЕ того как React закоммитил обновления user + loading.
+  // Это исключает race condition когда panel layout монтируется с user=null.
+  const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
+
   const router = useRouter();
   const pathname = usePathname();
 
@@ -61,24 +65,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  const redirectByRole = useCallback(
-    (role: string) => {
-      if (role === "admin") router.push("/dashboard");
-      else if (role === "student") router.push("/tasks");
-      else router.push("/user");
-    },
-    [router]
-  );
+  const redirectByRole = useCallback((role: string): string => {
+    if (role === "admin") return "/dashboard";
+    if (role === "student") return "/tasks";
+    return "/user";
+  }, []);
 
+  // ── Фаза 2: навигация происходит здесь, уже после render с актуальным state ──
+  useEffect(() => {
+    if (!loading && user && pendingRedirect) {
+      setPendingRedirect(null);
+      router.push(pendingRedirect);
+    }
+  }, [loading, user, pendingRedirect, router]);
+
+  // ── Фаза 1: аутентификация ─────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      // Load TG SDK first so we can check initData
       await loadTelegramWebAppSdk();
 
       const twa = (window as any).Telegram?.WebApp;
 
-      // initData present — we're inside Telegram Mini App
-      // Always prefer initData over stored token to handle account switching
       if (twa?.initData) {
         twa.ready();
         twa.expand();
@@ -93,48 +100,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!res.ok) throw new Error(data.message || "Auth failed");
 
           localStorage.setItem("token", data.access_token);
-          setUser(data.user);
 
-          // Handle deep link start_param
+          // Вычисляем цель навигации
           const startParam = twa.initDataUnsafe?.start_param;
+          let target: string | null = null;
+
           if (startParam) {
             const decoded = decodeURIComponent(startParam);
             const role = data.user.role as string;
 
-            // Сначала выставляем loading=false, ПОТОМ навигируем —
-            // иначе panel layout монтируется с loading=false, user=null → flash
-            setLoading(false);
-
             if (decoded.startsWith("r_")) {
               const requestId = decoded.slice(2);
-              router.push(
+              target =
                 role === "user"
                   ? `/user/${requestId}`
-                  : `/requests/${requestId}`
-              );
-              return;
-            }
-            if (decoded.startsWith("take_")) {
-              router.push(`/tasks?take=${decoded.slice(5)}`);
-              return;
-            }
-            if (decoded === "tasks") {
-              router.push("/tasks");
-              return;
-            }
-            if (decoded === "history") {
-              router.push("/history");
-              return;
+                  : `/requests/${requestId}`;
+            } else if (decoded.startsWith("take_")) {
+              target = `/tasks?take=${decoded.slice(5)}`;
+            } else if (decoded === "tasks") {
+              target = "/tasks";
+            } else if (decoded === "history") {
+              target = "/history";
             }
           }
 
-          if (pathname === "/login" || pathname === "/") {
-            redirectByRole(data.user.role);
+          if (!target && (pathname === "/login" || pathname === "/")) {
+            target = redirectByRole(data.user.role);
           }
+
+          // Сначала выставляем state — React закоммитит их в одном render.
+          // Только ПОСЛЕ этого (в фазе 2) произойдёт router.push.
+          setUser(data.user);
+          setLoading(false);
+          if (target) setPendingRedirect(target);
         } catch {
-          // initData auth failed — fall back to stored token below
+          // initData auth failed — fallback на stored token
           const token = localStorage.getItem("token");
           if (!token) {
+            setLoading(false);
             if (!isPanelAuthExcluded(pathname)) router.push("/login");
           } else {
             try {
@@ -143,15 +146,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } catch {
               localStorage.removeItem("token");
               if (!isPanelAuthExcluded(pathname)) router.push("/login");
+            } finally {
+              setLoading(false);
             }
           }
-        } finally {
-          setLoading(false);
         }
         return;
       }
 
-      // No initData — regular browser, use stored token
+      // Обычный браузер — проверяем stored token
       const token = localStorage.getItem("token");
       if (!token) {
         setLoading(false);
@@ -162,8 +165,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const u = await authApi.me();
         setUser(u);
-        if (pathname === "/login") {
-          redirectByRole(u.role);
+        if (pathname === "/login" || pathname === "/") {
+          setPendingRedirect(redirectByRole(u.role));
         }
       } catch {
         localStorage.removeItem("token");
@@ -182,9 +185,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authApi.telegramLogin(idToken);
       localStorage.setItem("token", res.access_token);
       setUser(res.user);
-      redirectByRole(res.user.role);
+      router.push(redirectByRole(res.user.role));
     },
-    [redirectByRole]
+    [redirectByRole, router]
   );
 
   return (

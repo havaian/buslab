@@ -51,21 +51,15 @@ export default function PanelLayout({
 
       <div className="flex flex-1 flex-col min-w-0">
         {/*
-          ── Mini App header strip (admin + student only) ────────────────────
-          Показывается только в Mini App на мобильных.
-          Решает две проблемы одновременно:
-          1. Fullscreen режим (открыт через кнопку бота): Telegram native bar
-             (кнопка закрытия, бургер) перекрывает webview сверху — добавляем
-             padding-top равный --tg-content-safe-area-inset-top чтобы
-             контент начинался ниже оверлея.
-          2. Non-fullscreen режим (deep link): --tg-content-safe-area-inset-top
-             равен 0, поэтому просто показывается полоска с логотипом.
-          Для citizen этот хедер не нужен — у них MobileHeader на каждой
-          странице, который сам обрабатывает safe area.
+          ── Mini App header (admin + student) ────────────────────────────────
+          Логотип + название по центру.
+          padding-top компенсирует нативный Telegram overlay (кнопка закрытия,
+          бургер) в fullscreen-режиме через --tg-content-safe-area-inset-top.
+          В non-fullscreen режиме переменная = 0, показывается обычная полоска.
         */}
         {isMiniApp && !isCitizen && (
           <div
-            className="flex shrink-0 items-center gap-2 border-b px-4 bg-background lg:hidden"
+            className="flex shrink-0 items-center justify-center gap-2 border-b bg-background lg:hidden"
             style={{
               paddingTop:
                 "var(--tg-content-safe-area-inset-top, env(safe-area-inset-top))",
@@ -74,16 +68,13 @@ export default function PanelLayout({
             }}
           >
             <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
-            <span className="font-semibold text-sm truncate">
-              Юридическая клиника
-            </span>
+            <span className="font-semibold text-sm">Юридическая клиника</span>
           </div>
         )}
 
         {/*
-          ── Regular mobile top bar (admin + student, NOT in Mini App) ────────
-          Скрываем в Mini App — там выше своя полоска с логотипом.
-          Citizen-страницы имеют свои MobileHeader-ы, этот им не нужен.
+          ── Regular mobile top bar (NOT Mini App) ─────────────────────────────
+          Логотип слева — стандартный хедер для обычного браузера на мобильном.
         */}
         {!isCitizen && !isMiniApp && (
           <div
