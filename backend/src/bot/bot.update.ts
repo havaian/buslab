@@ -13,6 +13,10 @@ import { User, UserDocument } from "../users/schemas/user.schema";
 import { Faq, FaqDocument } from "../faq/schemas/faq.schema";
 import { Request, RequestDocument } from "../requests/schemas/request.schema";
 import {
+  Category,
+  CategoryDocument,
+} from "../categories/schemas/category.schema";
+import {
   University,
   UniversityDocument,
 } from "../universities/schemas/university.schema";
@@ -20,7 +24,6 @@ import {
   Faculty,
   FacultyDocument,
 } from "../universities/schemas/faculty.schema";
-import mongoose from "mongoose";
 
 type Locale = "ru" | "uz" | "en";
 
@@ -40,6 +43,8 @@ export class BotUpdate {
     @InjectModel(University.name)
     private readonly uniModel: Model<UniversityDocument>,
     @InjectModel(Faculty.name)
+    @InjectModel(Category.name)
+    private readonly categoryModel: Model<CategoryDocument>,
     private readonly facModel: Model<FacultyDocument>,
     private readonly requestsService: RequestsService,
     private readonly adminUsersService: AdminUsersService,
@@ -705,12 +710,6 @@ export class BotUpdate {
       return;
     }
 
-    // ── FAQ text-based category selection ─────────────────────────────────
-    if (userState?.state === "selecting_faq_category") {
-      await this.handleFaqCategoryByName(ctx, text);
-      return;
-    }
-
     // Fallback
     await ctx.reply(this.t(ctx, "lists.select_action"), {
       reply_markup: this.mainMenuKb(ctx),
@@ -856,49 +855,13 @@ export class BotUpdate {
 
   // ── Citizen: faq ──────────────────────────────────────────────
 
-  private async handleFaqCategoryByName(
-    ctx: BotContext,
-    categoryName: string
-  ): Promise<void> {
-    if (!ctx.from) return;
-    const mongoose = await import("mongoose");
-    const category = await mongoose.default
-      .model("Category")
-      .findOne({ name: categoryName })
-      .lean();
-
-    if (!category) {
-      await ctx.reply(this.t(ctx, "errors.category_not_found"));
-      return;
-    }
-
-    const faqs = await this.faqModel
-      .find({ categoryId: (category as any)._id })
-      .lean();
-
-    if (!faqs.length) {
-      await ctx.reply(this.t(ctx, "errors.no_categories"));
-      return;
-    }
-
-    const kb = new InlineKeyboard();
-    for (const faq of faqs) {
-      kb.text(faq.question.slice(0, 64), `${CB.FAQ_ITEM}:${faq._id}`).row();
-    }
-
-    this.userStates.delete(ctx.from.id);
-    await ctx.reply(this.t(ctx, "prompts.select_faq_question"), {
-      reply_markup: kb,
-    });
-  }
-
   private async handleFaqMenu(ctx: BotContext): Promise<void> {
     const locale = (ctx.locale || "ru") as Locale;
-
-    const categories = (await mongoose
-      .model("Category")
+    const categories = await this.categoryModel
       .find()
-      .lean()) as any[];
+      .sort({ createdAt: 1 })
+      .lean();
+
     if (!categories.length) {
       await ctx.reply(this.t(ctx, "errors.no_categories"), {
         reply_markup: this.mainMenuKb(ctx),
@@ -912,12 +875,12 @@ export class BotUpdate {
       kb.text(name, `${CB.FAQ_CAT}:${cat._id}`).row();
     }
 
-    await ctx.reply(
-      this.t(ctx, "prompts.select_faq_category") ?? "📚 Выберите категорию:",
-      {
-        reply_markup: kb,
-      }
-    );
+    const prompts: Record<Locale, string> = {
+      ru: "📚 Выберите категорию:",
+      uz: "📚 Kategoriyani tanlang:",
+      en: "📚 Select a category:",
+    };
+    await ctx.reply(prompts[locale], { reply_markup: kb });
   }
 
   // ── Shared helpers ────────────────────────────────────────────────────────
