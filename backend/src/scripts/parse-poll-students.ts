@@ -26,7 +26,6 @@ import mongoose from "mongoose";
 const API_ID = Number(process.env.TELEGRAM_API_ID);
 const API_HASH = process.env.TELEGRAM_API_HASH ?? "";
 const SESSION_STRING = process.env.TELEGRAM_SESSION ?? "";
-const MONGODB_URI = process.env.MONGODB_URI ?? "";
 
 // Chat ID: ссылка t.me/c/2637443124/... → GramJS EntityLike строка с префиксом -100
 const STUDENT_CHAT_ID = "-1002637443124";
@@ -170,10 +169,6 @@ async function main() {
   if (!API_ID || !API_HASH) {
     throw new Error("TELEGRAM_API_ID и TELEGRAM_API_HASH не заданы в .env");
   }
-  if (!MONGODB_URI) {
-    throw new Error("MONGODB_URI не задан в .env");
-  }
-
   // ── Авторизация GramJS ──────────────────────────────────────────────────────
   console.log("Подключаемся к Telegram (MTProto)...");
   const session = new StringSession(SESSION_STRING);
@@ -304,7 +299,7 @@ async function main() {
 
   // ── MongoDB upsert ──────────────────────────────────────────────────────────
   console.log("Подключаемся к MongoDB...");
-  await mongoose.connect(MONGODB_URI);
+  await mongoose.connect(process.env.MONGO_URL || process.env.MONGO_URI || "");
 
   // Объединяем два Map — берём всех кто голосовал хотя бы в одном опросе
   const allTgIds = new Set([...uniFacMap.keys(), ...courseMap.keys()]);

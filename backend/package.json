@@ -5,7 +5,8 @@
     "build": "nest build",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "parse-poll": "ts-node -r tsconfig-paths/register src/scripts/parse-poll-students.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
@@ -45,5 +46,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "path-to-regexp": ">=8.3.1"
   }
 }
