@@ -20,6 +20,7 @@ import {
   Faculty,
   FacultyDocument,
 } from "../universities/schemas/faculty.schema";
+import mongoose from "mongoose";
 
 type Locale = "ru" | "uz" | "en";
 
@@ -622,6 +623,11 @@ export class BotUpdate {
       return;
     }
 
+    if (text === this.t(ctx, "buttons.faq")) {
+      await this.handleFaqMenu(ctx);
+      return;
+    }
+
     if (userState?.state === "selecting_category") {
       await this.submitRequest.onCategorySelected(ctx, text, this.userStates);
       return;
@@ -848,6 +854,8 @@ export class BotUpdate {
     await ctx.reply(this.t(ctx, "language.select"), { reply_markup: kb });
   }
 
+  // ── Citizen: faq ──────────────────────────────────────────────
+
   private async handleFaqCategoryByName(
     ctx: BotContext,
     categoryName: string
@@ -882,6 +890,34 @@ export class BotUpdate {
     await ctx.reply(this.t(ctx, "prompts.select_faq_question"), {
       reply_markup: kb,
     });
+  }
+
+  private async handleFaqMenu(ctx: BotContext): Promise<void> {
+    const locale = (ctx.locale || "ru") as Locale;
+
+    const categories = (await mongoose
+      .model("Category")
+      .find()
+      .lean()) as any[];
+    if (!categories.length) {
+      await ctx.reply(this.t(ctx, "errors.no_categories"), {
+        reply_markup: this.mainMenuKb(ctx),
+      });
+      return;
+    }
+
+    const kb = new InlineKeyboard();
+    for (const cat of categories) {
+      const name = cat.names?.[locale] || cat.names?.ru || cat.name;
+      kb.text(name, `${CB.FAQ_CAT}:${cat._id}`).row();
+    }
+
+    await ctx.reply(
+      this.t(ctx, "prompts.select_faq_category") ?? "📚 Выберите категорию:",
+      {
+        reply_markup: kb,
+      }
+    );
   }
 
   // ── Shared helpers ────────────────────────────────────────────────────────
@@ -920,6 +956,7 @@ export class BotUpdate {
     return new Keyboard()
       .text(this.t(ctx, "buttons.ask_question"))
       .row()
+      .text(this.t(ctx, "buttons.faq"))
       .text(this.t(ctx, "buttons.my_requests"))
       .row()
       .text(this.t(ctx, "buttons.help"))
