@@ -359,6 +359,9 @@ export class RequestsService {
     req.timerWarningSent = false;
     req.timerHalfWarningSent = false;
     req.timerExpiredNotified = false;
+    req.blockedStudentIds = (req.blockedStudentIds ?? []).filter(
+      (id) => String(id) !== String(studentId)
+    );
     await req.save();
 
     student.currentAssignmentId = req._id as any;
