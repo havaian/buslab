@@ -42,9 +42,9 @@ export class BotUpdate {
     private readonly requestModel: Model<RequestDocument>,
     @InjectModel(University.name)
     private readonly uniModel: Model<UniversityDocument>,
-    @InjectModel(Faculty.name)
     @InjectModel(Category.name)
     private readonly categoryModel: Model<CategoryDocument>,
+    @InjectModel(Faculty.name)
     private readonly facModel: Model<FacultyDocument>,
     private readonly requestsService: RequestsService,
     private readonly adminUsersService: AdminUsersService,
