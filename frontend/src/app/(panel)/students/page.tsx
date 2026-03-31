@@ -45,9 +45,15 @@ function StudentsContent() {
   const [unis, setUnis] = useState<UniversityWithFaculties[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [university, setUniversity] = useState("_all");
-  const [faculty, setFaculty] = useState("_all");
-  const [course, setCourse] = useState("_all");
+  const [university, setUniversity] = useState(
+  () => searchParams.get("university") || "_all"
+  );
+  const [faculty, setFaculty] = useState(
+    () => searchParams.get("faculty") || "_all"
+  );
+  const [course, setCourse] = useState(
+    () => searchParams.get("course") || "_all"
+  );
   const [status, setStatus] = useState(
     () => searchParams.get("status") || "_all"
   );

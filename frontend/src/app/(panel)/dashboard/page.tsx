@@ -279,15 +279,16 @@ function DashboardContent() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {stats.users.byUniversity.map((u) => (
-                  <div
+                  <button
                     key={u._id}
-                    className="flex items-center justify-between px-4 py-2.5"
+                    onClick={() => router.push(`/students?university=${u._id}`)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
                   >
                     <span className="text-sm truncate">{u.name}</span>
                     <span className="text-sm font-semibold shrink-0 ml-2">
                       {u.count}
                     </span>
-                  </div>
+                  </button>
                 ))}
                 {stats.users.byUniversity.length === 0 && (
                   <p className="text-xs text-muted-foreground px-4 py-3">
@@ -305,15 +306,16 @@ function DashboardContent() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {stats.users.byFaculty.map((f) => (
-                  <div
+                  <button
                     key={f._id}
-                    className="flex items-center justify-between px-4 py-2.5"
+                    onClick={() => router.push(`/students?faculty=${f._id}`)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
                   >
                     <span className="text-sm truncate">{f.name}</span>
                     <span className="text-sm font-semibold shrink-0 ml-2">
                       {f.count}
                     </span>
-                  </div>
+                  </button>
                 ))}
                 {stats.users.byFaculty.length === 0 && (
                   <p className="text-xs text-muted-foreground px-4 py-3">
@@ -331,13 +333,14 @@ function DashboardContent() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {stats.users.byCourse.map((c) => (
-                  <div
+                  <button
                     key={c.course}
-                    className="flex items-center justify-between px-4 py-2.5"
+                    onClick={() => router.push(`/students?course=${c.course}`)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
                   >
                     <span className="text-sm">{c.course} курс</span>
                     <span className="text-sm font-semibold">{c.count}</span>
-                  </div>
+                  </button>
                 ))}
                 {stats.users.byCourse.length === 0 && (
                   <p className="text-xs text-muted-foreground px-4 py-3">
