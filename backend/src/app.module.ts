@@ -21,6 +21,7 @@ import { SettingsModule } from "./settings/settings.module";
 import { LegalModule } from "./legal/legal.module";
 import { MiniappModule } from "./miniapp/miniapp.module";
 import { UniversitiesModule } from "./universities/universities.module";
+import { ScriptsRunnerModule } from "./scripts-runner/scripts-runner.module";
 import { BotModule } from "./bot/bot.module";
 
 @Module({
@@ -58,6 +59,7 @@ import { BotModule } from "./bot/bot.module";
     LegalModule,
     MiniappModule,
     UniversitiesModule,
+    ScriptsRunnerModule,
     BotModule,
   ],
 })

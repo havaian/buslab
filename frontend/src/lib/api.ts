@@ -252,6 +252,14 @@ export const universitiesApi = {
     del<{ deleted: boolean }>(`/universities/${uniId}/faculties/${facId}`),
 };
 
+// ── Scripts runner ────────────────────────────────────────────────────────
+
+export const scriptsApi = {
+  run:     ()           => post<{ runId: string }>("/scripts/parse-poll/run"),
+  logs:    ()           => get<ScriptRun[]>("/scripts/parse-poll/logs"),
+  getById: (id: string) => get<ScriptRun>(`/scripts/runs/${id}`),
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function toQuery(params: object): string {
@@ -512,4 +520,14 @@ export interface UniversityWithFaculties {
   courses: number[];
   active: boolean;
   faculties: UniversityFaculty[];
+}
+
+export interface ScriptRun {
+  _id: string;
+  script: string;
+  status: "running" | "success" | "error";
+  output: string;
+  exitCode: number | null;
+  finishedAt: string | null;
+  createdAt: string;
 }
