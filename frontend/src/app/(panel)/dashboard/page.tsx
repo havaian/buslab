@@ -101,7 +101,6 @@ function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [students, setStudents] = useState<StudentSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -114,8 +113,6 @@ function DashboardContent() {
       .dashboard()
       .then(setStats)
       .finally(() => setLoading(false));
-    // Студентов грузим отдельно — не блокируем рендер
-    statsApi.students().then(setStudents);
   }, [user, router]);
 
   if (loading || !stats) {
@@ -353,97 +350,6 @@ function DashboardContent() {
           </Card>
         </div>
       )}
-
-      {/* Students table */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Сводка по студентам</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px]">
-              <thead>
-                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 text-left font-medium">Студент</th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    Ответов
-                  </th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    Одобрено
-                  </th>
-                  <th className="px-4 py-2.5 text-right font-medium">Откл.</th>
-                  <th className="px-4 py-2.5 text-right font-medium">%</th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    Ср. время
-                  </th>
-                  <th className="px-4 py-2.5 text-left font-medium">Статус</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-6 text-center text-muted-foreground"
-                    >
-                      Нет данных
-                    </td>
-                  </tr>
-                ) : (
-                  students.map((s) => (
-                    <tr
-                      key={s.id}
-                      className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"
-                      onClick={() => router.push(`/students/${s.id}`)}
-                    >
-                      <td className="px-4 py-2.5">
-                        <p className="font-medium text-sm">
-                          {s.firstName} {s.lastName}
-                        </p>
-                        {s.username && (
-                          <p className="text-xs text-muted-foreground">
-                            @{s.username}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">{s.submitted}</td>
-                      <td className="px-4 py-2.5 text-right text-green-600">
-                        {s.approved}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-red-500">
-                        {s.rejected}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        {s.approvalRate}%
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-muted-foreground">
-                        {s.avgTime ? `${s.avgTime} мин` : "-"}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            s.currentStatus === "free"
-                              ? "bg-green-100 text-green-700"
-                              : s.currentStatus === "overdue"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          {s.currentStatus === "free"
-                            ? "Свободен"
-                            : s.currentStatus === "overdue"
-                            ? "Просрочен"
-                            : "Занят"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </PageShell>
   );
 }
