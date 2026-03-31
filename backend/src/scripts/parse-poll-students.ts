@@ -31,38 +31,20 @@ const SESSION_STRING = process.env.TELEGRAM_SESSION ?? "";
 const STUDENT_CHAT_ID = "-1002637443124";
 
 const POLL_UNI_FAC_MSG_ID = 560; // опрос "Fakultetingiz | Universitetingiz"
-const POLL_COURSE_MSG_ID = 561; // опрос "Kursingiz"
+const POLL_COURSE_MSG_ID = 561;  // опрос "Kursingiz"
 
 // ── Маппинг вариантов опроса → IDs из БД ─────────────────────────────────────
 // Ключи — точные строки из Telegram-опроса (uz)
 // Символ в "o'rganish" — типографская кавычка U+2019, скопирована из скриншота
 
-const FACULTY_POLL_MAP: Record<
-  string,
-  { uniId: string; facId: string | null }
-> = {
-  "Ommaviy huquq": {
-    uniId: "69c984f927cd20596deb7c48",
-    facId: "69c984fb27cd20596deb7c5e",
-  },
-  "Biznes huquqi va sud himoyasi": {
-    uniId: "69c984f927cd20596deb7c48",
-    facId: "69c984fb27cd20596deb7c5f",
-  },
-  "Jinoiy odil sudlov": {
-    uniId: "69c984f927cd20596deb7c48",
-    facId: "69c984fb27cd20596deb7c60",
-  },
-  "Xalqaro huquq va qiyosiy huquqshunoslik": {
-    uniId: "69c984f927cd20596deb7c48",
-    facId: "69c984fb27cd20596deb7c61",
-  },
-  "Huquqni sohalararo o\u2019rganish": {
-    uniId: "69c984f927cd20596deb7c48",
-    facId: "69c984fb27cd20596deb7c62",
-  },
-  WIUT: { uniId: "69c984fb27cd20596deb7c5a", facId: null },
-  UWED: { uniId: "69c984fb27cd20596deb7c58", facId: null },
+const FACULTY_POLL_MAP: Record<string, { uniId: string; facId: string | null }> = {
+  "Ommaviy huquq":                           { uniId: "69c984f927cd20596deb7c48", facId: "69c984fb27cd20596deb7c5e" },
+  "Biznes huquqi va sud himoyasi":            { uniId: "69c984f927cd20596deb7c48", facId: "69c984fb27cd20596deb7c5f" },
+  "Jinoiy odil sudlov":                       { uniId: "69c984f927cd20596deb7c48", facId: "69c984fb27cd20596deb7c60" },
+  "Xalqaro huquq va qiyosiy huquqshunoslik":  { uniId: "69c984f927cd20596deb7c48", facId: "69c984fb27cd20596deb7c61" },
+  "Huquqni sohalararo o\u2019rganish":        { uniId: "69c984f927cd20596deb7c48", facId: "69c984fb27cd20596deb7c62" },
+  "WIUT":                                     { uniId: "69c984fb27cd20596deb7c5a", facId: null },
+  "UWED":                                     { uniId: "69c984fb27cd20596deb7c58", facId: null },
 };
 
 // ── Mongoose (минимальная схема — только нужные поля) ─────────────────────────
@@ -83,10 +65,7 @@ const UserSchema = new mongoose.Schema(
     lastSeenSource: { type: String, default: null },
     hasUsedMiniapp: { type: Boolean, default: false },
     hasUsedPanel: { type: Boolean, default: false },
-    currentAssignmentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      default: null,
-    },
+    currentAssignmentId: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
   { timestamps: true, collection: "users" }
 );
@@ -96,10 +75,7 @@ const UserModel = mongoose.model("User", UserSchema);
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function prompt(question: string): Promise<string> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
       rl.close();
@@ -158,8 +134,7 @@ async function getPollMessage(
 
   const messages = (result as Api.messages.ChannelMessages).messages;
   const msg = messages[0];
-  if (!(msg instanceof Api.Message))
-    throw new Error(`Message ${msgId} not found`);
+  if (!(msg instanceof Api.Message)) throw new Error(`Message ${msgId} not found`);
   return msg;
 }
 
@@ -171,7 +146,7 @@ async function main() {
   }
   // ── Авторизация GramJS ──────────────────────────────────────────────────────
   console.log("Подключаемся к Telegram (MTProto)...");
-  const session = new StringSession(SESSION_STRING);
+  const session = new StringSession(SESSION_STRING || "");
   const client = new TelegramClient(session, API_ID, API_HASH, {
     connectionRetries: 5,
   });
@@ -200,30 +175,21 @@ async function main() {
   const pollCourse = msgCourse.media as Api.MessageMediaPoll;
 
   if (!pollUniFac?.poll || !pollCourse?.poll) {
-    throw new Error(
-      "Не удалось получить опросы — убедись что message ID верные"
-    );
+    throw new Error("Не удалось получить опросы — убедись что message ID верные");
   }
 
   // ── Парсим опрос 1: универ/факультет ───────────────────────────────────────
   // Map<telegramId, { uniId, facId, firstName, lastName, username }>
   const uniFacMap = new Map<
     number,
-    {
-      uniId: string;
-      facId: string | null;
-      firstName: string;
-      lastName: string;
-      username: string;
-    }
+    { uniId: string; facId: string | null; firstName: string; lastName: string; username: string }
   >();
 
   console.log("\nПарсим опрос 1 (университет/факультет)...");
   for (const answer of pollUniFac.poll.answers) {
     const optionText = answer.text?.text ?? "";
     // Матчим по первым двум словам — защита от различий в кавычках/апострофах
-    const firstTwoWords = (s: string) =>
-      s.trim().split(/\s+/).slice(0, 2).join(" ").toLowerCase();
+    const firstTwoWords = (s: string) => s.trim().split(/\s+/).slice(0, 2).join(" ").toLowerCase();
     const mapping =
       FACULTY_POLL_MAP[optionText] ??
       Object.entries(FACULTY_POLL_MAP).find(
@@ -231,23 +197,12 @@ async function main() {
       )?.[1];
 
     if (!mapping) {
-      console.warn(
-        `  ⚠️  Вариант не найден в маппинге: "${optionText}" — пропускаем`
-      );
+      console.warn(`  ⚠️  Вариант не найден в маппинге: "${optionText}" — пропускаем`);
       continue;
     }
 
-    console.log(
-      `  Вариант: "${optionText}" → uniId=${mapping.uniId}, facId=${
-        mapping.facId ?? "null"
-      }`
-    );
-    const voters = await getPollVoters(
-      client,
-      STUDENT_CHAT_ID,
-      POLL_UNI_FAC_MSG_ID,
-      answer.option
-    );
+    console.log(`  Вариант: "${optionText}" → uniId=${mapping.uniId}, facId=${mapping.facId ?? "null"}`);
+    const voters = await getPollVoters(client, STUDENT_CHAT_ID, POLL_UNI_FAC_MSG_ID, answer.option);
 
     for (const rawUser of voters) {
       if (!(rawUser instanceof Api.User)) continue;
@@ -274,18 +229,11 @@ async function main() {
     const course = Number(optionText);
 
     if (isNaN(course) || course < 1 || course > 4) {
-      console.warn(
-        `  ⚠️  Неожиданный вариант курса: "${optionText}" — пропускаем`
-      );
+      console.warn(`  ⚠️  Неожиданный вариант курса: "${optionText}" — пропускаем`);
       continue;
     }
 
-    const voters = await getPollVoters(
-      client,
-      STUDENT_CHAT_ID,
-      POLL_COURSE_MSG_ID,
-      answer.option
-    );
+    const voters = await getPollVoters(client, STUDENT_CHAT_ID, POLL_COURSE_MSG_ID, answer.option);
     for (const rawUser of voters) {
       if (!(rawUser instanceof Api.User)) continue;
       courseMap.set(Number(rawUser.id), course);
@@ -315,9 +263,7 @@ async function main() {
 
     // Если нет данных по универу — пропускаем (только курс без универа бессмысленно)
     if (!uniFac) {
-      console.warn(
-        `  ⚠️  telegramId=${tgId} есть только в опросе курса, без универа — пропускаем`
-      );
+      console.warn(`  ⚠️  telegramId=${tgId} есть только в опросе курса, без универа — пропускаем`);
       skipped++;
       continue;
     }
