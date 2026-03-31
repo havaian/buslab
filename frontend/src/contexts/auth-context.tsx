@@ -19,7 +19,10 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// "/" добавлен в исключения — root страница сама показывает loading spinner,
+// auth-context не должен редиректить на /login пока находится на ней
 const isPanelAuthExcluded = (pathname: string) =>
+  pathname === "/" ||
   pathname === "/login" ||
   pathname === "/privacy" ||
   pathname.startsWith("/user") ||
@@ -97,6 +100,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (startParam) {
             const decoded = decodeURIComponent(startParam);
             const role = data.user.role as string;
+
+            // Сначала выставляем loading=false, ПОТОМ навигируем —
+            // иначе panel layout монтируется с loading=false, user=null → flash
+            setLoading(false);
+
             if (decoded.startsWith("r_")) {
               const requestId = decoded.slice(2);
               router.push(
