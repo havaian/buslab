@@ -357,6 +357,7 @@ export class RequestsService {
     req.assignedAt = now;
     req.timerDeadline = new Date(now.getTime() + TIMER_DURATION_MS);
     req.timerWarningSent = false;
+    req.timerHalfWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
 
@@ -423,6 +424,11 @@ export class RequestsService {
         { _id: student._id },
         { currentAssignmentId: null }
       );
+      // Запрещаем этому студенту повторно взять то же обращение
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { $addToSet: { blockedStudentIds: student._id } }
+      );
       if (student.telegramId)
         await this.notifications.notifyStudentUnassigned(
           String(student.telegramId)
@@ -434,6 +440,7 @@ export class RequestsService {
     req.assignedAt = null;
     req.timerDeadline = null;
     req.timerWarningSent = false;
+    req.timerHalfWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
 
@@ -484,6 +491,10 @@ export class RequestsService {
       await this.userModel.updateOne(
         { _id: student._id },
         { currentAssignmentId: null }
+      );
+      await this.requestModel.updateOne(
+        { _id: req._id },
+        { $addToSet: { blockedStudentIds: student._id } }
       );
       if (student.telegramId)
         await this.notifications.notifyStudentReturnedToQueue(
@@ -757,6 +768,10 @@ export class RequestsService {
     const req = await this.requestModel.findById(requestId);
     if (!req) throw new NotFoundException();
 
+    // Находим originalName до удаления
+    const fileToRemove = (req.answerFiles ?? []).find(
+      (f) => f.filename === filename
+    );
     req.answerFiles = (req.answerFiles ?? []).filter(
       (f) => f.filename !== filename
     );
@@ -769,7 +784,7 @@ export class RequestsService {
       performedByRole: "admin",
       statusFrom: req.status,
       statusTo: req.status,
-      comment: filename,
+      comment: fileToRemove?.originalName ?? filename,
     });
 
     // Удалить физический файл
@@ -816,6 +831,11 @@ export class RequestsService {
     if (existing)
       throw new BadRequestException("You already have an active request");
 
+    // Запрещаем повторное взятие если студент был снят или просрочил
+    if (req.blockedStudentIds?.some((id) => String(id) === String(studentId))) {
+      throw new BadRequestException("You cannot take this request again");
+    }
+
     const student = await this.userModel.findById(studentId);
     if (!student) throw new NotFoundException();
 
@@ -826,6 +846,7 @@ export class RequestsService {
     req.assignedAt = now;
     req.timerDeadline = new Date(now.getTime() + TIMER_DURATION_MS);
     req.timerWarningSent = false;
+    req.timerHalfWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
 
@@ -858,6 +879,19 @@ export class RequestsService {
       await this.requestModel.updateOne(
         { _id: req._id },
         { studentChatMessageId: null }
+      );
+    }
+
+    // Уведомить гражданина что его обращение взято в работу
+    const citizenPopulated = await this.requestModel
+      .findById(requestId)
+      .populate("userId", "telegramId language")
+      .lean();
+    const citizen = citizenPopulated?.userId as any;
+    if (citizen?.telegramId) {
+      await this.notifications.notifyUserRequestTaken(
+        String(citizen.telegramId),
+        citizen.language || "ru"
       );
     }
 
@@ -972,6 +1006,7 @@ export class RequestsService {
     req.assignedAt = null;
     req.timerDeadline = null;
     req.timerWarningSent = false;
+    req.timerHalfWarningSent = false;
     req.timerExpiredNotified = false;
     await req.save();
 

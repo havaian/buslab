@@ -350,6 +350,15 @@ export class NotificationsService implements OnModuleInit {
     await this.send(telegramId, messages[language] || messages.ru);
   }
 
+  async notifyUserRequestTaken(telegramId: string, language: string) {
+    const messages: Record<string, string> = {
+      ru: "👨‍💼 Студент-консультант взял ваше обращение в работу. Ожидайте ответа.",
+      uz: "👨‍💼 Talaba-konsultant murojaatingizni ko'rib chiqishga oldi. Javobni kuting.",
+      en: "👨‍💼 A student consultant has taken your request. Please wait for the answer.",
+    };
+    await this.send(telegramId, messages[language] || messages.ru);
+  }
+
   async notifyUserRejected(
     telegramId: string,
     language: string,

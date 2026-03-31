@@ -92,7 +92,12 @@ export default function PanelLayout({
         )}
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto pb-16 lg:pb-0">{children}</div>
+        <div
+          className="flex-1 overflow-y-auto lg:pb-0"
+          style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}
+        >
+          {children}
+        </div>
       </div>
 
       {/* Mobile bottom nav — all roles */}

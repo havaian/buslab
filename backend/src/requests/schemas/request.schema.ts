@@ -68,6 +68,11 @@ export class Request {
   @Prop({ default: false })
   timerHalfWarningSent: boolean;
 
+  // Студенты, которым запрещено повторно брать это обращение.
+  // Заполняется при: снятии админом, таймер истёк, возврат в очередь.
+  @Prop({ type: [{ type: Types.ObjectId, ref: "User" }], default: [] })
+  blockedStudentIds: Types.ObjectId[];
+
   @Prop({ default: false })
   timerExpiredNotified: boolean;
 

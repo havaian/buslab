@@ -1,447 +1,284 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
-import {
-  UserPlus,
-  Link,
-  Search,
-  Copy,
-  Check,
-  GraduationCap,
-  UserMinus,
-  ExternalLink,
-} from "lucide-react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   adminUsersApi,
-  type PanelUser,
-  type AnyUser,
-  type InviteResult,
+  universitiesApi,
+  type StudentSummary,
+  type UniversityWithFaculties,
 } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { useToast } from "@/components/ui/toast-provider";
-import { getUserDisplayName, formatDate } from "@/lib/utils";
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
-type Tab = "invite" | "search";
+const STATUS_OPTS = [
+  { value: "_all", label: "Все" },
+  { value: "active", label: "В работе" },
+  { value: "free", label: "Свободны" },
+  { value: "overdue", label: "Просрочены" },
+  { value: "never", label: "Ни разу не брали" },
+];
 
-export default function StudentsPage() {
+const SORT_OPTS = [
+  { value: "createdAt", label: "По дате регистрации" },
+  { value: "approved", label: "По одобренным ответам" },
+];
+
+function StudentsContent() {
   const router = useRouter();
-  const { toast } = useToast();
+  const searchParams = useSearchParams();
 
-  const [students, setStudents] = useState<PanelUser[]>([]);
+  const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [unis, setUnis] = useState<UniversityWithFaculties[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
 
-  // Add student modal
-  const [modalOpen, setModalOpen] = useState(false);
-  const [tab, setTab] = useState<Tab>("invite");
+  const [university, setUniversity] = useState("_all");
+  const [faculty, setFaculty] = useState("_all");
+  const [course, setCourse] = useState("_all");
+  const [status, setStatus] = useState(
+    () => searchParams.get("status") || "_all"
+  );
+  const [sortBy, setSortBy] = useState("createdAt");
 
-  // Invite tab state
-  const [invite, setInvite] = useState<InviteResult | null>(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  // Search tab state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<AnyUser[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Demote confirm
-  const [demoteTarget, setDemoteTarget] = useState<PanelUser | null>(null);
-
-  // ── Data ─────────────────────────────────────────────────────────────────
+  const selectedUni = unis.find((u) => u._id === university);
+  const faculties = selectedUni?.faculties ?? [];
+  const courses = selectedUni?.courses ?? [];
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await adminUsersApi.students();
-      setStudents(list.map((s: any) => ({ ...s, id: String(s._id ?? s.id) })));
+      const params: Record<string, string> = {};
+      if (university !== "_all") params.university = university;
+      if (faculty !== "_all") params.faculty = faculty;
+      if (course !== "_all") params.course = course;
+      if (status !== "_all") params.status = status;
+      if (sortBy !== "createdAt") params.sortBy = sortBy;
+
+      const query = new URLSearchParams(params).toString();
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+      const token = localStorage.getItem("token");
+      const res = await fetch(
+        `${apiBase}/admin-users/students${query ? "?" + query : ""}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await res.json();
+      setStudents(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
     }
+  }, [university, faculty, course, status, sortBy]);
+
+  useEffect(() => {
+    universitiesApi
+      .list()
+      .then(setUnis)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // ── Invite tab ────────────────────────────────────────────────────────────
-
-  const generateInvite = async () => {
-    setInviteLoading(true);
-    try {
-      const result = await adminUsersApi.createInvite();
-      setInvite(result);
-      setCopied(false);
-    } catch (e: unknown) {
-      toast((e as Error).message, "error");
-    } finally {
-      setInviteLoading(false);
-    }
+  // Сбрасываем факультет при смене универа
+  const handleUniChange = (v: string) => {
+    setUniversity(v);
+    setFaculty("_all");
+    setCourse("_all");
   };
-
-  const copyLink = async () => {
-    if (!invite) return;
-    await navigator.clipboard.writeText(invite.link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const openModal = () => {
-    setModalOpen(true);
-    setTab("invite");
-    setInvite(null);
-    setSearchQuery("");
-    setSearchResults([]);
-  };
-
-  // ── Search tab ────────────────────────────────────────────────────────────
-
-  const handleSearchInput = (value: string) => {
-    setSearchQuery(value);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (value.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    searchTimer.current = setTimeout(async () => {
-      setSearchLoading(true);
-      try {
-        const results = await adminUsersApi.searchUsers(value.trim());
-        setSearchResults(results);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 350);
-  };
-
-  const handlePromote = async (user: AnyUser) => {
-    setBusy(true);
-    try {
-      await adminUsersApi.promote(user._id);
-      toast(`${getUserDisplayName(user)} теперь студент`, "success");
-      setModalOpen(false);
-      await load();
-    } catch (e: unknown) {
-      toast((e as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDemote = async () => {
-    if (!demoteTarget) return;
-    setBusy(true);
-    try {
-      await adminUsersApi.demote(demoteTarget.id);
-      toast(
-        `${getUserDisplayName(demoteTarget)} переведён в пользователи`,
-        "success"
-      );
-      setDemoteTarget(null);
-      await load();
-    } catch (e: unknown) {
-      toast((e as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <PageShell
-      title="Студенты"
-      description={`${students.length} студентов`}
-      actions={
-        <Button size="sm" onClick={openModal}>
-          <UserPlus size={14} />
-          Добавить студента
-        </Button>
-      }
-    >
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Загрузка...</p>
-      ) : students.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <GraduationCap
-              size={36}
-              className="mx-auto text-muted-foreground/30 mb-3"
-            />
-            <p className="text-sm text-muted-foreground">Нет студентов</p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-4"
-              onClick={openModal}
-            >
-              Добавить первого студента
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                    <th className="px-4 py-2.5 text-left font-medium">
-                      Студент
-                    </th>
-                    <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
-                      Telegram ID
-                    </th>
-                    <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">
-                      Статус
-                    </th>
-                    <th className="px-4 py-2.5 text-right font-medium">
-                      Действия
-                    </th>
+    <PageShell title="Студенты" description={`${students.length} записей`}>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Select value={university} onValueChange={handleUniChange}>
+          <SelectTrigger className="h-9 text-sm w-[180px]">
+            <SelectValue placeholder="Университет" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">Все университеты</SelectItem>
+            {unis.map((u) => (
+              <SelectItem key={u._id} value={u._id}>
+                {u.names.ru}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {faculties.length > 0 && (
+          <Select value={faculty} onValueChange={setFaculty}>
+            <SelectTrigger className="h-9 text-sm w-[180px]">
+              <SelectValue placeholder="Факультет" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Все факультеты</SelectItem>
+              {faculties.map((f) => (
+                <SelectItem key={f._id} value={f._id}>
+                  {f.names.ru}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {courses.length > 0 && (
+          <Select value={course} onValueChange={setCourse}>
+            <SelectTrigger className="h-9 text-sm w-[100px]">
+              <SelectValue placeholder="Курс" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Все курсы</SelectItem>
+              {courses.map((c) => (
+                <SelectItem key={c} value={String(c)}>
+                  {c} курс
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="h-9 text-sm w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="h-9 text-sm w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead>
+                <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 text-left font-medium">Студент</th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Ответов
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">
+                    Одобрено
+                  </th>
+                  <th className="px-4 py-2.5 text-right font-medium">Откл.</th>
+                  <th className="px-4 py-2.5 text-right font-medium">%</th>
+                  <th className="px-4 py-2.5 text-right font-medium hidden md:table-cell">
+                    Ср. время
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium">Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-8 text-center text-muted-foreground"
+                    >
+                      Загрузка...
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {students.map((s) => (
+                ) : students.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-8 text-center text-muted-foreground"
+                    >
+                      Нет данных
+                    </td>
+                  </tr>
+                ) : (
+                  students.map((s) => (
                     <tr
                       key={s.id}
                       className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"
                       onClick={() => router.push(`/students/${s.id}`)}
                     >
                       <td className="px-4 py-2.5">
-                        <p className="font-medium">{getUserDisplayName(s)}</p>
+                        <p className="font-medium text-sm">
+                          {s.firstName} {s.lastName}
+                        </p>
                         {s.username && (
                           <p className="text-xs text-muted-foreground">
                             @{s.username}
                           </p>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">
-                        {s.telegramId}
+                      <td className="px-4 py-2.5 text-right">{s.submitted}</td>
+                      <td className="px-4 py-2.5 text-right text-green-600">
+                        {s.approved}
                       </td>
-                      <td className="px-4 py-2.5 hidden lg:table-cell">
-                        {s.isBanned ? (
-                          <span className="text-xs text-red-500">
-                            Заблокирован
-                          </span>
-                        ) : (
-                          <span className="text-xs text-green-600">
-                            Активен
-                          </span>
-                        )}
+                      <td className="px-4 py-2.5 text-right text-red-500">
+                        {s.rejected}
                       </td>
-                      <td
-                        className="px-4 py-2.5 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-7"
-                            onClick={() => router.push(`/students/${s.id}`)}
-                          >
-                            <ExternalLink size={12} />
-                            Профиль
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-7 text-destructive hover:text-destructive"
-                            onClick={() => setDemoteTarget(s)}
-                          >
-                            <UserMinus size={12} />
-                            Убрать
-                          </Button>
-                        </div>
+                      <td className="px-4 py-2.5 text-right">
+                        {s.approvalRate}%
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">
+                        {s.avgTime ? `${s.avgTime} мин` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            s.currentStatus === "free"
+                              ? "bg-green-100 text-green-700"
+                              : s.currentStatus === "overdue"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {s.currentStatus === "free"
+                            ? "Свободен"
+                            : s.currentStatus === "overdue"
+                            ? "Просрочен"
+                            : "Занят"}
+                        </span>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Add student modal ──────────────────────────────────────────────── */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Добавить студента</DialogTitle>
-          </DialogHeader>
-
-          {/* Tab switcher */}
-          <div className="flex gap-1 border rounded-md p-1 bg-muted/30">
-            <button
-              onClick={() => setTab("invite")}
-              className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded transition-colors ${
-                tab === "invite"
-                  ? "bg-background shadow-sm font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Link size={12} />
-              Invite-ссылка
-            </button>
-            <button
-              onClick={() => setTab("search")}
-              className={`flex-1 flex items-center justify-center gap-1.5 text-xs py-1.5 rounded transition-colors ${
-                tab === "search"
-                  ? "bg-background shadow-sm font-medium"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Search size={12} />
-              Найти в базе
-            </button>
-          </div>
-
-          {/* ── Invite tab ─────────────────────────────────────────────────── */}
-          {tab === "invite" && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Сгенерируйте одноразовую ссылку и отправьте студенту. После
-                перехода по ссылке и запуска бота — студент автоматически
-                получит роль.
-              </p>
-
-              {!invite ? (
-                <Button
-                  className="w-full"
-                  onClick={generateInvite}
-                  disabled={inviteLoading}
-                >
-                  {inviteLoading ? "Генерация..." : "Сгенерировать ссылку"}
-                </Button>
-              ) : (
-                <div className="space-y-3">
-                  <div className="rounded-md border bg-muted/30 p-3 break-all text-xs font-mono">
-                    {invite.link}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={copyLink}
-                    >
-                      {copied ? (
-                        <>
-                          <Check size={13} /> Скопировано
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={13} /> Копировать
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={generateInvite}
-                      disabled={inviteLoading}
-                    >
-                      Новая
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Ссылка действительна до {formatDate(invite.expiresAt)} (48
-                    ч)
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Search tab ─────────────────────────────────────────────────── */}
-          {tab === "search" && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Найдите пользователя, который уже писал боту, по username или
-                Telegram ID.
-              </p>
-              <Input
-                placeholder="@username или Telegram ID"
-                value={searchQuery}
-                onChange={(e) => handleSearchInput(e.target.value)}
-                autoFocus
-              />
-
-              {searchLoading && (
-                <p className="text-xs text-muted-foreground">Поиск...</p>
-              )}
-
-              {!searchLoading &&
-                searchQuery.length >= 2 &&
-                searchResults.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Ничего не найдено. Попробуйте другой запрос или используйте
-                    invite-ссылку.
-                  </p>
+                  ))
                 )}
-
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {searchResults.map((u) => (
-                  <div
-                    key={u._id}
-                    className="flex items-center justify-between rounded-md border px-3 py-2"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">
-                        {getUserDisplayName(u)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {u.username ? `@${u.username} · ` : ""}
-                        ID: {u.telegramId}
-                        {u.role === "student" && (
-                          <span className="ml-1 text-green-600">
-                            · уже студент
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    {u.role !== "student" && u.role !== "admin" && (
-                      <Button
-                        size="sm"
-                        className="ml-3 shrink-0"
-                        disabled={busy}
-                        onClick={() => handlePromote(u)}
-                      >
-                        <GraduationCap size={13} />
-                        Сделать студентом
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Demote confirm ────────────────────────────────────────────────── */}
-      <ConfirmDialog
-        open={!!demoteTarget}
-        onOpenChange={(v) => !v && setDemoteTarget(null)}
-        title={`Убрать ${getUserDisplayName(demoteTarget)} из студентов?`}
-        description="Пользователь потеряет доступ к веб-панели и будет переведён в обычные пользователи."
-        confirmLabel="Убрать"
-        variant="destructive"
-        loading={busy}
-        onConfirm={handleDemote}
-      />
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </PageShell>
+  );
+}
+
+export default function StudentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageShell title="Студенты">
+          <p className="text-sm text-muted-foreground">Загрузка...</p>
+        </PageShell>
+      }
+    >
+      <StudentsContent />
+    </Suspense>
   );
 }

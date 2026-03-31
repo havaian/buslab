@@ -104,7 +104,9 @@ export class SchedulerService {
         }
         await this.requestModel.updateOne(
           { _id: req._id },
-          { $set: { timerExpiredNotified: true } }
+          { $set: { timerExpiredNotified: true },
+            $addToSet: { blockedStudentIds: student._id }
+          },
         );
       }
     }

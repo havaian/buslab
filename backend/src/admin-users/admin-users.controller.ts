@@ -38,8 +38,20 @@ export class AdminUsersController {
 
   @Roles(UserRole.ADMIN)
   @Get("students")
-  async findStudents() {
-    const students = await this.adminUsersService.findStudents();
+  async findStudents(
+    @Query("university") university?: string,
+    @Query("faculty") faculty?: string,
+    @Query("course") course?: string,
+    @Query("status") status?: "active" | "free" | "overdue" | "never",
+    @Query("sortBy") sortBy?: "approved" | "createdAt"
+  ) {
+    const students = await this.adminUsersService.findStudents({
+      university: university || undefined,
+      faculty: faculty || undefined,
+      course: course ? Number(course) : undefined,
+      status: status || undefined,
+      sortBy: sortBy || undefined,
+    });
     return students.map((s: any) => ({ ...s, id: String(s._id) }));
   }
 

@@ -32,8 +32,76 @@ export class AdminUsersService {
 
   // ── Students ──────────────────────────────────────────────────────────────
 
-  async findStudents() {
-    return this.userModel.find({ role: "student" }).lean();
+  async findStudents(filters?: {
+    university?: string;
+    faculty?: string;
+    course?: number;
+    status?: "active" | "free" | "overdue" | "never";
+    sortBy?: "approved" | "createdAt";
+  }) {
+    const query: any = { role: "student" };
+
+    if (filters?.university) query.university = filters.university;
+    if (filters?.faculty) query.faculty = filters.faculty;
+    if (filters?.course) query.course = Number(filters.course);
+
+    let students = await this.userModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Фильтр по статусу активности требует join с requests — делаем в памяти
+    if (filters?.status) {
+      const ids = students.map((s) => s._id);
+      const activeRequests = await this.requestModel
+        .find({ studentId: { $in: ids }, status: "assigned" })
+        .select("studentId timerDeadline")
+        .lean();
+      const activeMap = new Map(
+        activeRequests.map((r) => [String(r.studentId), r])
+      );
+      // "never" — ни разу не брал заявку
+      if (filters.status === "never") {
+        const everTook = await this.requestModel.distinct("studentId");
+        const everSet = new Set(everTook.map(String));
+        students = students.filter((s) => !everSet.has(String(s._id)));
+      } else {
+        students = students.filter((s) => {
+          const active = activeMap.get(String(s._id));
+          const isActive = !!active;
+          const isOverdue =
+            isActive &&
+            (active as any).timerDeadline &&
+            new Date((active as any).timerDeadline) < new Date();
+          if (filters.status === "active") return isActive;
+          if (filters.status === "free") return !isActive;
+          if (filters.status === "overdue") return isOverdue;
+          return true;
+        });
+      }
+    }
+
+    // Сортировка по количеству одобренных
+    if (filters?.sortBy === "approved") {
+      const ids = students.map((s) => s._id);
+      const logs = await this.studentLogModel.aggregate([
+        {
+          $match: {
+            studentId: { $in: ids },
+            action: "answer_approved",
+          },
+        },
+        { $group: { _id: "$studentId", count: { $sum: 1 } } },
+      ]);
+      const countMap = new Map(logs.map((l: any) => [String(l._id), l.count]));
+      students = students.sort(
+        (a, b) =>
+          (countMap.get(String(b._id)) ?? 0) -
+          (countMap.get(String(a._id)) ?? 0)
+      );
+    }
+
+    return students;
   }
 
   async findFreeStudents() {

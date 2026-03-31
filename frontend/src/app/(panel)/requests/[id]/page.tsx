@@ -730,7 +730,7 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
     label: "Ответ изменён администратором",
     color: "bg-yellow-500",
   },
-  answer_draft_saved: { label: "Черновик ответа сохранён", color: "bg-gray-400" },
+  answer_draft_saved: { label: "Ответ на обращение изменён администратором", color: "bg-gray-400" },
   answer_file_added: { label: "Файл добавлен администратором", color: "bg-blue-400" },
   answer_file_removed: { label: "Файл удалён администратором", color: "bg-orange-400" },
 };

@@ -83,7 +83,10 @@ export function BottomNav({ role }: { role: string }) {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background lg:hidden">
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         <div className="flex h-16 items-stretch">
           {role === "admin" && (
             <>
@@ -121,7 +124,10 @@ export function BottomNav({ role }: { role: string }) {
             className="fixed inset-0 z-50 bg-black/40 lg:hidden"
             onClick={() => setSheetOpen(false)}
           />
-          <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t bg-background pb-safe lg:hidden">
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t bg-background lg:hidden"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          >
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <span className="text-sm font-semibold">Ещё</span>
               <button

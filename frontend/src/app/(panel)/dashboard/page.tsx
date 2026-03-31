@@ -131,10 +131,18 @@ function DashboardContent() {
   }));
 
   // Вспомогательная: сегодняшняя дата в ISO для фильтров
-  const todayISO = new Date().toISOString().slice(0, 10);
-  const weekAgoISO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const now = new Date();
+  const todayISO = now.toISOString().slice(0, 10);
+  // dateTo должен быть следующим днём — бэк делает $lte new Date(dateTo),
+  // т.е. new Date("2025-03-31") = midnight, не захватывает сегодняшние записи
+  const tomorrowISO = new Date(now.getTime() + 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
+  // startOfWeek — совпадает с тем как считает getDashboard на бэке
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  const startOfWeekISO = startOfWeek.toISOString().slice(0, 10);
 
   return (
     <PageShell title="Дашборд">
@@ -176,17 +184,17 @@ function DashboardContent() {
           label="За сегодня"
           value={stats.periods.today}
           onClick={() =>
-            router.push(`/requests?dateFrom=${todayISO}&dateTo=${todayISO}`)
+            router.push(`/requests?dateFrom=${todayISO}&dateTo=${tomorrowISO}`)
           }
         />
         <PeriodCard
           label="За неделю"
           value={stats.periods.week}
-          onClick={() => router.push(`/requests?dateFrom=${weekAgoISO}`)}
+          onClick={() => router.push(`/requests?dateFrom=${startOfWeekISO}`)}
         />
         <Card
           className="cursor-pointer hover:bg-muted/30 transition-colors"
-          onClick={() => router.push("/students")}
+          onClick={() => router.push("/students?status=active")}
         >
           <CardContent className="flex items-center gap-2 pt-4 pb-4">
             <Users size={14} className="text-muted-foreground shrink-0" />
