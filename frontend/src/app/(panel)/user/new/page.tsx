@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Paperclip, X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { categoriesApi, type Category } from "@/lib/api";
-import { PageShell } from "@/components/layout/page-shell";
+import { MobileHeader } from "@/components/layout/mobile-header";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 
@@ -73,105 +73,103 @@ export default function UserNewRequestPage() {
   };
 
   return (
-    <PageShell
-      title="Новое обращение"
-      actions={
-        <Button variant="outline" size="sm" onClick={() => router.back()}>
-          <ArrowLeft size={14} /> Назад
-        </Button>
-      }
-    >
-      <div className="space-y-4 max-w-2xl">
-        {/* Category */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
-            Категория
-          </label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full rounded-lg border bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {categories.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.names?.ru || c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Text */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">
-            Текст обращения
-          </label>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={`Опишите вашу ситуацию подробно (минимум ${MIN_LENGTH} символов)`}
-            rows={8}
-            className="w-full rounded-lg border bg-card px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <p
-            className={`text-xs text-right ${
-              text.length < MIN_LENGTH
-                ? "text-muted-foreground"
-                : "text-green-600"
-            }`}
-          >
-            {text.length} / {MIN_LENGTH}
-          </p>
-        </div>
-
-        {/* Files */}
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">
-            Файлы (необязательно)
-          </label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf,image/*"
-            multiple
-            className="hidden"
-            onChange={addFiles}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 rounded-lg border border-dashed px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground w-full"
-          >
-            <Paperclip size={15} />
-            Прикрепить файлы
-          </button>
-          {files.length > 0 && (
-            <div className="space-y-1">
-              {files.map((f) => (
-                <div
-                  key={f.name}
-                  className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2"
-                >
-                  <span className="text-xs truncate">{f.name}</span>
-                  <button
-                    onClick={() =>
-                      setFiles((prev) => prev.filter((x) => x.name !== f.name))
-                    }
-                  >
-                    <X size={14} className="text-muted-foreground" />
-                  </button>
-                </div>
+    <div className="flex flex-col min-h-full">
+      <MobileHeader title="Новое обращение" back />
+      <div className="flex-1 p-4">
+        <div className="space-y-4 max-w-2xl">
+          {/* Category */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Категория
+            </label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full rounded-lg border bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.names?.ru || c.name}
+                </option>
               ))}
-            </div>
-          )}
-        </div>
+            </select>
+          </div>
 
-        <Button
-          onClick={submit}
-          disabled={submitting || text.length < MIN_LENGTH || !categoryId}
-          className="w-full"
-        >
-          {submitting ? "Отправка..." : "Отправить обращение"}
-        </Button>
+          {/* Text */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Текст обращения
+            </label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`Опишите вашу ситуацию подробно (минимум ${MIN_LENGTH} символов)`}
+              rows={8}
+              className="w-full rounded-lg border bg-card px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p
+              className={`text-xs text-right ${
+                text.length < MIN_LENGTH
+                  ? "text-muted-foreground"
+                  : "text-green-600"
+              }`}
+            >
+              {text.length} / {MIN_LENGTH}
+            </p>
+          </div>
+
+          {/* Files */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">
+              Файлы (необязательно)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              multiple
+              className="hidden"
+              onChange={addFiles}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 rounded-lg border border-dashed px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground w-full"
+            >
+              <Paperclip size={15} />
+              Прикрепить файлы
+            </button>
+            {files.length > 0 && (
+              <div className="space-y-1">
+                {files.map((f) => (
+                  <div
+                    key={f.name}
+                    className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2"
+                  >
+                    <span className="text-xs truncate">{f.name}</span>
+                    <button
+                      onClick={() =>
+                        setFiles((prev) =>
+                          prev.filter((x) => x.name !== f.name)
+                        )
+                      }
+                    >
+                      <X size={14} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={submit}
+            disabled={submitting || text.length < MIN_LENGTH || !categoryId}
+            className="w-full"
+          >
+            {submitting ? "Отправка..." : "Отправить обращение"}
+          </Button>
+        </div>
       </div>
-    </PageShell>
+    </div>
   );
 }

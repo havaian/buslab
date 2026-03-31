@@ -20,10 +20,10 @@ export function MobileHeader({
 }: MobileHeaderProps) {
   const router = useRouter();
 
-  // В Telegram Mini App нативный UI (кнопка закрытия, бургер) перекрывает
-  // верхнюю часть экрана. Используем CSS переменную --tg-content-safe-area-inset-top
-  // которую Telegram SDK выставляет автоматически (Bot API 7.10+).
-  // Fallback: env(safe-area-inset-top) для устройств с челкой.
+  // В Mini App fullscreen-режиме Telegram native overlay (кнопка закрытия, бургер)
+  // перекрывает верхнюю часть webview.
+  // --tg-content-safe-area-inset-top (Bot API 7.10+) = высота этого overlay.
+  // В non-fullscreen и в обычном браузере = 0 или env(safe-area-inset-top).
   const [isMiniApp, setIsMiniApp] = useState(false);
 
   useEffect(() => {

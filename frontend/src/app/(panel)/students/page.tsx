@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
-  adminUsersApi,
+  statsApi,
   universitiesApi,
   type StudentSummary,
   type UniversityWithFaculties,
@@ -17,25 +18,30 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { Suspense } from "react";
 
 const STATUS_OPTS = [
   { value: "_all", label: "Все" },
   { value: "active", label: "В работе" },
   { value: "free", label: "Свободны" },
   { value: "overdue", label: "Просрочены" },
-  { value: "never", label: "Ни разу не брали" },
 ];
 
-const SORT_OPTS = [
-  { value: "createdAt", label: "По дате регистрации" },
-  { value: "approved", label: "По одобренным ответам" },
+type SortKey = "approved" | "submitted" | "approvalRate" | "avgTime";
+type SortDir = "desc" | "asc";
+
+const SORT_OPTS: { value: SortKey; label: string }[] = [
+  { value: "approved", label: "По одобренным" },
+  { value: "submitted", label: "По ответам" },
+  { value: "approvalRate", label: "По % одобрения" },
+  { value: "avgTime", label: "По среднему времени" },
 ];
 
 function StudentsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [students, setStudents] = useState<StudentSummary[]>([]);
+  const [all, setAll] = useState<StudentSummary[]>([]);
   const [unis, setUnis] = useState<UniversityWithFaculties[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,106 +51,53 @@ function StudentsContent() {
   const [status, setStatus] = useState(
     () => searchParams.get("status") || "_all"
   );
-  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortKey, setSortKey] = useState<SortKey>("approved");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const selectedUni = unis.find((u) => u._id === university);
-  const faculties = selectedUni?.faculties ?? [];
-  const courses = selectedUni?.courses ?? [];
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, string> = {};
-      if (university !== "_all") params.university = university;
-      if (faculty !== "_all") params.faculty = faculty;
-      if (course !== "_all") params.course = course;
-      if (status !== "_all") params.status = status;
-      if (sortBy !== "createdAt") params.sortBy = sortBy;
-
-      const query = new URLSearchParams(params).toString();
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
-      const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${apiBase}/admin-users/students${query ? "?" + query : ""}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const data = await res.json();
-      setStudents(Array.isArray(data) ? data : []);
-    } finally {
-      setLoading(false);
-    }
-  }, [university, faculty, course, status, sortBy]);
 
   useEffect(() => {
-    universitiesApi
-      .list()
-      .then(setUnis)
-      .catch(() => {});
+    Promise.all([statsApi.students(), universitiesApi.list()])
+      .then(([s, u]) => {
+        setAll(s);
+        setUnis(u);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const filtered = useMemo(() => {
+    let result = [...all];
 
-  // Сбрасываем факультет при смене универа
-  const handleUniChange = (v: string) => {
-    setUniversity(v);
-    setFaculty("_all");
-    setCourse("_all");
-  };
+    if (status !== "_all") {
+      result = result.filter((s) => s.currentStatus === status);
+    }
+
+    // university/faculty/course — поля могут быть не в StudentSummary,
+    // пропускаем если не заполнены (они есть только в полном User объекте)
+    // Оставляем для будущего расширения бэкенда
+
+    result.sort((a, b) => {
+      const av = a[sortKey] ?? 0;
+      const bv = b[sortKey] ?? 0;
+      return sortDir === "desc"
+        ? (bv as number) - (av as number)
+        : (av as number) - (bv as number);
+    });
+
+    return result;
+  }, [all, status, sortKey, sortDir]);
+
+  const toggleDir = () => setSortDir((d) => (d === "desc" ? "asc" : "desc"));
 
   return (
-    <PageShell title="Студенты" description={`${students.length} записей`}>
+    <PageShell
+      title="Студенты"
+      description={`${filtered.length} из ${all.length}`}
+    >
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Select value={university} onValueChange={handleUniChange}>
-          <SelectTrigger className="h-9 text-sm w-[180px]">
-            <SelectValue placeholder="Университет" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Все университеты</SelectItem>
-            {unis.map((u) => (
-              <SelectItem key={u._id} value={u._id}>
-                {u.names.ru}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {faculties.length > 0 && (
-          <Select value={faculty} onValueChange={setFaculty}>
-            <SelectTrigger className="h-9 text-sm w-[180px]">
-              <SelectValue placeholder="Факультет" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all">Все факультеты</SelectItem>
-              {faculties.map((f) => (
-                <SelectItem key={f._id} value={f._id}>
-                  {f.names.ru}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {courses.length > 0 && (
-          <Select value={course} onValueChange={setCourse}>
-            <SelectTrigger className="h-9 text-sm w-[100px]">
-              <SelectValue placeholder="Курс" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_all">Все курсы</SelectItem>
-              {courses.map((c) => (
-                <SelectItem key={c} value={String(c)}>
-                  {c} курс
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
+      <div className="flex flex-wrap gap-2 mb-4 items-center">
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-9 text-sm w-[160px]">
+          <SelectTrigger className="h-9 text-sm w-[150px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -156,8 +109,8 @@ function StudentsContent() {
           </SelectContent>
         </Select>
 
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="h-9 text-sm w-[200px]">
+        <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+          <SelectTrigger className="h-9 text-sm w-[190px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -168,6 +121,16 @@ function StudentsContent() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Sort direction toggle */}
+        <button
+          onClick={toggleDir}
+          className="flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+          title={sortDir === "desc" ? "По убыванию" : "По возрастанию"}
+        >
+          {sortDir === "desc" ? <ArrowDown size={15} /> : <ArrowUp size={15} />}
+          {sortDir === "desc" ? "По убыванию" : "По возрастанию"}
+        </button>
       </div>
 
       <Card>
@@ -201,7 +164,7 @@ function StudentsContent() {
                       Загрузка...
                     </td>
                   </tr>
-                ) : students.length === 0 ? (
+                ) : filtered.length === 0 ? (
                   <tr>
                     <td
                       colSpan={7}
@@ -211,7 +174,7 @@ function StudentsContent() {
                     </td>
                   </tr>
                 ) : (
-                  students.map((s) => (
+                  filtered.map((s) => (
                     <tr
                       key={s.id}
                       className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"

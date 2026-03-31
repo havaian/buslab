@@ -41,7 +41,7 @@ export default function PanelLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar — hidden for citizen, hidden on mobile for all */}
+      {/* Desktop sidebar */}
       <Sidebar
         role={user.role}
         firstName={user.firstName}
@@ -51,11 +51,10 @@ export default function PanelLayout({
 
       <div className="flex flex-1 flex-col min-w-0">
         {/*
-          ── Mini App header (admin + student) ────────────────────────────────
-          Логотип + название по центру.
-          padding-top компенсирует нативный Telegram overlay (кнопка закрытия,
-          бургер) в fullscreen-режиме через --tg-content-safe-area-inset-top.
-          В non-fullscreen режиме переменная = 0, показывается обычная полоска.
+          Mini App header — admin + student only.
+          Логотип по центру. padding-top = высота нативного Telegram overlay
+          (кнопка закрытия, бургер) в fullscreen-режиме.
+          В non-fullscreen режиме --tg-content-safe-area-inset-top = 0.
         */}
         {isMiniApp && !isCitizen && (
           <div
@@ -72,10 +71,7 @@ export default function PanelLayout({
           </div>
         )}
 
-        {/*
-          ── Regular mobile top bar (NOT Mini App) ─────────────────────────────
-          Логотип слева — стандартный хедер для обычного браузера на мобильном.
-        */}
+        {/* Обычный браузер — admin + student */}
         {!isCitizen && !isMiniApp && (
           <div
             className="flex shrink-0 items-center gap-3 border-b px-4 lg:hidden"
@@ -91,7 +87,12 @@ export default function PanelLayout({
           </div>
         )}
 
-        {/* Main content */}
+        {/*
+          Основной контент.
+          padding-bottom: 4rem (высота BottomNav) + env(safe-area-inset-bottom)
+          (высота нативных кнопок телефона — домой, назад, последние приложения).
+          На десктопе pb=0.
+        */}
         <div
           className="flex-1 overflow-y-auto lg:pb-0"
           style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}
@@ -100,7 +101,6 @@ export default function PanelLayout({
         </div>
       </div>
 
-      {/* Mobile bottom nav — all roles */}
       <BottomNav role={user.role} />
     </div>
   );
