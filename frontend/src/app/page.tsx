@@ -1,6 +1,6 @@
 "use client";
 
-// Корень приложения — auth-context сам обрабатывает редирект
+// Корень приложения - auth-context сам обрабатывает редирект
 // (убрали server-side redirect("/login") который вызывал 404 flash в Mini App)
 export default function RootPage() {
   return (

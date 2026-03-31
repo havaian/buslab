@@ -19,7 +19,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// "/" исключён — root page.tsx показывает spinner, auth-context сам редиректит
+// "/" исключён - root page.tsx показывает spinner, auth-context сам редиректит
 const isPanelAuthExcluded = (pathname: string) =>
   pathname === "/login" ||
   pathname === "/privacy" ||
@@ -50,7 +50,7 @@ function loadTelegramWebAppSdk(): Promise<void> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<PanelUser | null>(null);
   const [loading, setLoading] = useState(true);
-  // Цель редиректа после auth — навигация происходит в отдельном useEffect
+  // Цель редиректа после auth - навигация происходит в отдельном useEffect
   // ПОСЛЕ того как React закоммитил обновления user + loading.
   // Это исключает race condition когда panel layout монтируется с user=null.
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
@@ -127,13 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             target = redirectByRole(data.user.role);
           }
 
-          // Сначала выставляем state — React закоммитит их в одном render.
+          // Сначала выставляем state - React закоммитит их в одном render.
           // Только ПОСЛЕ этого (в фазе 2) произойдёт router.push.
           setUser(data.user);
           setLoading(false);
           if (target) setPendingRedirect(target);
         } catch {
-          // initData auth failed — fallback на stored token
+          // initData auth failed - fallback на stored token
           const token = localStorage.getItem("token");
           if (!token) {
             setLoading(false);
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Обычный браузер — проверяем stored token
+      // Обычный браузер - проверяем stored token
       const token = localStorage.getItem("token");
       if (!token) {
         setLoading(false);

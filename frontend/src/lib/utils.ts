@@ -66,9 +66,9 @@ export function getTimerColor(ms: number): string {
 }
 
 export function getCategoryName(categoryId: unknown): string {
-  if (!categoryId) return "—";
+  if (!categoryId) return "-";
   if (typeof categoryId === "object" && categoryId !== null) {
-    return (categoryId as { name: string }).name || "—";
+    return (categoryId as { name: string }).name || "-";
   }
   return String(categoryId);
 }
@@ -79,7 +79,7 @@ export function getUserDisplayName(
     | null
     | undefined
 ): string {
-  if (!user) return "—";
+  if (!user) return "-";
   const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
-  return name || user.username || "—";
+  return name || user.username || "-";
 }

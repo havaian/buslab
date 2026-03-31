@@ -58,7 +58,7 @@ export default function UserProfilePage() {
               </div>
               <div className="min-w-0">
                 <p className="font-semibold text-sm truncate">
-                  {displayName || "—"}
+                  {displayName || "-"}
                 </p>
                 {user?.username && (
                   <p className="text-xs text-muted-foreground truncate">

@@ -3,7 +3,7 @@ import { Document, Types } from "mongoose";
 
 export type UserDocument = User & Document;
 
-// Single collection for all roles — matches existing bot's User model
+// Single collection for all roles - matches existing bot's User model
 @Schema({ timestamps: true, collection: "users" })
 export class User {
   @Prop({ required: true, unique: true, type: Number })
@@ -33,7 +33,7 @@ export class User {
   @Prop({ type: Types.ObjectId, ref: "Request", default: null })
   currentAssignmentId: Types.ObjectId | null;
 
-  // Source tracking — last seen source
+  // Source tracking - last seen source
   @Prop({ enum: ["miniapp", "panel", "bot"], default: null })
   lastSeenSource: string | null;
 

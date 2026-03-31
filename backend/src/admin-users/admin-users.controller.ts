@@ -21,7 +21,7 @@ export class AdminUsersController {
 
   // ── Student self-access ───────────────────────────────────────────────────
 
-  /** Students call this to get their own stats — no admin role required. */
+  /** Students call this to get their own stats - no admin role required. */
   @Roles(UserRole.STUDENT)
   @Get("my-stats")
   getMyStats(@CurrentUser() user: any) {

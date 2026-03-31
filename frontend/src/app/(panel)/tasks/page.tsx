@@ -181,7 +181,7 @@ function TasksPageContent() {
               ["Всего ответов", myStats.submitted, "text-blue-600"],
               [
                 "Рейтинг",
-                myStats.rating !== null ? `${myStats.rating}%` : "—",
+                myStats.rating !== null ? `${myStats.rating}%` : "-",
                 "text-primary",
               ],
             ] as [string, string | number, string][]
@@ -216,7 +216,7 @@ function TasksPageContent() {
             </Card>
           )}
 
-          {/* Active: assigned — work in progress */}
+          {/* Active: assigned - work in progress */}
           {activeRequest?.status === "assigned" && (
             <>
               <Card>
@@ -356,7 +356,7 @@ function TasksPageContent() {
             </>
           )}
 
-          {/* Active: answered — read-only, waiting for review */}
+          {/* Active: answered - read-only, waiting for review */}
           {activeRequest?.status === "answered" && (
             <>
               <Card>
@@ -383,7 +383,7 @@ function TasksPageContent() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <CheckCircle size={14} className="text-orange-500" />
-                    Ответ отправлен — ожидает проверки
+                    Ответ отправлен - ожидает проверки
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

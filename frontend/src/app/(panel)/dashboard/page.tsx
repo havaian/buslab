@@ -30,7 +30,7 @@ const PIE_COLORS = [
   "#06b6d4",
 ];
 
-// Исправленные ключи — совпадают с реальными статусами в БД
+// Исправленные ключи - совпадают с реальными статусами в БД
 const STATUS_RU: Record<string, string> = {
   pending: "Ожидает",
   approved: "Одобрено",
@@ -133,12 +133,12 @@ function DashboardContent() {
   // Вспомогательная: сегодняшняя дата в ISO для фильтров
   const now = new Date();
   const todayISO = now.toISOString().slice(0, 10);
-  // dateTo должен быть следующим днём — бэк делает $lte new Date(dateTo),
+  // dateTo должен быть следующим днём - бэк делает $lte new Date(dateTo),
   // т.е. new Date("2025-03-31") = midnight, не захватывает сегодняшние записи
   const tomorrowISO = new Date(now.getTime() + 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
-  // startOfWeek — совпадает с тем как считает getDashboard на бэке
+  // startOfWeek - совпадает с тем как считает getDashboard на бэке
   const startOfWeek = new Date(now);
   startOfWeek.setDate(now.getDate() - now.getDay());
   startOfWeek.setHours(0, 0, 0, 0);
@@ -413,7 +413,7 @@ function DashboardContent() {
                         {s.approvalRate}%
                       </td>
                       <td className="px-4 py-2.5 text-right text-muted-foreground">
-                        {s.avgTime ? `${s.avgTime} мин` : "—"}
+                        {s.avgTime ? `${s.avgTime} мин` : "-"}
                       </td>
                       <td className="px-4 py-2.5">
                         <span

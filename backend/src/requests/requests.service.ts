@@ -645,7 +645,7 @@ export class RequestsService {
     const prev = req.status;
     req.status = "assigned";
     req.adminComment = comment;
-    // Сбрасываем таймер — выдаём новый срок с момента возврата в работу
+    // Сбрасываем таймер - выдаём новый срок с момента возврата в работу
     req.assignedAt = new Date();
     req.timerDeadline = new Date(Date.now() + TIMER_DURATION_MS);
     req.timerWarningSent = false;
@@ -921,7 +921,7 @@ export class RequestsService {
     const prev = req.status;
     req.status = "answered";
     req.answerText = answer;
-    // Аннулируем таймер — ответ уже отправлен, уведомления о просрочке не нужны
+    // Аннулируем таймер - ответ уже отправлен, уведомления о просрочке не нужны
     req.timerDeadline = null;
     req.timerWarningSent = true;
     req.timerHalfWarningSent = true;

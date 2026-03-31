@@ -19,9 +19,9 @@ const REJECTION_LOCALES: { key: LocaleKey; label: string }[] = [
 ];
 
 const LOCALE_TABS: { key: LocaleKey; label: string }[] = [
-  { key: "ru", label: "RU — Русский" },
-  { key: "uz", label: "UZ — O'zbek" },
-  { key: "en", label: "EN — English" },
+  { key: "ru", label: "RU - Русский" },
+  { key: "uz", label: "UZ - O'zbek" },
+  { key: "en", label: "EN - English" },
 ];
 
 const DOC_LOCALES: { key: LocaleKey; label: string }[] = [
@@ -224,7 +224,7 @@ function DocumentsTab() {
         </CardHeader>
         <CardContent className="px-4 pb-4 pt-2 space-y-1">
           <p className="text-xs text-muted-foreground mb-4">
-            Один PDF-файл на каждый язык. Содержит оба документа — политику
+            Один PDF-файл на каждый язык. Содержит оба документа - политику
             конфиденциальности и условия использования. Отображается на странице{" "}
             <a
               href="/privacy"
@@ -327,7 +327,7 @@ export default function SettingsPage() {
 
   return (
     <PageShell title="Настройки">
-      {/* Main tabs — horizontally scrollable on narrow screens */}
+      {/* Main tabs - horizontally scrollable on narrow screens */}
       <div className="overflow-x-auto mb-5">
         <div className="flex gap-1 border-b min-w-max">
           {MAIN_TABS.map(({ key, label }) => (

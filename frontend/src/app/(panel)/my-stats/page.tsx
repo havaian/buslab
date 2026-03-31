@@ -154,7 +154,7 @@ export default function MyStatsPage() {
                 ["Отклонено", stats.rejected, XCircle, "text-red-500"],
                 [
                   "Среднее время",
-                  stats.avgTime ? `${stats.avgTime} мин` : "—",
+                  stats.avgTime ? `${stats.avgTime} мин` : "-",
                   Clock,
                   "text-orange-500",
                 ],
@@ -191,7 +191,7 @@ export default function MyStatsPage() {
                     onChange={(e) => handleUniChange(e.target.value)}
                     className="w-full appearance-none rounded-lg border bg-background px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="">— не указан —</option>
+                    <option value="">- не указан -</option>
                     {unis.map((u) => (
                       <option key={u._id} value={u._id}>
                         {u.names.ru}
@@ -205,7 +205,7 @@ export default function MyStatsPage() {
                 </div>
               </div>
 
-              {/* Faculty — only if selected university has faculties */}
+              {/* Faculty - only if selected university has faculties */}
               {faculties.length > 0 && (
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">
@@ -217,7 +217,7 @@ export default function MyStatsPage() {
                       onChange={(e) => setFaculty(e.target.value)}
                       className="w-full appearance-none rounded-lg border bg-background px-3 py-2 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="">— не указан —</option>
+                      <option value="">- не указан -</option>
                       {faculties.map((f) => (
                         <option key={f._id} value={f._id}>
                           {f.names.ru}

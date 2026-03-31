@@ -5,7 +5,7 @@ export type FaqDocument = Faq & Document;
 
 @Schema({ timestamps: true, collection: "faqs" })
 export class Faq {
-  // Legacy fields — kept as Russian defaults
+  // Legacy fields - kept as Russian defaults
   @Prop({ required: true })
   question: string;
 
@@ -15,7 +15,7 @@ export class Faq {
   @Prop({ required: true, type: Types.ObjectId, ref: "Category" })
   categoryId: Types.ObjectId;
 
-  // Localized translations — ru falls back to question/answer if empty
+  // Localized translations - ru falls back to question/answer if empty
   @Prop({
     type: {
       ru: { question: String, answer: String },

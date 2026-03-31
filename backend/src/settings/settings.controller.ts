@@ -21,7 +21,7 @@ import { UserRole } from "../common/enums/user-role.enum";
 const ALLOWED_LOCALES = ["ru", "uz", "en"] as const;
 type AllowedLocale = (typeof ALLOWED_LOCALES)[number];
 
-// Path to locale files — works for both src (ts-node) and dist (compiled)
+// Path to locale files - works for both src (ts-node) and dist (compiled)
 // __dirname = .../settings/, locales are at ../bot/i18n/locales/
 const LOCALES_DIR = path.join(__dirname, "..", "bot", "i18n", "locales");
 
@@ -47,7 +47,7 @@ export class SettingsController implements OnModuleInit {
         strict: false,
       });
     } catch {
-      // BotI18nService not available — locale hot-reload will be skipped
+      // BotI18nService not available - locale hot-reload will be skipped
     }
   }
 

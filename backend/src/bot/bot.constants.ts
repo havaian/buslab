@@ -14,16 +14,16 @@ export const CB = {
   FAQ_CAT: "faq_cat", // faq_cat:<categoryId>
   FAQ_ITEM: "faq_item", // faq_item:<faqId>
 
-  // Admin — request moderation
+  // Admin - request moderation
   APPROVE_REQUEST: "approve_request", // approve_request:<requestId>
   DECLINE_REQUEST: "decline_request", // decline_request:<requestId>
 
-  // Admin — answer moderation
+  // Admin - answer moderation
   APPROVE_ANSWER: "approve_answer", // approve_answer:<requestId>
   DECLINE_ANSWER: "decline_answer", // decline_answer:<requestId>
 } as const;
 
-// Regex builders — used in bot.update.ts bot.callbackQuery() calls
+// Regex builders - used in bot.update.ts bot.callbackQuery() calls
 export const CBRegex = {
   ONBOARD_LANG: /^onboard_lang:(.+)$/,
   LANG: /^lang:(.+)$/,

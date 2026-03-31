@@ -25,7 +25,7 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
-      this.logger.warn("TELEGRAM_BOT_TOKEN not set — bot will not start");
+      this.logger.warn("TELEGRAM_BOT_TOKEN not set - bot will not start");
       return;
     }
 
@@ -58,7 +58,7 @@ export class BotService implements OnModuleInit, OnModuleDestroy {
     bot.use(async (ctx, next) => {
       const chatId = ctx.chat?.id?.toString();
 
-      // Force Russian in group chats — no DB lookup needed
+      // Force Russian in group chats - no DB lookup needed
       if (chatId === adminChatId || chatId === studentChatId) {
         ctx.locale = DEFAULT_LOCALE;
         return next();

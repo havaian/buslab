@@ -43,13 +43,13 @@ interface SidebarProps {
 export function Sidebar({ role, firstName, lastName, logout }: SidebarProps) {
   const pathname = usePathname();
 
-  // Citizen role has no sidebar — they use bottom nav only
+  // Citizen role has no sidebar - they use bottom nav only
   if (role === "user") return null;
 
   const nav = role === "admin" ? adminNav : studentNav;
 
   return (
-    // Desktop only — hidden on mobile, bottom nav takes over
+    // Desktop only - hidden on mobile, bottom nav takes over
     <aside className="hidden lg:flex h-screen w-56 shrink-0 flex-col border-r bg-card">
       {/* Logo */}
       <div className="flex h-14 items-center gap-2 border-b px-4">

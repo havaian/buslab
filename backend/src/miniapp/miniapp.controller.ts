@@ -141,7 +141,7 @@ export class MiniappController {
     };
   }
 
-  /** Returns current user info — same as /auth/me but usable from miniapp context. */
+  /** Returns current user info - same as /auth/me but usable from miniapp context. */
   @UseGuards(JwtAuthGuard)
   @Get("me")
   getMe(@CurrentUser() user: any) {

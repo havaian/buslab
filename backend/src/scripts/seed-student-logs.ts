@@ -85,7 +85,7 @@ async function run() {
       });
     }
 
-    // submitted_answer — has answer text and status is answered or closed
+    // submitted_answer - has answer text and status is answered or closed
     if (
       req.answerText &&
       (req.status === "answered" || req.status === "closed")
@@ -107,7 +107,7 @@ async function run() {
       });
     }
 
-    // answer_approved — closed
+    // answer_approved - closed
     if (req.status === "closed") {
       logs.push({
         studentId,
@@ -118,7 +118,7 @@ async function run() {
       });
     }
 
-    // answer_rejected — has adminComment and still assigned (sent back at least once)
+    // answer_rejected - has adminComment and still assigned (sent back at least once)
     if (req.status === "assigned" && req.adminComment) {
       logs.push({
         studentId,

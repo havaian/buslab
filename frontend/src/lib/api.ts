@@ -293,7 +293,7 @@ export interface CitizenUser {
   course?: number | null;
 }
 
-/** Any user from DB (role: user | student | admin) — used in search results */
+/** Any user from DB (role: user | student | admin) - used in search results */
 export interface AnyUser {
   _id: string;
   telegramId: number;

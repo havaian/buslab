@@ -50,7 +50,7 @@ export class AdminUsersService {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Фильтр по статусу активности требует join с requests — делаем в памяти
+    // Фильтр по статусу активности требует join с requests - делаем в памяти
     if (filters?.status) {
       const ids = students.map((s) => s._id);
       const activeRequests = await this.requestModel
@@ -60,7 +60,7 @@ export class AdminUsersService {
       const activeMap = new Map(
         activeRequests.map((r) => [String(r.studentId), r])
       );
-      // "never" — ни разу не брал заявку
+      // "never" - ни разу не брал заявку
       if (filters.status === "never") {
         const everTook = await this.requestModel.distinct("studentId");
         const everSet = new Set(everTook.map(String));
@@ -176,7 +176,7 @@ export class AdminUsersService {
     if (!user) return { success: false, alreadyStudent: false };
 
     if (user.role === "student") {
-      // Already a student — still mark token used so it can't be reused
+      // Already a student - still mark token used so it can't be reused
       invite.usedBy = user._id as any;
       invite.usedAt = new Date();
       await invite.save();

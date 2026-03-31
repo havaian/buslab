@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/layout/sidebar";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { useTgSafeArea } from "@/hooks/use-tg-safe-area";
+
+// Высота BottomNav (h-16 = 4rem = 64px)
+const BOTTOM_NAV_H = 64;
 
 export default function PanelLayout({
   children,
@@ -13,12 +17,9 @@ export default function PanelLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const { top: tgTop, bottom: tgBottom } = useTgSafeArea();
 
-  const [isMiniApp, setIsMiniApp] = useState(false);
-
-  useEffect(() => {
-    setIsMiniApp(!!(window as any).Telegram?.WebApp?.initData);
-  }, []);
+  const isMiniApp = tgTop > 0 || tgBottom > 0;
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -41,7 +42,6 @@ export default function PanelLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Desktop sidebar */}
       <Sidebar
         role={user.role}
         firstName={user.firstName}
@@ -51,19 +51,16 @@ export default function PanelLayout({
 
       <div className="flex flex-1 flex-col min-w-0">
         {/*
-          Mini App header — admin + student only.
-          Логотип по центру. padding-top = высота нативного Telegram overlay
-          (кнопка закрытия, бургер) в fullscreen-режиме.
-          В non-fullscreen режиме --tg-content-safe-area-inset-top = 0.
+          Mini App header.
+          paddingTop = высота Telegram overlay (JS значение из SDK).
+          Логотип по центру.
         */}
-        {isMiniApp && !isCitizen && (
+        {isMiniApp && (
           <div
             className="flex shrink-0 items-center justify-center gap-2 border-b bg-background lg:hidden"
             style={{
-              paddingTop:
-                "var(--tg-content-safe-area-inset-top, env(safe-area-inset-top))",
-              height:
-                "calc(3.5rem + var(--tg-content-safe-area-inset-top, env(safe-area-inset-top)))",
+              paddingTop: tgTop,
+              height: 56 + tgTop,
             }}
           >
             <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
@@ -71,14 +68,11 @@ export default function PanelLayout({
           </div>
         )}
 
-        {/* Обычный браузер — admin + student */}
-        {!isCitizen && !isMiniApp && (
+        {/* Обычный браузер */}
+        {!isMiniApp && (
           <div
             className="flex shrink-0 items-center gap-3 border-b px-4 lg:hidden"
-            style={{
-              paddingTop: "env(safe-area-inset-top)",
-              height: "calc(3.5rem + env(safe-area-inset-top))",
-            }}
+            style={{ height: 56 }}
           >
             <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
             <span className="font-semibold text-sm truncate">
@@ -89,13 +83,12 @@ export default function PanelLayout({
 
         {/*
           Основной контент.
-          padding-bottom: 4rem (высота BottomNav) + env(safe-area-inset-bottom)
-          (высота нативных кнопок телефона — домой, назад, последние приложения).
+          paddingBottom = высота BottomNav + отступ нативных кнопок телефона.
           На десктопе pb=0.
         */}
         <div
           className="flex-1 overflow-y-auto lg:pb-0"
-          style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: BOTTOM_NAV_H + tgBottom }}
         >
           {children}
         </div>

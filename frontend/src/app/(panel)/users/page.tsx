@@ -208,7 +208,7 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">
-                        {u.username ? `@${u.username}` : "—"}
+                        {u.username ? `@${u.username}` : "-"}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell whitespace-nowrap">
                         {u.telegramId}

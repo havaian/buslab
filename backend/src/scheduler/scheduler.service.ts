@@ -29,7 +29,7 @@ export class SchedulerService {
   async checkTimers() {
     const now = new Date();
 
-    // Только assigned — answered/closed уже не нуждаются в таймере
+    // Только assigned - answered/closed уже не нуждаются в таймере
     const activeRequests = await this.requestModel
       .find({ status: "assigned", timerDeadline: { $ne: null } })
       .populate("studentId", "telegramId firstName lastName")

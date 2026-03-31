@@ -257,7 +257,7 @@ function RequestsPageContent() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-muted-foreground text-xs hidden md:table-cell whitespace-nowrap">
@@ -273,7 +273,7 @@ function RequestsPageContent() {
                         {r.status === "assigned" ? (
                           <Timer deadline={r.timerDeadline} />
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap hidden lg:table-cell">
@@ -283,7 +283,7 @@ function RequestsPageContent() {
                         {r.studentId && typeof r.studentId === "object" ? (
                           getUserDisplayName(r.studentId)
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
                     </tr>

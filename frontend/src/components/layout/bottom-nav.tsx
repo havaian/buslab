@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTgSafeArea } from "@/hooks/use-tg-safe-area";
 
 interface NavItem {
   href: string;
@@ -76,6 +77,7 @@ function NavLink({ href, label, icon: Icon }: NavItem) {
 export function BottomNav({ role }: { role: string }) {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const { bottom } = useTgSafeArea();
 
   const moreActive = adminMore.some(
     (item) => pathname === item.href || pathname.startsWith(item.href + "/")
@@ -85,7 +87,7 @@ export function BottomNav({ role }: { role: string }) {
     <>
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background lg:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{ paddingBottom: bottom }}
       >
         <div className="flex h-16 items-stretch">
           {role === "admin" && (
@@ -117,7 +119,6 @@ export function BottomNav({ role }: { role: string }) {
         </div>
       </nav>
 
-      {/* Bottom sheet for admin "More" */}
       {sheetOpen && (
         <>
           <div
@@ -126,7 +127,7 @@ export function BottomNav({ role }: { role: string }) {
           />
           <div
             className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl border-t bg-background lg:hidden"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            style={{ paddingBottom: bottom }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <span className="text-sm font-semibold">Ещё</span>

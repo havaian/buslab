@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTgSafeArea } from "@/hooks/use-tg-safe-area";
 
 interface MobileHeaderProps {
   title: string;
@@ -19,16 +19,7 @@ export function MobileHeader({
   className,
 }: MobileHeaderProps) {
   const router = useRouter();
-
-  // В Mini App fullscreen-режиме Telegram native overlay (кнопка закрытия, бургер)
-  // перекрывает верхнюю часть webview.
-  // --tg-content-safe-area-inset-top (Bot API 7.10+) = высота этого overlay.
-  // В non-fullscreen и в обычном браузере = 0 или env(safe-area-inset-top).
-  const [isMiniApp, setIsMiniApp] = useState(false);
-
-  useEffect(() => {
-    setIsMiniApp(!!(window as any).Telegram?.WebApp?.initData);
-  }, []);
+  const { top } = useTgSafeArea();
 
   const handleBack = () => {
     if (typeof back === "string") router.push(back);
@@ -41,14 +32,7 @@ export function MobileHeader({
         "sticky top-0 z-40 flex flex-col border-b bg-background px-3",
         className
       )}
-      style={
-        isMiniApp
-          ? {
-              paddingTop:
-                "var(--tg-content-safe-area-inset-top, env(safe-area-inset-top))",
-            }
-          : undefined
-      }
+      style={{ paddingTop: top }}
     >
       <div className="flex h-12 items-center gap-2">
         {back !== undefined && (

@@ -181,14 +181,14 @@ export default function CategoriesPage() {
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
                         {c.names?.uz || (
                           <span className="text-muted-foreground/40 italic text-xs">
-                            —
+                            -
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
                         {c.names?.en || (
                           <span className="text-muted-foreground/40 italic text-xs">
-                            —
+                            -
                           </span>
                         )}
                       </td>
@@ -277,12 +277,12 @@ export default function CategoriesPage() {
               />
               {activeLang !== "ru" && (
                 <p className="text-xs text-muted-foreground">
-                  Если оставить пустым — будет использоваться русское название
+                  Если оставить пустым - будет использоваться русское название
                 </p>
               )}
             </div>
 
-            {/* Hashtag — always visible */}
+            {/* Hashtag - always visible */}
             <div className="space-y-1.5">
               <Label>
                 Хэштег <span className="text-red-500">*</span>

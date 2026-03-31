@@ -59,7 +59,7 @@ export class RequestsController {
     return this.requestsService.findById(id);
   }
 
-  // ── Miniapp — citizen request history ────────────────────────────────────
+  // ── Miniapp - citizen request history ────────────────────────────────────
 
   @Get("my/history")
   myHistory(@CurrentUser() user: any) {
@@ -236,7 +236,7 @@ export class RequestsController {
     return this.requestsService.sendDirectMessage(id, text);
   }
 
-  // ── Student — static routes BEFORE :id ───────────────────────────────────
+  // ── Student - static routes BEFORE :id ───────────────────────────────────
 
   @UseGuards(RolesGuard)
   @Roles(UserRole.STUDENT)
@@ -279,7 +279,7 @@ export class RequestsController {
     return this.requestsService.declineRequest(id, user.sub);
   }
 
-  // NOTE: must be LAST among GET routes — :id catches everything not matched above
+  // NOTE: must be LAST among GET routes - :id catches everything not matched above
   @Get(":id/history")
   getHistory(@Param("id") id: string) {
     return this.requestsService.getHistory(id);

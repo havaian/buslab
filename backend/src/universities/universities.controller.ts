@@ -19,11 +19,11 @@ import { UserRole } from "../common/enums/user-role.enum";
 export class UniversitiesController {
   constructor(private readonly universitiesService: UniversitiesService) {}
 
-  // ── Public — used by bot and frontend dropdowns ───────────────────────────
+  // ── Public - used by bot and frontend dropdowns ───────────────────────────
 
   @Get()
   findAll(@Query("admin") admin?: string): Promise<any[]> {
-    // Pass admin=1 to get inactive too — but only admins would know to do this
+    // Pass admin=1 to get inactive too - but only admins would know to do this
     return this.universitiesService.findAll(admin !== "1");
   }
 

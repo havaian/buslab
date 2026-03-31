@@ -48,7 +48,7 @@ export class BotUpdate {
 
   // ── Registration ────────────────────────────────────────────────────────
 
-  /** Called by BotService.onModuleInit() — registers all handlers on the bot instance. */
+  /** Called by BotService.onModuleInit() - registers all handlers on the bot instance. */
   register(bot: Bot<BotContext>): void {
     // Commands
     bot.command("start", (ctx) => this.handleStart(ctx));
@@ -191,7 +191,7 @@ export class BotUpdate {
     await ctx.reply(this.t(ctx, "onboarding.offer_text"), {
       parse_mode: "Markdown",
       reply_markup: offerKb,
-      // @ts-ignore — Grammy passes through API fields
+      // @ts-ignore - Grammy passes through API fields
       disable_web_page_preview: true,
     });
   }
@@ -238,7 +238,7 @@ export class BotUpdate {
       .lean();
 
     if (!unis.length) {
-      // No universities configured — skip straight to main menu
+      // No universities configured - skip straight to main menu
       await this.finishOnboarding(ctx);
       return;
     }
@@ -289,7 +289,7 @@ export class BotUpdate {
       };
       await ctx.reply(prompts[locale], { reply_markup: kb });
     } else {
-      // No faculties — ask for course
+      // No faculties - ask for course
       await this.sendCourseSelect(ctx, uniId);
     }
   }
@@ -529,7 +529,7 @@ export class BotUpdate {
 
     // ── Private chat ─────────────────────────────────────────────────────
 
-    // Offer guard — all non-command messages require accepted offer
+    // Offer guard - all non-command messages require accepted offer
     if (!text.startsWith("/")) {
       const dbUser = await this.userModel
         .findOne({ telegramId: ctx.from.id })
@@ -726,10 +726,10 @@ export class BotUpdate {
     for (let i = 0; i < requests.length; i++) {
       const req = requests[i] as any;
       const date = new Date(req.createdAt).toLocaleDateString("ru-RU");
-      const cat = req.categoryId?.name ?? "—";
+      const cat = req.categoryId?.name ?? "-";
       const status = this.t(ctx, `statuses.${req.status}`);
 
-      message += `${i + 1}. ${cat} — ${status}\n`;
+      message += `${i + 1}. ${cat} - ${status}\n`;
       message += `   ${this.t(ctx, "lists.request_date")} ${date}\n`;
 
       if (req.status === "closed" && req.finalAnswerText) {

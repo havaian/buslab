@@ -72,7 +72,7 @@ function StudentsContent() {
       result = result.filter((s) => s.currentStatus === status);
     }
 
-    // university/faculty/course — поля могут быть не в StudentSummary,
+    // university/faculty/course - поля могут быть не в StudentSummary,
     // пропускаем если не заполнены (они есть только в полном User объекте)
     // Оставляем для будущего расширения бэкенда
 
@@ -201,7 +201,7 @@ function StudentsContent() {
                         {s.approvalRate}%
                       </td>
                       <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">
-                        {s.avgTime ? `${s.avgTime} мин` : "—"}
+                        {s.avgTime ? `${s.avgTime} мин` : "-"}
                       </td>
                       <td className="px-4 py-2.5">
                         <span

@@ -80,7 +80,7 @@ export default function RequestDetailPage() {
       requestsApi.findById(id),
       requestsApi.getHistory(id),
     ];
-    // freeStudents — только для admin, студентам недоступен (403)
+    // freeStudents - только для admin, студентам недоступен (403)
     if (isAdmin) {
       fetches.push(adminUsersApi.freeStudents());
     }
@@ -218,7 +218,7 @@ export default function RequestDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Answer card — shown when answered or closed */}
+          {/* Answer card - shown when answered or closed */}
           {(request.status === "answered" || request.status === "closed") && (
             <Card>
               <CardHeader className="pb-1 pt-3 px-4">
@@ -613,7 +613,7 @@ export default function RequestDetailPage() {
                   </>
                 )}
 
-                {/* answered — approve or send back for revision */}
+                {/* answered - approve or send back for revision */}
                 {request.status === "answered" && (
                   <>
                     <Button
@@ -660,7 +660,7 @@ export default function RequestDetailPage() {
                   </>
                 )}
 
-                {/* closed / declined — reopen */}
+                {/* closed / declined - reopen */}
                 {(request.status === "closed" ||
                   request.status === "declined") && (
                   <Button

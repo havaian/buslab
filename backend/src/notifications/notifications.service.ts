@@ -106,7 +106,7 @@ export class NotificationsService implements OnModuleInit {
         }),
       });
     } catch (e) {
-      // Editing can fail if the message is too old or already deleted — non-fatal
+      // Editing can fail if the message is too old or already deleted - non-fatal
       this.logger.warn(
         `Failed to edit message ${messageId} in ${chatId}: ${e.message}`
       );

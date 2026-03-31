@@ -13,7 +13,7 @@ export function Timer({ deadline }: { deadline: string | null }) {
   }, [deadline]);
 
   if (!deadline)
-    return <span className="text-muted-foreground text-sm">—</span>;
+    return <span className="text-muted-foreground text-sm">-</span>;
 
   return (
     <span className={`font-mono text-sm font-semibold ${getTimerColor(ms)}`}>

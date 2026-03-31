@@ -200,7 +200,7 @@ export default function TaskDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Take button — available request not yet taken */}
+        {/* Take button - available request not yet taken */}
         {canTake && (
           <Button className="w-full" onClick={handleTake} disabled={busy}>
             <CheckCircle size={15} />
@@ -208,7 +208,7 @@ export default function TaskDetailPage() {
           </Button>
         )}
 
-        {/* Answer form — student's active request */}
+        {/* Answer form - student's active request */}
         {canAnswer && (
           <Card>
             <CardHeader className="pb-1 pt-3 px-4">
@@ -292,7 +292,7 @@ export default function TaskDetailPage() {
           </Button>
         )}
 
-        {/* Submitted answer — answered / closed state */}
+        {/* Submitted answer - answered / closed state */}
         {isMyRequest &&
           (request.status === "answered" || request.status === "closed") && (
             <Card>

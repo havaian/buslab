@@ -209,7 +209,7 @@ export default function StudentDetailPage() {
                 [
                   Clock,
                   "text-amber-500",
-                  stats.avgTime ? `${stats.avgTime} мин` : "—",
+                  stats.avgTime ? `${stats.avgTime} мин` : "-",
                   "Ср. время ответа",
                 ],
                 [AlertTriangle, "text-red-500", stats.expired, "Просрочек"],
