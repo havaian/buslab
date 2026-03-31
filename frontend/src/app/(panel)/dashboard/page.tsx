@@ -109,12 +109,13 @@ function DashboardContent() {
       router.push("/tasks");
       return;
     }
-    Promise.all([statsApi.dashboard(), statsApi.students()])
-      .then(([d, s]) => {
-        setStats(d);
-        setStudents(s);
-      })
+    // Грузим дашборд сразу
+    statsApi
+      .dashboard()
+      .then(setStats)
       .finally(() => setLoading(false));
+    // Студентов грузим отдельно — не блокируем рендер
+    statsApi.students().then(setStudents);
   }, [user, router]);
 
   if (loading || !stats) {

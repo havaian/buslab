@@ -100,9 +100,11 @@ export class Request {
 }
 
 export const RequestSchema = SchemaFactory.createForClass(Request);
-
 RequestSchema.index({ status: 1 });
 RequestSchema.index({ userId: 1 });
 RequestSchema.index({ studentId: 1 });
 RequestSchema.index({ categoryId: 1 });
+RequestSchema.index({ createdAt: -1 });
+RequestSchema.index({ status: 1 });
+RequestSchema.index({ studentId: 1, status: 1 });
 RequestSchema.index({ createdAt: -1 });

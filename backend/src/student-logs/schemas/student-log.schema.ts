@@ -28,3 +28,4 @@ export const StudentLogSchema = SchemaFactory.createForClass(StudentLog);
 StudentLogSchema.index({ studentId: 1 });
 StudentLogSchema.index({ requestId: 1 });
 StudentLogSchema.index({ createdAt: -1 });
+StudentLogSchema.index({ studentId: 1, action: 1 });

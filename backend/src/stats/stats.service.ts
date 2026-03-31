@@ -150,65 +150,109 @@ export class StatsService {
   }
 
   async getStudentsSummary() {
-    const students = await this.userModel.find({ role: "student" }).lean();
+    const students = await this.userModel
+      .find({ role: "student" })
+      .select("_id firstName lastName username university faculty course")
+      .lean();
 
-    const summary = await Promise.all(
-      students.map(async (s) => {
-        const sid = new Types.ObjectId(String(s._id));
-        const logs = await this.studentLogModel.find({ studentId: sid }).lean();
+    const ids = students.map((s) => s._id);
 
-        const submitted = logs.filter(
-          (l) => l.action === "submitted_answer"
-        ).length;
-        const approved = logs.filter(
-          (l) => l.action === "answer_approved"
-        ).length;
-        const rejected = logs.filter(
-          (l) => l.action === "answer_rejected"
-        ).length;
-        const expired = logs.filter((l) => l.action === "timer_expired").length;
+    // Один агрегат на все логи всех студентов
+    const logStats = await this.studentLogModel.aggregate([
+      { $match: { studentId: { $in: ids } } },
+      {
+        $group: {
+          _id: "$studentId",
+          submitted: {
+            $sum: { $cond: [{ $eq: ["$action", "submitted_answer"] }, 1, 0] },
+          },
+          approved: {
+            $sum: { $cond: [{ $eq: ["$action", "answer_approved"] }, 1, 0] },
+          },
+          rejected: {
+            $sum: { $cond: [{ $eq: ["$action", "answer_rejected"] }, 1, 0] },
+          },
+          expired: {
+            $sum: { $cond: [{ $eq: ["$action", "timer_expired"] }, 1, 0] },
+          },
+          // avgTime — считаем сумму и количество, делим потом
+          timeSum: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$action", "submitted_answer"] },
+                    { $gt: ["$timeSpentMinutes", 0] },
+                  ],
+                },
+                "$timeSpentMinutes",
+                0,
+              ],
+            },
+          },
+          timeCount: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$action", "submitted_answer"] },
+                    { $gt: ["$timeSpentMinutes", 0] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
 
-        const timeLogs = logs.filter(
-          (l) => l.action === "submitted_answer" && l.timeSpentMinutes
-        );
-        const avgTime =
-          timeLogs.length > 0
-            ? Math.round(
-                timeLogs.reduce((a, b) => a + (b.timeSpentMinutes || 0), 0) /
-                  timeLogs.length
-              )
-            : 0;
+    // Один запрос на все активные назначения
+    const activeRequests = await this.requestModel
+      .find({ status: "assigned", studentId: { $in: ids } })
+      .select("studentId timerDeadline")
+      .lean();
 
-        const approvalRate =
-          submitted > 0 ? Math.round((approved / submitted) * 100) : 0;
-
-        const active = await this.requestModel.findOne({
-          studentId: sid,
-          status: "assigned",
-        });
-        const overdue =
-          active && active.timerDeadline && active.timerDeadline < new Date();
-        const currentStatus = !active ? "free" : overdue ? "overdue" : "busy";
-
-        return {
-          id: String(s._id),
-          firstName: s.firstName,
-          lastName: s.lastName,
-          username: s.username,
-          university: s.university ?? null,
-          faculty: s.faculty ?? null,
-          course: s.course ?? null,
-          submitted,
-          approved,
-          rejected,
-          approvalRate,
-          avgTime,
-          expired,
-          currentStatus,
-        };
-      })
+    // Строим Maps
+    const logMap = new Map(logStats.map((l: any) => [String(l._id), l]));
+    const activeMap = new Map(
+      activeRequests.map((r) => [String(r.studentId), r])
     );
 
-    return summary;
+    return students.map((s) => {
+      const sid = String(s._id);
+      const l = logMap.get(sid);
+      const submitted = l?.submitted ?? 0;
+      const approved = l?.approved ?? 0;
+      const rejected = l?.rejected ?? 0;
+      const expired = l?.expired ?? 0;
+      const avgTime =
+        l?.timeCount > 0 ? Math.round(l.timeSum / l.timeCount) : 0;
+      const approvalRate =
+        submitted > 0 ? Math.round((approved / submitted) * 100) : 0;
+
+      const active = activeMap.get(sid);
+      const overdue =
+        active?.timerDeadline && active.timerDeadline < new Date();
+      const currentStatus = !active ? "free" : overdue ? "overdue" : "busy";
+
+      return {
+        id: sid,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        username: s.username,
+        university: (s as any).university ?? null,
+        faculty: (s as any).faculty ?? null,
+        course: (s as any).course ?? null,
+        submitted,
+        approved,
+        rejected,
+        approvalRate,
+        avgTime,
+        expired,
+        currentStatus,
+      };
+    });
   }
 }

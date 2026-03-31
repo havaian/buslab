@@ -79,5 +79,4 @@ export class RequestHistory {
 
 export const RequestHistorySchema =
   SchemaFactory.createForClass(RequestHistory);
-
 RequestHistorySchema.index({ requestId: 1, createdAt: 1 });
