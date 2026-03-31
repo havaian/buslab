@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { requestsApi, type Request } from "@/lib/api";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { formatDate, getCategoryName } from "@/lib/utils";
 
 export default function HistoryPage() {
+  const router = useRouter();
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -44,71 +46,64 @@ export default function HistoryPage() {
               >
                 <span className="text-muted-foreground shrink-0">
                   {expanded.has(r._id) ? (
-                    <ChevronDown size={14} />
+                    <ChevronDown size={16} />
                   ) : (
-                    <ChevronRight size={14} />
+                    <ChevronRight size={16} />
                   )}
                 </span>
+                <span className="font-mono text-xs text-muted-foreground shrink-0">
+                  #{r._id.slice(-6)}
+                </span>
                 <StatusBadge status={r.status} />
-                <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap">
+                <span className="flex-1 truncate text-sm">
                   {getCategoryName(r.categoryId)}
                 </span>
-                <span className="flex-1 text-sm truncate">{r.text}</span>
                 <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 hidden sm:inline">
                   {formatDate(r.createdAt)}
                 </span>
+                {/* Открыть страницу обращения */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/requests/${r._id}`);
+                  }}
+                  className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
+                  title="Открыть обращение"
+                >
+                  <ExternalLink size={14} />
+                </button>
               </div>
 
               {expanded.has(r._id) && (
-                <CardContent className="pt-0 pb-4 space-y-4 border-t">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1 mt-3">
-                      Вопрос
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {r.text}
-                    </p>
-                  </div>
-
+                <CardContent className="pt-0 pb-3 px-4 border-t">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed mt-3">
+                    {r.text}
+                  </p>
                   {r.answerText && (
-                    <div>
+                    <div className="mt-3 border-l-2 border-green-500 pl-3">
                       <p className="text-xs font-medium text-muted-foreground mb-1">
-                        Мой ответ
+                        Ответ
                       </p>
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                        {r.answerText}
+                        {r.finalAnswerText || r.answerText}
                       </p>
                     </div>
                   )}
-
-                  {r.status === "closed" &&
-                    r.finalAnswerText &&
-                    r.finalAnswerText !== r.answerText && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">
-                          Финальный ответ (отредактирован администратором)
-                        </p>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground">
-                          {r.finalAnswerText}
-                        </p>
-                      </div>
-                    )}
-
                   {r.adminComment && (
-                    <div className="rounded-md bg-orange-50 border border-orange-200 p-3 text-xs text-orange-800">
-                      <span className="font-medium">
-                        Комментарий администратора:{" "}
-                      </span>
-                      {r.adminComment}
+                    <div className="mt-2 border-l-2 border-yellow-500 pl-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">
+                        Комментарий администратора
+                      </p>
+                      <p className="text-sm">{r.adminComment}</p>
                     </div>
                   )}
-
-                  {r.status === "declined" && r.declineReason && (
-                    <div className="rounded-md bg-red-50 border border-red-200 p-3 text-xs text-red-800">
-                      <span className="font-medium">Причина отклонения: </span>
-                      {r.declineReason}
-                    </div>
-                  )}
+                  <button
+                    onClick={() => router.push(`/requests/${r._id}`)}
+                    className="mt-3 text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    <ExternalLink size={12} />
+                    Открыть полную страницу обращения
+                  </button>
                 </CardContent>
               )}
             </Card>

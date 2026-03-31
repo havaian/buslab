@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Param,
+  Delete,
   Body,
   Query,
   UseGuards,
@@ -91,19 +92,26 @@ export class RequestsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.USER)   // нужно добавить USER в UserRole enum
+  @Roles(UserRole.USER) // нужно добавить USER в UserRole enum
   @Post()
-  @UseInterceptors(FilesInterceptor("files", 5, {
-    storage: uploadStorage,
-    limits: { fileSize: 10 * 1024 * 1024 },
-  }))
+  @UseInterceptors(
+    FilesInterceptor("files", 5, {
+      storage: uploadStorage,
+      limits: { fileSize: 10 * 1024 * 1024 },
+    })
+  )
   submitRequest(
     @CurrentUser() user: any,
     @Body("categoryId") categoryId: string,
     @Body("text") text: string,
     @UploadedFiles() files?: Express.Multer.File[]
   ) {
-    return this.requestsService.submitRequest(user.sub, categoryId, text, files);
+    return this.requestsService.submitRequest(
+      user.sub,
+      categoryId,
+      text,
+      files
+    );
   }
 
   @UseGuards(RolesGuard)
@@ -176,6 +184,49 @@ export class RequestsController {
     @CurrentUser() admin: any
   ) {
     return this.requestsService.rejectAnswer(id, comment, admin.sub);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Patch(":id/save-answer")
+  saveAnswerDraft(
+    @Param("id") id: string,
+    @Body("answerText") answerText: string,
+    @Body("adminComment") adminComment: string | undefined,
+    @CurrentUser() admin: any
+  ) {
+    return this.requestsService.saveAnswerDraft(
+      id,
+      answerText,
+      adminComment,
+      admin.sub
+    );
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Post(":id/answer-files")
+  @UseInterceptors(FilesInterceptor("files", 5, answerUploadOptions))
+  addAnswerFiles(
+    @Param("id") id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() admin: any
+  ) {
+    // Upload all files sequentially and return final request state
+    return Promise.all(
+      files.map((f) => this.requestsService.addAnswerFile(id, f, admin.sub))
+    ).then(() => this.requestsService.findById(id));
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @Delete(":id/answer-files/:filename")
+  removeAnswerFile(
+    @Param("id") id: string,
+    @Param("filename") filename: string,
+    @CurrentUser() admin: any
+  ) {
+    return this.requestsService.removeAnswerFile(id, filename, admin.sub);
   }
 
   @UseGuards(RolesGuard)

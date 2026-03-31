@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   User,
   ShieldCheck,
+  Upload,
+  Trash2,
 } from "lucide-react";
 import {
   requestsApi,
@@ -40,6 +42,7 @@ import { FileList } from "@/components/shared/file-list";
 import { useToast } from "@/components/ui/toast-provider";
 import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDate, getCategoryName, getUserDisplayName } from "@/lib/utils";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function RequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +50,8 @@ export default function RequestDetailPage() {
   const { toast } = useToast();
   const dialog = useDialog();
 
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [request, setRequest] = useState<Request | null>(null);
   const [history, setHistory] = useState<RequestHistoryEntry[]>([]);
   const [freeStudents, setFreeStudents] = useState<PanelUser[]>([]);
@@ -55,6 +60,9 @@ export default function RequestDetailPage() {
 
   const [finalAnswer, setFinalAnswer] = useState("");
   const [assignStudentId, setAssignStudentId] = useState("");
+
+  const [saving, setSaving] = useState(false);
+  const answerFileInputRef = useRef<HTMLInputElement>(null);
 
   const reload = async () => {
     const [r, h] = await Promise.all([
@@ -86,6 +94,55 @@ export default function RequestDetailPage() {
     try {
       await fn();
       toast(successMsg, "success");
+      await reload();
+    } catch (e: unknown) {
+      toast((e as Error).message || "Ошибка", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    try {
+      await requestsApi.saveAnswerDraft(
+        id,
+        finalAnswer,
+        request?.adminComment ?? undefined
+      );
+      toast("Сохранено", "success");
+      await reload();
+    } catch (e: unknown) {
+      toast((e as Error).message || "Ошибка", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddAnswerFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    try {
+      await requestsApi.addAnswerFiles(id, files);
+      toast("Файлы загружены", "success");
+      await reload();
+    } catch (e: unknown) {
+      toast((e as Error).message || "Ошибка", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveAnswerFile = async (filename: string) => {
+    const ok = await dialog.confirm("Удалить файл?", {
+      variant: "destructive",
+      confirmLabel: "Удалить",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await requestsApi.removeAnswerFile(id, filename);
+      toast("Файл удалён", "success");
       await reload();
     } catch (e: unknown) {
       toast((e as Error).message || "Ошибка", "error");
@@ -158,7 +215,7 @@ export default function RequestDetailPage() {
               </CardHeader>
               <CardContent className="px-4 pb-3 pt-1 space-y-3">
                 {/* Editable textarea for admin to tweak before approving */}
-                {request.status === "answered" ? (
+                {request.status === "answered" && isAdmin ? (
                   <>
                     <Textarea
                       value={finalAnswer}
@@ -166,13 +223,66 @@ export default function RequestDetailPage() {
                       rows={8}
                       className="text-sm"
                     />
-                    {/* Files attached by student */}
-                    <FileList files={request.answerFiles} />
+
+                    {/* Файлы ответа с возможностью удаления */}
+                    {request.answerFiles.length > 0 && (
+                      <div className="space-y-1">
+                        {request.answerFiles.map((f) => (
+                          <div
+                            key={f.filename}
+                            className="flex items-center gap-2 text-xs"
+                          >
+                            <span className="flex-1 truncate text-muted-foreground">
+                              {f.originalName}
+                            </span>
+                            <button
+                              onClick={() => handleRemoveAnswerFile(f.filename)}
+                              disabled={busy}
+                              className="text-destructive hover:text-destructive/80 shrink-0"
+                              title="Удалить файл"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {request.adminComment && (
                       <p className="text-xs text-muted-foreground border-l-2 pl-3">
                         Комментарий: {request.adminComment}
                       </p>
                     )}
+
+                    {/* Скрытый file input */}
+                    <input
+                      ref={answerFileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx"
+                      className="hidden"
+                      onChange={(e) => handleAddAnswerFiles(e.target.files)}
+                    />
+
+                    {/* Кнопки: сохранить черновик + загрузить файлы */}
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={saving || busy}
+                        onClick={handleSaveDraft}
+                      >
+                        {saving ? "Сохранение..." : "Сохранить"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => answerFileInputRef.current?.click()}
+                      >
+                        <Upload size={13} /> Загрузить файлы
+                      </Button>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -304,243 +414,248 @@ export default function RequestDetailPage() {
           )}
 
           {/* Actions */}
-          <Card>
-            <CardHeader className="pb-1 pt-3 px-4">
-              <CardTitle className="text-sm">Действия</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3 pt-1 space-y-2">
-              {/* pending */}
-              {request.status === "pending" && (
-                <>
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const ok = await dialog.confirm("Одобрить обращение?");
-                      if (ok) run(() => requestsApi.approve(id), "Одобрено");
-                    }}
-                  >
-                    <CheckCheck size={13} /> Одобрить
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const reason = await dialog.prompt(
-                        "Укажите причину отклонения:",
-                        {
-                          title: "Отклонить обращение",
-                          placeholder: "Причина...",
-                          confirmLabel: "Отклонить",
-                        }
-                      );
-                      if (!reason) return;
-                      run(
-                        () => requestsApi.reject(id, reason),
-                        "Обращение отклонено"
-                      );
-                    }}
-                  >
-                    <XCircle size={13} /> Отклонить
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const ok = await dialog.confirm(
-                        "Отклонить стандартной причиной отказа?",
-                        {
-                          title: "Стандартный отказ",
-                          variant: "destructive",
-                          confirmLabel: "Отклонить",
-                        }
-                      );
-                      if (!ok) return;
-                      run(
-                        () => requestsApi.rejectStandard(id),
-                        "Обращение отклонено"
-                      );
-                    }}
-                  >
-                    <XCircle size={13} /> Стандартный отказ
-                  </Button>
-                </>
-              )}
-
-              {/* approved */}
-              {request.status === "approved" && (
-                <>
-                  <div className="space-y-1.5">
-                    <Select
-                      value={assignStudentId}
-                      onValueChange={setAssignStudentId}
-                    >
-                      <SelectTrigger className="text-xs h-8">
-                        <SelectValue placeholder="Выбрать студента..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {freeStudents.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {getUserDisplayName(s)}
-                            {s.username ? ` (@${s.username})` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+          {isAdmin && (
+            <Card>
+              <CardHeader className="pb-1 pt-3 px-4">
+                <CardTitle className="text-sm">Действия</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3 pt-1 space-y-2">
+                {/* pending */}
+                {request.status === "pending" && (
+                  <>
                     <Button
                       size="sm"
                       className="w-full"
-                      disabled={busy || !assignStudentId}
+                      disabled={busy}
                       onClick={async () => {
-                        const ok = await dialog.confirm("Назначить студента?", {
-                          confirmLabel: "Назначить",
-                        });
+                        const ok = await dialog.confirm("Одобрить обращение?");
+                        if (ok) run(() => requestsApi.approve(id), "Одобрено");
+                      }}
+                    >
+                      <CheckCheck size={13} /> Одобрить
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={async () => {
+                        const reason = await dialog.prompt(
+                          "Укажите причину отклонения:",
+                          {
+                            title: "Отклонить обращение",
+                            placeholder: "Причина...",
+                            confirmLabel: "Отклонить",
+                          }
+                        );
+                        if (!reason) return;
+                        run(
+                          () => requestsApi.reject(id, reason),
+                          "Обращение отклонено"
+                        );
+                      }}
+                    >
+                      <XCircle size={13} /> Отклонить
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={async () => {
+                        const ok = await dialog.confirm(
+                          "Отклонить стандартной причиной отказа?",
+                          {
+                            title: "Стандартный отказ",
+                            variant: "destructive",
+                            confirmLabel: "Отклонить",
+                          }
+                        );
+                        if (!ok) return;
+                        run(
+                          () => requestsApi.rejectStandard(id),
+                          "Обращение отклонено"
+                        );
+                      }}
+                    >
+                      <XCircle size={13} /> Стандартный отказ
+                    </Button>
+                  </>
+                )}
+
+                {/* approved */}
+                {request.status === "approved" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Select
+                        value={assignStudentId}
+                        onValueChange={setAssignStudentId}
+                      >
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Выбрать студента..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {freeStudents.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {getUserDisplayName(s)}
+                              {s.username ? ` (@${s.username})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        disabled={busy || !assignStudentId}
+                        onClick={async () => {
+                          const ok = await dialog.confirm(
+                            "Назначить студента?",
+                            {
+                              confirmLabel: "Назначить",
+                            }
+                          );
+                          if (ok)
+                            run(
+                              () => requestsApi.assign(id, assignStudentId),
+                              "Студент назначен"
+                            );
+                        }}
+                      >
+                        <UserCheck size={13} /> Назначить
+                      </Button>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={async () => {
+                        const ok = await dialog.confirm("Вернуть в очередь?");
                         if (ok)
                           run(
-                            () => requestsApi.assign(id, assignStudentId),
-                            "Студент назначен"
+                            () => requestsApi.returnToQueue(id),
+                            "Возвращено в очередь"
                           );
                       }}
                     >
-                      <UserCheck size={13} /> Назначить
+                      <RotateCcw size={13} /> Вернуть в очередь
                     </Button>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const ok = await dialog.confirm("Вернуть в очередь?");
-                      if (ok)
-                        run(
-                          () => requestsApi.returnToQueue(id),
-                          "Возвращено в очередь"
-                        );
-                    }}
-                  >
-                    <RotateCcw size={13} /> Вернуть в очередь
-                  </Button>
-                </>
-              )}
+                  </>
+                )}
 
-              {/* assigned */}
-              {request.status === "assigned" && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const ok = await dialog.confirm("Снять со студента?", {
-                        variant: "destructive",
-                        confirmLabel: "Снять",
-                      });
-                      if (ok)
-                        run(
-                          () => requestsApi.unassign(id),
-                          "Снято со студента"
-                        );
-                    }}
-                  >
-                    <UserX size={13} /> Снять со студента
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const ok = await dialog.confirm("Вернуть в очередь?");
-                      if (ok)
-                        run(
-                          () => requestsApi.returnToQueue(id),
-                          "Возвращено в очередь"
-                        );
-                    }}
-                  >
-                    <RotateCcw size={13} /> Вернуть в очередь
-                  </Button>
-                </>
-              )}
+                {/* assigned */}
+                {request.status === "assigned" && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={async () => {
+                        const ok = await dialog.confirm("Снять со студента?", {
+                          variant: "destructive",
+                          confirmLabel: "Снять",
+                        });
+                        if (ok)
+                          run(
+                            () => requestsApi.unassign(id),
+                            "Снято со студента"
+                          );
+                      }}
+                    >
+                      <UserX size={13} /> Снять со студента
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={async () => {
+                        const ok = await dialog.confirm("Вернуть в очередь?");
+                        if (ok)
+                          run(
+                            () => requestsApi.returnToQueue(id),
+                            "Возвращено в очередь"
+                          );
+                      }}
+                    >
+                      <RotateCcw size={13} /> Вернуть в очередь
+                    </Button>
+                  </>
+                )}
 
-              {/* answered — approve or send back for revision */}
-              {request.status === "answered" && (
-                <>
+                {/* answered — approve or send back for revision */}
+                {request.status === "answered" && (
+                  <>
+                    <Button
+                      className="w-full"
+                      size="sm"
+                      disabled={busy}
+                      onClick={async () => {
+                        const ok = await dialog.confirm(
+                          "Одобрить и отправить ответ пользователю?",
+                          { confirmLabel: "Одобрить" }
+                        );
+                        if (ok)
+                          run(
+                            () => requestsApi.approveAnswer(id, finalAnswer),
+                            "Ответ одобрен и отправлен"
+                          );
+                      }}
+                    >
+                      <CheckCheck size={13} /> Подтвердить ответ
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      disabled={busy}
+                      onClick={async () => {
+                        const comment = await dialog.prompt(
+                          "Комментарий для студента:",
+                          {
+                            title: "Вернуть на доработку",
+                            placeholder: "Что нужно исправить...",
+                            confirmLabel: "Вернуть",
+                          }
+                        );
+                        if (!comment) return;
+                        run(
+                          () => requestsApi.rejectAnswer(id, comment),
+                          "Возвращено на доработку"
+                        );
+                      }}
+                    >
+                      <XCircle size={13} /> Вернуть на доработку
+                    </Button>
+                  </>
+                )}
+
+                {/* closed / declined — reopen */}
+                {(request.status === "closed" ||
+                  request.status === "declined") && (
                   <Button
-                    className="w-full"
+                    variant="outline"
                     size="sm"
+                    className="w-full"
                     disabled={busy}
                     onClick={async () => {
                       const ok = await dialog.confirm(
-                        "Одобрить и отправить ответ пользователю?",
-                        { confirmLabel: "Одобрить" }
+                        "Вернуть обращение в очередь?",
+                        { confirmLabel: "Переоткрыть" }
                       );
                       if (ok)
-                        run(
-                          () => requestsApi.approveAnswer(id, finalAnswer),
-                          "Ответ одобрен и отправлен"
-                        );
+                        run(() => requestsApi.returnToQueue(id), "Переоткрыто");
                     }}
                   >
-                    <CheckCheck size={13} /> Подтвердить ответ
+                    <RotateCcw size={13} /> Переоткрыть
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full"
-                    disabled={busy}
-                    onClick={async () => {
-                      const comment = await dialog.prompt(
-                        "Комментарий для студента:",
-                        {
-                          title: "Вернуть на доработку",
-                          placeholder: "Что нужно исправить...",
-                          confirmLabel: "Вернуть",
-                        }
-                      );
-                      if (!comment) return;
-                      run(
-                        () => requestsApi.rejectAnswer(id, comment),
-                        "Возвращено на доработку"
-                      );
-                    }}
-                  >
-                    <XCircle size={13} /> Вернуть на доработку
-                  </Button>
-                </>
-              )}
-
-              {/* closed / declined — reopen */}
-              {(request.status === "closed" ||
-                request.status === "declined") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  disabled={busy}
-                  onClick={async () => {
-                    const ok = await dialog.confirm(
-                      "Вернуть обращение в очередь?",
-                      { confirmLabel: "Переоткрыть" }
-                    );
-                    if (ok)
-                      run(() => requestsApi.returnToQueue(id), "Переоткрыто");
-                  }}
-                >
-                  <RotateCcw size={13} /> Переоткрыть
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

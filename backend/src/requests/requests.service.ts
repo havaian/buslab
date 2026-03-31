@@ -522,6 +522,12 @@ export class RequestsService {
         { studentChatMessageId: messageId }
       );
 
+    await this.notifications.notifyAdminReturnedToQueue(
+      requestId,
+      cat?.name || "",
+      req.text
+    );
+
     return req;
   }
 
@@ -666,6 +672,76 @@ export class RequestsService {
         cat?.name || "",
         `🔄 <b>Возвращено на доработку</b>\nКомментарий: ${comment}`
       );
+    }
+
+    return req;
+  }
+
+  /** Admin saves edited answer text + comment without changing status (draft). */
+  async saveAnswerDraft(
+    requestId: string,
+    answerText: string,
+    adminComment: string | undefined,
+    adminId?: string
+  ) {
+    const req = await this.requestModel.findById(requestId);
+    if (!req) throw new NotFoundException();
+    if (req.status !== "answered")
+      throw new BadRequestException("Request is not in answered status");
+
+    req.answerText = answerText;
+    if (adminComment !== undefined) req.adminComment = adminComment;
+    await req.save();
+
+    return req;
+  }
+
+  /** Admin uploads an extra file to answerFiles of an answered/assigned request. */
+  async addAnswerFile(
+    requestId: string,
+    file: Express.Multer.File,
+    adminId?: string
+  ) {
+    const req = await this.requestModel.findById(requestId);
+    if (!req) throw new NotFoundException();
+
+    req.answerFiles = [
+      ...(req.answerFiles ?? []),
+      {
+        filename: file.filename,
+        originalName: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        ref: file.filename,
+        source: "web",
+      },
+    ];
+    await req.save();
+    return req;
+  }
+
+  /** Admin removes a file from answerFiles by filename. */
+  async removeAnswerFile(
+    requestId: string,
+    filename: string,
+    adminId?: string
+  ) {
+    const req = await this.requestModel.findById(requestId);
+    if (!req) throw new NotFoundException();
+
+    req.answerFiles = (req.answerFiles ?? []).filter(
+      (f) => f.filename !== filename
+    );
+    await req.save();
+
+    // Удалить физический файл
+    try {
+      const { unlinkSync, existsSync } = await import("fs");
+      const { join } = await import("path");
+      const filePath = join(process.cwd(), "uploads", filename);
+      if (existsSync(filePath)) unlinkSync(filePath);
+    } catch {
+      // non-fatal
     }
 
     return req;

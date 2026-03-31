@@ -80,6 +80,23 @@ export const requestsApi = {
     post<{ sent: boolean }>(`/requests/${id}/message`, { text }),
   getHistory: (id: string) =>
     get<RequestHistoryEntry[]>(`/requests/${id}/history`),
+    // Admin draft + file management
+  saveAnswerDraft: (id: string, answerText: string, adminComment?: string) =>
+    patch<Request>(`/requests/${id}/save-answer`, { answerText, adminComment }),
+  addAnswerFiles: (id: string, files: FileList) => {
+    const form = new FormData();
+    Array.from(files).forEach((f) => form.append("files", f));
+    return request<Request>(
+      "POST",
+      `/requests/${id}/answer-files`,
+      undefined,
+      form
+    );
+  },
+  removeAnswerFile: (id: string, filename: string) =>
+    del<Request>(
+      `/requests/${id}/answer-files/${encodeURIComponent(filename)}`
+    ),
   // Student
   available: () => get<Request[]>("/requests/student/available"),
   myHistory: () => get<Request[]>("/requests/student/history"),
@@ -197,7 +214,12 @@ export const legalApi = {
   upload: (locale: string, file: File) => {
     const form = new FormData();
     form.append("file", file);
-    return request<{ ok: boolean }>("POST", `/legal/${locale}`, undefined, form);
+    return request<{ ok: boolean }>(
+      "POST",
+      `/legal/${locale}`,
+      undefined,
+      form
+    );
   },
 };
 
@@ -206,12 +228,25 @@ export const universitiesApi = {
     get<UniversityWithFaculties[]>(`/universities${admin ? "?admin=1" : ""}`),
   create: (data: { code: string; names: LocalizedNames; courses?: number[] }) =>
     post<UniversityWithFaculties>("/universities", data),
-  update: (id: string, data: Partial<{ code: string; names: LocalizedNames; courses: number[]; active: boolean }>) =>
-    patch<UniversityWithFaculties>(`/universities/${id}`, data),
+  update: (
+    id: string,
+    data: Partial<{
+      code: string;
+      names: LocalizedNames;
+      courses: number[];
+      active: boolean;
+    }>
+  ) => patch<UniversityWithFaculties>(`/universities/${id}`, data),
   remove: (id: string) => del<{ deleted: boolean }>(`/universities/${id}`),
-  createFaculty: (uniId: string, data: { code: string; names: LocalizedNames }) =>
-    post<UniversityFaculty>(`/universities/${uniId}/faculties`, data),
-  updateFaculty: (uniId: string, facId: string, data: Partial<{ code: string; names: LocalizedNames; active: boolean }>) =>
+  createFaculty: (
+    uniId: string,
+    data: { code: string; names: LocalizedNames }
+  ) => post<UniversityFaculty>(`/universities/${uniId}/faculties`, data),
+  updateFaculty: (
+    uniId: string,
+    facId: string,
+    data: Partial<{ code: string; names: LocalizedNames; active: boolean }>
+  ) =>
     patch<UniversityFaculty>(`/universities/${uniId}/faculties/${facId}`, data),
   deleteFaculty: (uniId: string, facId: string) =>
     del<{ deleted: boolean }>(`/universities/${uniId}/faculties/${facId}`),

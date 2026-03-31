@@ -17,7 +17,9 @@ export class NotificationsService implements OnModuleInit {
   // иначе fallback на веб-панель
   private appLink(param: string): string {
     if (this.botName && this.appName) {
-      return `https://t.me/${this.botName}/${this.appName}?startapp=${encodeURIComponent(param)}`;
+      return `https://t.me/${this.botName}/${
+        this.appName
+      }?startapp=${encodeURIComponent(param)}`;
     }
     return `${this.webPanelUrl}`;
   }
@@ -173,6 +175,18 @@ export class NotificationsService implements OnModuleInit {
     await this.send(
       this.adminChatId,
       `↩️ <b>Студент отказался от обращения</b>\nСтудент: ${studentName}\n\n<a href="${link}">Открыть обращение →</a>`
+    );
+  }
+
+  async notifyAdminReturnedToQueue(
+    requestId: string,
+    category: string,
+    shortText: string
+  ): Promise<void> {
+    const link = this.appLink(`r_${requestId}`);
+    await this.send(
+      this.adminChatId,
+      `🔄 <b>Обращение возвращено в очередь</b>\nКатегория: ${category}\n${shortText}\n\n<a href="${link}">Открыть в панели →</a>`
     );
   }
 
