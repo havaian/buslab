@@ -157,10 +157,9 @@ async function getPollMsg(
 async function main() {
   if (!API_ID || !API_HASH)
     throw new Error("TELEGRAM_API_ID / TELEGRAM_API_HASH не заданы");
+  if (!MONGO) throw new Error("MONGO_URL / MONGO_URI не заданы");
 
-  console.log(`MongoDB: ${MONGO}`);
   console.log("Подключаемся к Telegram...");
-
   const client = new TelegramClient(
     new StringSession(SESSION),
     API_ID,
@@ -175,7 +174,7 @@ async function main() {
   });
 
   if (!SESSION) {
-    console.log("\n✅ Сессия создана. Добавь в .env:");
+    console.log("\n✅ Добавь в .env и пересобери контейнер:");
     console.log(`TELEGRAM_SESSION=${String(client.session.save())}\n`);
   }
 
@@ -190,6 +189,7 @@ async function main() {
   if (!pollUniFac?.poll || !pollCourse?.poll)
     throw new Error("Не удалось получить опросы");
 
+  // Опрос 1: универ / факультет
   const uniFacMap = new Map<
     number,
     {
@@ -225,6 +225,7 @@ async function main() {
     console.log(`    └─ ${voters.length} голосов`);
   }
 
+  // Опрос 2: курс
   const courseMap = new Map<number, number>();
   console.log("\nПарсим опрос 2 (курс)...");
   for (const answer of pollCourse.poll.answers) {
@@ -245,11 +246,13 @@ async function main() {
   await client.destroy();
   console.log("\nTelegram отключён.");
 
+  // MongoDB upsert
   await mongoose.connect(MONGO);
   const allIds = new Set([...uniFacMap.keys(), ...courseMap.keys()]);
   console.log(`\nВсего telegramId из опросов: ${allIds.size}`);
 
-  let upserted = 0,
+  let created = 0,
+    updated = 0,
     skipped = 0;
   for (const tgId of allIds) {
     const uniFac = uniFacMap.get(tgId);
@@ -263,31 +266,49 @@ async function main() {
       continue;
     }
 
-    await UserModel.findOneAndUpdate(
-      { telegramId: tgId },
-      {
-        $set: {
-          role: "student",
-          university: uniFac.uniId,
-          faculty: uniFac.facId,
-          course,
-        },
-        $setOnInsert: {
-          firstName: uniFac.firstName,
-          lastName: uniFac.lastName,
-          username: uniFac.username,
-        },
-      },
-      { upsert: true, new: true }
-    );
-    upserted++;
+    const existing = await UserModel.findOne({ telegramId: tgId })
+      .select("role")
+      .lean();
+
+    if (existing) {
+      // Не трогаем role если пользователь уже admin
+      const roleUpdate = existing.role === "admin" ? {} : { role: "student" };
+      await UserModel.updateOne(
+        { telegramId: tgId },
+        {
+          $set: {
+            ...roleUpdate,
+            university: uniFac.uniId,
+            faculty: uniFac.facId,
+            course,
+          },
+        }
+      );
+    } else {
+      await UserModel.create({
+        telegramId: tgId,
+        role: "student",
+        firstName: uniFac.firstName,
+        lastName: uniFac.lastName,
+        username: uniFac.username,
+        university: uniFac.uniId,
+        faculty: uniFac.facId,
+        course,
+      });
+    }
+
+    const wasNew = !(await UserModel.exists({
+      telegramId: tgId,
+      createdAt: { $lt: new Date() },
+    }));
+    wasNew ? created++ : updated++;
   }
 
   await mongoose.disconnect();
 
   console.log("\n═══════════════════════════════════");
   console.log("✅ Готово!");
-  console.log(`   Обновлено/создано: ${upserted}`);
+  console.log(`   Обновлено/создано: ${created + updated}`);
   console.log(`   Пропущено:         ${skipped}`);
   console.log("═══════════════════════════════════");
 }

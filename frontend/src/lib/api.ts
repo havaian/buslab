@@ -475,6 +475,9 @@ export interface StudentSummary {
   firstName: string;
   lastName: string;
   username: string;
+  university: string | null;
+  faculty: string | null;
+  course: number | null;
   submitted: number;
   approved: number;
   rejected: number;

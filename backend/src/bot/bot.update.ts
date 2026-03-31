@@ -52,6 +52,8 @@ export class BotUpdate {
   register(bot: Bot<BotContext>): void {
     // Commands
     bot.command("start", (ctx) => this.handleStart(ctx));
+    bot.command("get_admin", (ctx) => this.handleGetAdmin(ctx));
+    bot.command("stats", (ctx) => this.handleStats(ctx));
 
     // Onboarding
     bot.callbackQuery(CBRegex.ONBOARD_LANG, (ctx) =>
@@ -165,6 +167,68 @@ export class BotUpdate {
         "🇺🇸 Welcome! Choose your language.",
       { reply_markup: kb }
     );
+  }
+
+  // ── /get_admin ──────────────────────────────────────────────────────────────
+
+  private async handleGetAdmin(ctx: BotContext): Promise<void> {
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    if (ctx.chat?.id?.toString() !== adminChatId) return;
+    if (!ctx.from) return;
+
+    await this.userModel.updateOne(
+      { telegramId: ctx.from.id },
+      { $set: { role: "admin" } },
+      { upsert: false }
+    );
+
+    await ctx.reply(`✅ Роль admin выдана пользователю ${ctx.from.id}`);
+  }
+
+  // ── /stats ──────────────────────────────────────────────────────────────
+
+  private async handleStats(ctx: BotContext): Promise<void> {
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+    if (ctx.chat?.id?.toString() !== adminChatId) return;
+
+    const [totalUsers, admins, students, requests] = await Promise.all([
+      this.userModel.countDocuments(),
+      this.userModel.countDocuments({ role: "admin" }),
+      this.userModel.countDocuments({ role: "student" }),
+      this.requestModel.find().select("status").lean(),
+    ]);
+
+    const activeStudents = await this.requestModel.distinct("studentId", {
+      status: "assigned",
+    });
+
+    const counts = {
+      pending: requests.filter((r) => r.status === "pending").length,
+      approved: requests.filter((r) => r.status === "approved").length,
+      assigned: requests.filter((r) => r.status === "assigned").length,
+      answered: requests.filter((r) => r.status === "answered").length,
+      closed: requests.filter((r) => r.status === "closed").length,
+      declined: requests.filter((r) => r.status === "declined").length,
+    };
+
+    const text =
+      `📊 <b>Статистика бота:</b>\n\n` +
+      `👥 <b>Пользователи:</b>\n` +
+      `   Всего: ${totalUsers}\n` +
+      `   Администраторы: ${admins}\n` +
+      `   Студенты: ${students}\n` +
+      `   Обычные пользователи: ${totalUsers - admins - students}\n` +
+      `   Активных исполнителей: ${activeStudents.length}\n\n` +
+      `📨 <b>Обращения:</b>\n` +
+      `   Всего: ${requests.length}\n` +
+      `   ⏳ На рассмотрении: ${counts.pending}\n` +
+      `   👨‍💼 Ожидают исполнителя: ${counts.approved}\n` +
+      `   🔄 В обработке: ${counts.assigned}\n` +
+      `   ✅ На проверке: ${counts.answered}\n` +
+      `   ✅ Закрыто: ${counts.closed}\n` +
+      `   ❌ Отклонено: ${counts.declined}`;
+
+    await ctx.reply(text, { parse_mode: "HTML" });
   }
 
   // ── Onboarding callbacks ─────────────────────────────────────────────────
