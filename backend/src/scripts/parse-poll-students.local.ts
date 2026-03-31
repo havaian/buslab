@@ -1,11 +1,11 @@
 /**
- * src/scripts/parse-poll-students.ts  [PROD]
+ * src/scripts/parse-poll-students.local.ts  [LOCAL]
  *
  * Запуск внутри контейнера:
- *   docker exec -it legal_clinic_backend npm run parse-poll
+ *   npx ts-node -r tsconfig-paths/register src/scripts/parse-poll-students.local.ts
  *
  * Первый запуск — интерактивная авторизация (телефон + код из Telegram).
- * После — скопируй выведенную строку TELEGRAM_SESSION в .env и пересобери контейнер.
+ * После — скопируй выведенную строку TELEGRAM_SESSION в .env.
  */
 
 import * as readline from "readline";
@@ -19,7 +19,16 @@ import mongoose from "mongoose";
 const API_ID = Number(process.env.TELEGRAM_API_ID ?? "0");
 const API_HASH = String(process.env.TELEGRAM_API_HASH ?? "");
 const SESSION = String(process.env.TELEGRAM_SESSION ?? "");
-const MONGO = String(process.env.MONGO_URL ?? process.env.MONGO_URI ?? "");
+import * as dotenv from "dotenv";
+dotenv.config();
+
+// Для локалки: LOCAL_MONGO_URL имеет приоритет, иначе fallback на продовые переменные
+const MONGO = String(
+  process.env.LOCAL_MONGO_URL ??
+    process.env.MONGO_URL ??
+    process.env.MONGO_URI ??
+    "mongodb://localhost:27017/legal_clinic"
+);
 
 // Chat ID: из ссылки t.me/c/2637443124/... → строка с префиксом -100
 const CHAT_ID = "-1002637443124";

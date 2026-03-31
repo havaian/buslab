@@ -6,7 +6,8 @@
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "parse-poll": "ts-node -r tsconfig-paths/register src/scripts/parse-poll-students.ts"
+    "parse-poll": "ts-node -r tsconfig-paths/register src/scripts/parse-poll-students.ts",
+    "parse-poll:local": "ts-node -r tsconfig-paths/register src/scripts/parse-poll-students.local.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
