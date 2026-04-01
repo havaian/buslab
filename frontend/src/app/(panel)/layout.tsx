@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sun, Moon } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -19,10 +19,10 @@ export default function PanelLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const { top: tgTop, bottom: tgBottom } = useTgSafeArea();
+  // isMiniApp теперь приходит из хука (персистируется в sessionStorage)
+  // вместо вычисления tgTop > 0 — которое всегда false на первом рендере
+  const { top: tgTop, bottom: tgBottom, isMiniApp } = useTgSafeArea();
   const { theme, toggle } = useTheme();
-
-  const isMiniApp = tgTop > 0 || tgBottom > 0;
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -54,7 +54,6 @@ export default function PanelLayout({
         {/*
           Mini App header.
           paddingTop = высота Telegram overlay (JS значение из SDK).
-          Логотип по центру.
         */}
         {isMiniApp && (
           <div
