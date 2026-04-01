@@ -56,12 +56,6 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
   return (
     <div className="border-t">
       <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          {run && <StatusBadge status={run.status} />}
-          <span className="text-muted-foreground text-xs">
-            {run ? new Date(run.createdAt).toLocaleString("ru-RU") : ""}
-          </span>
-        </div>
         <button
           onClick={onClose}
           className="text-xs text-muted-foreground hover:text-foreground"
