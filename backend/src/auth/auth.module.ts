@@ -11,10 +11,18 @@ import { User, UserSchema } from "../users/schemas/user.schema";
   imports: [
     PassportModule,
     JwtModule.registerAsync({
-      useFactory: () => ({
-        secret: process.env.JWT_SECRET || "fallback_secret",
-        signOptions: { expiresIn: 604800 },
-      }),
+      useFactory: () => {
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+          throw new Error(
+            "JWT_SECRET environment variable is not set. Refusing to start."
+          );
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: 604800 },
+        };
+      },
     }),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],

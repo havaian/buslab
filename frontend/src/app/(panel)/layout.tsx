@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sun, Moon } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -12,6 +12,11 @@ import { useTheme } from "@/hooks/use-theme";
 // Высота BottomNav (h-16 = 4rem = 64px)
 const BOTTOM_NAV_H = 64;
 
+// Дополнительный отступ сверху внутри Mini App хедера сверх tgTop —
+// чтобы контент не упирался в нативные кнопки Telegram даже если
+// contentSafeAreaInset немного занижен на конкретном устройстве.
+const MINIAPP_HEADER_EXTRA_PX = 12;
+
 export default function PanelLayout({
   children,
 }: {
@@ -19,10 +24,8 @@ export default function PanelLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const { top: tgTop, bottom: tgBottom } = useTgSafeArea();
+  const { top: tgTop, bottom: tgBottom, isMiniApp } = useTgSafeArea();
   const { theme, toggle } = useTheme();
-
-  const isMiniApp = tgTop > 0 || tgBottom > 0;
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -41,6 +44,9 @@ export default function PanelLayout({
 
   if (!user) return null;
 
+  const headerPaddingTop = tgTop + MINIAPP_HEADER_EXTRA_PX;
+  const headerHeight = 56 + headerPaddingTop;
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
@@ -53,15 +59,15 @@ export default function PanelLayout({
       <div className="flex flex-1 flex-col min-w-0">
         {/*
           Mini App header.
-          paddingTop = высота Telegram overlay (JS значение из SDK).
-          Логотип по центру.
+          isMiniApp определяется через WebApp.initData — надёжнее чем проверка tgTop > 0.
+          paddingTop = tgTop (SDK) + небольшой дополнительный отступ.
         */}
         {isMiniApp && (
           <div
             className="flex shrink-0 items-center justify-between border-b bg-background lg:hidden px-3"
             style={{
-              paddingTop: Math.round(tgTop * 1.3),
-              height: 56 + Math.round(tgTop * 1.3),
+              paddingTop: headerPaddingTop,
+              height: headerHeight,
             }}
           >
             <div className="flex items-center gap-2">

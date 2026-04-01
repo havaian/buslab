@@ -2,9 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { MongooseModule } from "@nestjs/mongoose";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ServeStaticModule } from "@nestjs/serve-static";
 import { ThrottlerModule } from "@nestjs/throttler";
-import { join } from "path";
 
 import { AuthModule } from "./auth/auth.module";
 import { AdminUsersModule } from "./admin-users/admin-users.module";
@@ -39,11 +37,9 @@ import { BotModule } from "./bot/bot.module";
       },
     ]),
     ScheduleModule.forRoot(),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), "uploads"),
-      serveRoot: "/static/uploads",
-      serveStaticOptions: { index: false },
-    }),
+    // ServeStaticModule для /uploads убран — файлы доступны только
+    // через /api/files/:filename с JWT-авторизацией (FilesModule).
+    // Публичный доступ по UUID к приватным документам нарушал конфиденциальность.
     NotificationsModule,
     AuthModule,
     AdminUsersModule,

@@ -29,11 +29,17 @@ export class SchedulerService {
   async checkTimers() {
     const now = new Date();
 
-    // Только assigned - answered/closed уже не нуждаются в таймере
     const activeRequests = await this.requestModel
       .find({ status: "assigned", timerDeadline: { $ne: null } })
       .populate("studentId", "telegramId firstName lastName")
       .lean();
+
+    // Fix #13: вместо отдельного updateOne на каждый запрос — собираем ID
+    // и делаем один updateMany в конце для каждого типа флага.
+    const halfWarnIds: any[] = [];
+    const warnIds: any[] = [];
+    const expiredIds: any[] = [];
+    const expiredStudentIds: any[] = [];
 
     for (const req of activeRequests) {
       if (!req.timerDeadline) continue;
@@ -42,11 +48,9 @@ export class SchedulerService {
       const timeLeft = deadlineMs - now.getTime();
 
       // ── 50% предупреждение ─────────────────────────────────────────────
-      // Вычисляем половину общего срока через assignedAt
       if (req.assignedAt && !req.timerHalfWarningSent) {
         const totalDuration = deadlineMs - new Date(req.assignedAt).getTime();
         const halfDuration = totalDuration / 2;
-        // Предупреждаем когда осталось <= половины И > 1 часа (чтобы не дублировать с часовым)
         if (
           timeLeft > 0 &&
           timeLeft <= halfDuration &&
@@ -60,10 +64,7 @@ export class SchedulerService {
               Math.round(timeLeft / ONE_HOUR_MS)
             );
           }
-          await this.requestModel.updateOne(
-            { _id: req._id },
-            { $set: { timerHalfWarningSent: true } }
-          );
+          halfWarnIds.push(req._id);
         }
       }
 
@@ -76,10 +77,7 @@ export class SchedulerService {
             String(req._id)
           );
         }
-        await this.requestModel.updateOne(
-          { _id: req._id },
-          { $set: { timerWarningSent: true } }
-        );
+        warnIds.push(req._id);
       }
 
       // ── Просрочка ─────────────────────────────────────────────────────
@@ -101,12 +99,36 @@ export class SchedulerService {
             action: StudentAction.TIMER_EXPIRED,
             requestId: req._id,
           });
+          expiredStudentIds.push({ reqId: req._id, studentId: student._id });
         }
+        expiredIds.push(req._id);
+      }
+    }
+
+    // Батчевые обновления вместо N отдельных updateOne
+    if (halfWarnIds.length) {
+      await this.requestModel.updateMany(
+        { _id: { $in: halfWarnIds } },
+        { $set: { timerHalfWarningSent: true } }
+      );
+    }
+    if (warnIds.length) {
+      await this.requestModel.updateMany(
+        { _id: { $in: warnIds } },
+        { $set: { timerWarningSent: true } }
+      );
+    }
+    if (expiredIds.length) {
+      // Помечаем как уведомлённые; blockedStudentIds добавляем отдельно per-doc
+      // т.к. $addToSet требует разных значений для каждого документа
+      await this.requestModel.updateMany(
+        { _id: { $in: expiredIds } },
+        { $set: { timerExpiredNotified: true } }
+      );
+      for (const { reqId, studentId } of expiredStudentIds) {
         await this.requestModel.updateOne(
-          { _id: req._id },
-          { $set: { timerExpiredNotified: true },
-            $addToSet: { blockedStudentIds: student._id }
-          },
+          { _id: reqId },
+          { $addToSet: { blockedStudentIds: studentId } }
         );
       }
     }

@@ -3,6 +3,7 @@ import {
   Post,
   Body,
   UnauthorizedException,
+  BadRequestException,
   Get,
   Patch,
   UseGuards,
@@ -10,10 +11,13 @@ import {
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { JwtService } from "@nestjs/jwt";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import * as crypto from "crypto";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
+
+const ALLOWED_LANGUAGES = ["ru", "uz", "en", "kk"];
 
 @Controller("miniapp")
 export class MiniappController {
@@ -26,14 +30,10 @@ export class MiniappController {
    * Verifies Telegram WebApp initData via HMAC-SHA256.
    * Spec: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
    *
-   * Flow:
-   * 1. Parse initData query string
-   * 2. Extract hash, sort remaining fields, build data_check_string
-   * 3. secret_key = HMAC-SHA256("WebAppData", BOT_TOKEN)
-   * 4. Compare HMAC-SHA256(secret_key, data_check_string) with hash
-   * 5. Check auth_date is not older than 1 hour
-   * 6. Upsert user, return JWT
+   * Fix #7: добавлен rate limit — 20 запросов в минуту на IP
    */
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
+  @UseGuards(ThrottlerGuard)
   @Post("auth")
   async auth(@Body("initData") initData: string) {
     if (!initData) throw new UnauthorizedException("initData is required");
@@ -41,12 +41,10 @@ export class MiniappController {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) throw new UnauthorizedException("Bot token not configured");
 
-    // Parse the initData query string
     const params = new URLSearchParams(initData);
     const hash = params.get("hash");
     if (!hash) throw new UnauthorizedException("Missing hash in initData");
 
-    // Build data_check_string: all fields except hash, sorted alphabetically, joined by \n
     const checkEntries: string[] = [];
     params.forEach((value, key) => {
       if (key !== "hash") checkEntries.push(`${key}=${value}`);
@@ -54,13 +52,11 @@ export class MiniappController {
     checkEntries.sort();
     const dataCheckString = checkEntries.join("\n");
 
-    // Compute secret key: HMAC-SHA256(key="WebAppData", data=botToken)
     const secretKey = crypto
       .createHmac("sha256", "WebAppData")
       .update(botToken)
       .digest();
 
-    // Compute expected hash
     const expectedHash = crypto
       .createHmac("sha256", secretKey)
       .update(dataCheckString)
@@ -70,13 +66,11 @@ export class MiniappController {
       throw new UnauthorizedException("Invalid initData signature");
     }
 
-    // Check auth_date freshness (1 hour max)
     const authDate = Number(params.get("auth_date"));
     if (!authDate || Date.now() / 1000 - authDate > 3600) {
       throw new UnauthorizedException("initData expired");
     }
 
-    // Parse user object from initData
     const userJson = params.get("user");
     if (!userJson) throw new UnauthorizedException("No user in initData");
 
@@ -93,28 +87,24 @@ export class MiniappController {
       throw new UnauthorizedException("Invalid user JSON in initData");
     }
 
-    // Upsert user in DB
     let user = await this.userModel.findOne({ telegramId: tgUser.id });
     if (!user) {
+      const rawLang = tgUser.language_code?.split("-")[0] ?? "ru";
       user = await this.userModel.create({
         telegramId: tgUser.id,
         firstName: tgUser.first_name ?? "",
         lastName: tgUser.last_name ?? "",
         username: tgUser.username ?? "",
-        language: tgUser.language_code?.split("-")[0] ?? "ru",
+        language: ALLOWED_LANGUAGES.includes(rawLang) ? rawLang : "ru",
         lastSeenSource: "miniapp",
         hasUsedMiniapp: true,
       });
     } else {
-      // Refresh profile fields
       user.firstName = tgUser.first_name ?? user.firstName;
       user.lastName = tgUser.last_name ?? user.lastName ?? "";
       user.username = tgUser.username ?? user.username ?? "";
-
-      // Track miniapp usage
       user.lastSeenSource = "miniapp";
       user.hasUsedMiniapp = true;
-
       await user.save();
     }
 
@@ -142,7 +132,6 @@ export class MiniappController {
     };
   }
 
-  /** Returns current user info - same as /auth/me but usable from miniapp context. */
   @UseGuards(JwtAuthGuard)
   @Get("me")
   getMe(@CurrentUser() user: any) {
@@ -167,18 +156,57 @@ export class MiniappController {
       });
   }
 
+  /**
+   * Fix #6: валидируем university/faculty как непустые строки если заданы,
+   * course — целое число в диапазоне 1–6.
+   */
   @UseGuards(JwtAuthGuard)
   @Patch("profile")
   async updateProfile(
     @CurrentUser() user: any,
-    @Body("university") university?: string,
-    @Body("faculty") faculty?: string,
-    @Body("course") course?: number
+    @Body("university") university?: string | null,
+    @Body("faculty") faculty?: string | null,
+    @Body("course") course?: number | null
   ) {
     const update: Record<string, any> = {};
-    if (university !== undefined) update.university = university;
-    if (faculty !== undefined) update.faculty = faculty;
-    if (course !== undefined) update.course = course;
+
+    if (university !== undefined) {
+      if (
+        university !== null &&
+        (typeof university !== "string" || !university.trim())
+      ) {
+        throw new BadRequestException(
+          "university must be a non-empty string or null"
+        );
+      }
+      update.university = university || null;
+    }
+
+    if (faculty !== undefined) {
+      if (
+        faculty !== null &&
+        (typeof faculty !== "string" || !faculty.trim())
+      ) {
+        throw new BadRequestException(
+          "faculty must be a non-empty string or null"
+        );
+      }
+      update.faculty = faculty || null;
+    }
+
+    if (course !== undefined) {
+      if (course !== null) {
+        const n = Number(course);
+        if (!Number.isInteger(n) || n < 1 || n > 6) {
+          throw new BadRequestException(
+            "course must be an integer between 1 and 6"
+          );
+        }
+        update.course = n;
+      } else {
+        update.course = null;
+      }
+    }
 
     await this.userModel.updateOne({ _id: user.sub }, { $set: update });
     return { ok: true };

@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFiles,
+  ForbiddenException,
 } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
@@ -52,11 +53,42 @@ const answerUploadOptions = {
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
-  // ── Shared ────────────────────────────────────────────────────────────────
+  // ── Shared: GET /:id — доступен admin, student (свои/доступные), user (свои) ──
 
   @Get(":id")
-  findById(@Param("id") id: string) {
-    return this.requestsService.findById(id);
+  async findById(@Param("id") id: string, @CurrentUser() user: any) {
+    const req = await this.requestsService.findById(id);
+
+    const role: string = user.role;
+
+    if (role === UserRole.ADMIN) return req;
+
+    if (role === UserRole.STUDENT) {
+      // Студент видит только: доступные (approved) или назначенные ему
+      const isAssignedToMe =
+        req.studentId &&
+        (typeof req.studentId === "object"
+          ? String((req.studentId as any)._id) === user.sub
+          : String(req.studentId) === user.sub);
+      const isAvailable = req.status === "approved";
+      if (!isAssignedToMe && !isAvailable) {
+        throw new ForbiddenException("Access denied");
+      }
+      return req;
+    }
+
+    if (role === UserRole.USER) {
+      // Гражданин видит только свои обращения
+      const ownerId = req.userId
+        ? typeof req.userId === "object"
+          ? String((req.userId as any)._id)
+          : String(req.userId)
+        : null;
+      if (ownerId !== user.sub) throw new ForbiddenException("Access denied");
+      return req;
+    }
+
+    throw new ForbiddenException("Access denied");
   }
 
   // ── Miniapp - citizen request history ────────────────────────────────────
@@ -92,7 +124,7 @@ export class RequestsController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(UserRole.USER) // нужно добавить USER в UserRole enum
+  @Roles(UserRole.USER)
   @Post()
   @UseInterceptors(
     FilesInterceptor("files", 5, {
@@ -207,15 +239,17 @@ export class RequestsController {
   @Roles(UserRole.ADMIN)
   @Post(":id/answer-files")
   @UseInterceptors(FilesInterceptor("files", 5, answerUploadOptions))
-  addAnswerFiles(
+  async addAnswerFiles(
     @Param("id") id: string,
     @UploadedFiles() files: Express.Multer.File[],
     @CurrentUser() admin: any
   ) {
-    // Upload all files sequentially and return final request state
-    return Promise.all(
-      files.map((f) => this.requestsService.addAnswerFile(id, f, admin.sub))
-    ).then(() => this.requestsService.findById(id));
+    // Fix #15: последовательно, не параллельно — исключаем race condition
+    // на одном документе (параллельный save() может перетереть предыдущий)
+    for (const f of files) {
+      await this.requestsService.addAnswerFile(id, f, admin.sub);
+    }
+    return this.requestsService.findById(id);
   }
 
   @UseGuards(RolesGuard)
@@ -279,9 +313,29 @@ export class RequestsController {
     return this.requestsService.declineRequest(id, user.sub);
   }
 
-  // NOTE: must be LAST among GET routes - :id catches everything not matched above
+  // NOTE: must be LAST among GET routes — :id catches everything not matched above
+  // Fix #2: история обращения доступна только admin + участникам (student/user этого обращения)
   @Get(":id/history")
-  getHistory(@Param("id") id: string) {
+  async getHistory(@Param("id") id: string, @CurrentUser() user: any) {
+    const role: string = user.role;
+    if (role === UserRole.ADMIN) {
+      return this.requestsService.getHistory(id);
+    }
+    // Для студентов и граждан — сначала проверяем доступ к самому обращению
+    const req = await this.requestsService.findById(id);
+    const isStudent =
+      role === UserRole.STUDENT &&
+      req.studentId &&
+      (typeof req.studentId === "object"
+        ? String((req.studentId as any)._id) === user.sub
+        : String(req.studentId) === user.sub);
+    const isOwner =
+      role === UserRole.USER &&
+      req.userId &&
+      (typeof req.userId === "object"
+        ? String((req.userId as any)._id) === user.sub
+        : String(req.userId) === user.sub);
+    if (!isStudent && !isOwner) throw new ForbiddenException("Access denied");
     return this.requestsService.getHistory(id);
   }
 }

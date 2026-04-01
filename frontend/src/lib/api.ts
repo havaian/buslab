@@ -24,7 +24,10 @@ async function request<T>(
 
   if (res.status === 401) {
     localStorage.removeItem("token");
-    window.location.href = "/login";
+    // Защита от бесконечного редиректа если /login сама делает API-запрос
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
     throw new Error("Unauthorized");
   }
 

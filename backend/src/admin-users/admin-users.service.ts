@@ -39,8 +39,8 @@ export class AdminUsersService {
     status?: "active" | "free" | "overdue" | "never";
     sortBy?: "approved" | "createdAt";
   }) {
+    // Fix #12: university/faculty/course фильтруем в БД, а не в памяти
     const query: any = { role: "student" };
-
     if (filters?.university) query.university = filters.university;
     if (filters?.faculty) query.faculty = filters.faculty;
     if (filters?.course) query.course = Number(filters.course);
@@ -50,22 +50,27 @@ export class AdminUsersService {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Фильтр по статусу активности требует join с requests - делаем в памяти
+    // Фильтр по статусу активности требует join с requests — остаётся в памяти,
+    // но теперь работает только на уже отфильтрованном по БД подмножестве
     if (filters?.status) {
       const ids = students.map((s) => s._id);
-      const activeRequests = await this.requestModel
-        .find({ studentId: { $in: ids }, status: "assigned" })
-        .select("studentId timerDeadline")
-        .lean();
-      const activeMap = new Map(
-        activeRequests.map((r) => [String(r.studentId), r])
-      );
-      // "never" - ни разу не брал заявку
+
       if (filters.status === "never") {
-        const everTook = await this.requestModel.distinct("studentId");
+        // Студенты которые ни разу не брали обращение
+        const everTook = await this.requestModel.distinct("studentId", {
+          studentId: { $in: ids },
+        });
         const everSet = new Set(everTook.map(String));
         students = students.filter((s) => !everSet.has(String(s._id)));
       } else {
+        const activeRequests = await this.requestModel
+          .find({ studentId: { $in: ids }, status: "assigned" })
+          .select("studentId timerDeadline")
+          .lean();
+        const activeMap = new Map(
+          activeRequests.map((r) => [String(r.studentId), r])
+        );
+
         students = students.filter((s) => {
           const active = activeMap.get(String(s._id));
           const isActive = !!active;
@@ -81,7 +86,6 @@ export class AdminUsersService {
       }
     }
 
-    // Сортировка по количеству одобренных
     if (filters?.sortBy === "approved") {
       const ids = students.map((s) => s._id);
       const logs = await this.studentLogModel.aggregate([
@@ -137,7 +141,6 @@ export class AdminUsersService {
 
   // ── Invite tokens ─────────────────────────────────────────────────────────
 
-  /** Generate a one-time invite link token (48h TTL). */
   async createInvite(
     adminId: string
   ): Promise<{ token: string; expiresAt: Date; link: string }> {
@@ -156,10 +159,6 @@ export class AdminUsersService {
     return { token, expiresAt, link };
   }
 
-  /**
-   * Called from the bot when a user opens /start?start=ref_<token>.
-   * Sets the user's role to "student" and marks the token as used.
-   */
   async redeemInvite(
     token: string,
     telegramId: number
@@ -176,7 +175,6 @@ export class AdminUsersService {
     if (!user) return { success: false, alreadyStudent: false };
 
     if (user.role === "student") {
-      // Already a student - still mark token used so it can't be reused
       invite.usedBy = user._id as any;
       invite.usedAt = new Date();
       await invite.save();
@@ -195,16 +193,11 @@ export class AdminUsersService {
 
   // ── User search / promote ─────────────────────────────────────────────────
 
-  /**
-   * Search users (role: user) by username or Telegram ID.
-   * Used for the "promote existing user" flow.
-   */
   async searchUsers(query: string): Promise<any[]> {
     if (!query || query.trim().length < 2) return [];
 
     const q = query.trim().replace(/^@/, "");
 
-    // Try numeric Telegram ID first
     const numericId = Number(q);
     if (!isNaN(numericId) && String(numericId) === q) {
       return this.userModel
@@ -225,7 +218,6 @@ export class AdminUsersService {
       .lean();
   }
 
-  /** Promote a user to student role. */
   async promoteToStudent(userId: string): Promise<any> {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException("User not found");
@@ -235,7 +227,6 @@ export class AdminUsersService {
     return user.save();
   }
 
-  /** Demote a student back to user role. */
   async demoteFromStudent(userId: string): Promise<any> {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException("User not found");

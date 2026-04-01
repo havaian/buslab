@@ -9,13 +9,13 @@ async function bootstrap() {
 
   app.use(helmet());
 
-  // Global prefix for all routes
   app.setGlobalPrefix("api");
 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false,
+      // Fix #9: лишние поля в теле запроса теперь вызывают 400 вместо тихого игнора
+      forbidNonWhitelisted: true,
       transform: true,
     })
   );

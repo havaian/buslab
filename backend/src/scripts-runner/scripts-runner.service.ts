@@ -5,6 +5,8 @@ import { spawn } from "child_process";
 import { join } from "path";
 import { ScriptRun, ScriptRunDocument } from "./schemas/script-run.schema";
 
+const OUTPUT_FLUSH_MS = 500; // пишем в БД не чаще раза в 500мс
+
 @Injectable()
 export class ScriptsRunnerService {
   constructor(
@@ -15,7 +17,6 @@ export class ScriptsRunnerService {
   // ── Run ───────────────────────────────────────────────────────────────────
 
   async runParsePoll(): Promise<{ runId: string }> {
-    // Запрещаем параллельный запуск
     const running = await this.runModel.exists({
       script: "parse-poll",
       status: "running",
@@ -30,7 +31,6 @@ export class ScriptsRunnerService {
       finishedAt: null,
     });
 
-    // Запускаем асинхронно — не ждём завершения
     this._spawn(String(run._id));
 
     return { runId: String(run._id) };
@@ -46,31 +46,43 @@ export class ScriptsRunnerService {
       ["ts-node", "-r", "tsconfig-paths/register", scriptPath],
       {
         env: { ...process.env },
-        // stdin должен быть закрыт — скрипт не ожидает ввода если SESSION задан
         stdio: ["ignore", "pipe", "pipe"],
       }
     );
 
-    const append = async (chunk: string) => {
-      await this.runModel.updateOne(
-        { _id: runId },
-        { $set: { output: chunk } }
-      );
+    let output = "";
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingFlush = false;
+
+    // Fix #14: дебаунсим запись в БД — не пишем на каждый chunk stdout,
+    // а максимум раз в OUTPUT_FLUSH_MS мс.
+    const scheduleFlush = () => {
+      if (flushTimer) return;
+      flushTimer = setTimeout(async () => {
+        flushTimer = null;
+        pendingFlush = false;
+        await this.runModel.updateOne({ _id: runId }, { $set: { output } });
+      }, OUTPUT_FLUSH_MS);
     };
 
-    let output = "";
-
-    child.stdout.on("data", async (data: Buffer) => {
+    child.stdout.on("data", (data: Buffer) => {
       output += data.toString();
-      await append(output);
+      pendingFlush = true;
+      scheduleFlush();
     });
 
-    child.stderr.on("data", async (data: Buffer) => {
+    child.stderr.on("data", (data: Buffer) => {
       output += data.toString();
-      await append(output);
+      pendingFlush = true;
+      scheduleFlush();
     });
 
     child.on("close", async (code) => {
+      // Отменяем pending дебаунс и пишем финальное состояние сразу
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
       await this.runModel.updateOne(
         { _id: runId },
         {
@@ -85,6 +97,10 @@ export class ScriptsRunnerService {
     });
 
     child.on("error", async (err) => {
+      if (flushTimer) {
+        clearTimeout(flushTimer);
+        flushTimer = null;
+      }
       output += `\nProcess error: ${err.message}`;
       await this.runModel.updateOne(
         { _id: runId },
