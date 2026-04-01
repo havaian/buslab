@@ -56,7 +56,6 @@ function truncate(str: string, max: number): string {
   return str.length > max ? str.slice(0, max) + "…" : str;
 }
 
-// Кликабельный заголовок колонки с индикатором сортировки
 function SortTh({
   label,
   sortKey: key,
@@ -125,15 +124,27 @@ function StudentsContent() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
 
-  const selectedUni = unis.find((u) => u._id === university);
-
   useEffect(() => {
     Promise.all([statsApi.students(), universitiesApi.list()])
       .then(([s, u]) => {
         setAll(s);
         setUnis(u);
+
+        // Если пришли с дашборда с ?faculty=xxx без ?university=xxx —
+        // автоматически вычисляем родительский университет по faculty _id
+        const facParam = searchParams.get("faculty");
+        const uniParam = searchParams.get("university");
+        if (facParam && !uniParam) {
+          const parentUni = u.find((uni) =>
+            uni.faculties.some((f) => f._id === facParam)
+          );
+          if (parentUni) {
+            setUniversity(parentUni._id);
+          }
+        }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Сброс страницы при смене любого фильтра
@@ -146,7 +157,6 @@ function StudentsContent() {
     setFaculty("_all");
   };
 
-  // Клик по заголовку: если уже активна — переключаем направление, иначе — меняем ключ с desc
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
@@ -155,6 +165,8 @@ function StudentsContent() {
       setSortDir("desc");
     }
   };
+
+  const selectedUni = unis.find((u) => u._id === university);
 
   const filtered = useMemo(() => {
     let result = [...all];
@@ -183,11 +195,18 @@ function StudentsContent() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Счётчик: при активном фильтре — только filtered, иначе — total
+  const isFiltered =
+    university !== "_all" ||
+    faculty !== "_all" ||
+    course !== "_all" ||
+    status !== "_all";
+  const description = isFiltered
+    ? `${filtered.length} студентов`
+    : `${all.length} студентов`;
+
   return (
-    <PageShell
-      title="Студенты"
-      description={`${filtered.length} из ${all.length}`}
-    >
+    <PageShell title="Студенты" description={description}>
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-4 items-center">
         <Select value={status} onValueChange={setStatus}>
@@ -312,51 +331,45 @@ function StudentsContent() {
                     </td>
                   </tr>
                 ) : (
-                  paginated.map((s) => {
-                    return (
-                      <tr
-                        key={s.id}
-                        className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                        onClick={() => router.push(`/students/${s.id}`)}
-                      >
-                        <td className="px-4 py-2.5">
-                          <p className="font-medium">
-                            {truncate(
-                              [s.firstName, s.lastName]
-                                .filter(Boolean)
-                                .join(" "),
-                              28
-                            )}
-                          </p>
-                          {s.username && (
-                            <p className="text-xs text-muted-foreground">
-                              @{s.username}
-                            </p>
+                  paginated.map((s) => (
+                    <tr
+                      key={s.id}
+                      className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/students/${s.id}`)}
+                    >
+                      <td className="px-4 py-2.5">
+                        <p className="font-medium">
+                          {truncate(
+                            [s.firstName, s.lastName].filter(Boolean).join(" "),
+                            28
                           )}
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {s.submitted}
-                        </td>
-                        <td className="px-4 py-2.5 text-right">{s.approved}</td>
-                        <td className="px-4 py-2.5 text-right">{s.rejected}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          {s.submitted > 0 ? `${s.approvalRate}%` : "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-right hidden md:table-cell">
-                          {s.avgTime ? `${s.avgTime} мин` : "—"}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              STATUS_COLORS[s.currentStatus] ?? ""
-                            }`}
-                          >
-                            {STATUS_LABELS[s.currentStatus] ?? s.currentStatus}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })
+                        </p>
+                        {s.username && (
+                          <p className="text-xs text-muted-foreground">
+                            @{s.username}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">{s.submitted}</td>
+                      <td className="px-4 py-2.5 text-right">{s.approved}</td>
+                      <td className="px-4 py-2.5 text-right">{s.rejected}</td>
+                      <td className="px-4 py-2.5 text-right">
+                        {s.submitted > 0 ? `${s.approvalRate}%` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-right hidden md:table-cell">
+                        {s.avgTime ? `${s.avgTime} мин` : "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            STATUS_COLORS[s.currentStatus] ?? ""
+                          }`}
+                        >
+                          {STATUS_LABELS[s.currentStatus] ?? s.currentStatus}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

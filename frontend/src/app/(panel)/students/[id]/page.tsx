@@ -69,18 +69,24 @@ export default function StudentDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const getUniName = (code: string | null | undefined) => {
-    if (!code) return null;
-    return unis.find((u) => u.code === code)?.names.ru ?? code;
+  const getUniName = (value: string | null | undefined) => {
+    if (!value) return null;
+    // university хранится как _id (ObjectId string) — ищем по _id, fallback на code
+    const uni = unis.find((u) => String(u._id) === value || u.code === value);
+    return uni?.names.ru ?? value;
   };
 
   const getFacName = (
-    uniCode: string | null | undefined,
-    facCode: string | null | undefined
+    uniValue: string | null | undefined,
+    facValue: string | null | undefined
   ) => {
-    if (!uniCode || !facCode) return null;
-    const uni = unis.find((u) => u.code === uniCode);
-    return uni?.faculties.find((f) => f.code === facCode)?.names.ru ?? facCode;
+    if (!uniValue || !facValue) return null;
+    const uni = unis.find((u) => String(u._id) === uniValue || u.code === uniValue);
+    return (
+      uni?.faculties.find(
+        (f) => String(f._id) === facValue || f.code === facValue
+      )?.names.ru ?? facValue
+    );
   };
 
   if (loading || !stats) {

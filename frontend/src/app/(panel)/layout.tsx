@@ -9,8 +9,10 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { useTgSafeArea } from "@/hooks/use-tg-safe-area";
 import { useTheme } from "@/hooks/use-theme";
 
-// Высота BottomNav (h-16 = 4rem = 64px)
+// Высота BottomNav (h-16 = 4rem = 64px) + буфер чтобы последний элемент
+// не упирался в нижний бар визуально
 const BOTTOM_NAV_H = 64;
+const BOTTOM_BUFFER = 16;
 
 export default function PanelLayout({
   children,
@@ -19,9 +21,7 @@ export default function PanelLayout({
 }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  // isMiniApp теперь приходит из хука (персистируется в sessionStorage)
-  // вместо вычисления tgTop > 0 — которое всегда false на первом рендере
-  const { top: tgTop, bottom: tgBottom, isMiniApp } = useTgSafeArea();
+  const { top: tgTop, bottom: tgBottom } = useTgSafeArea();
   const { theme, toggle } = useTheme();
 
   useEffect(() => {
@@ -52,59 +52,41 @@ export default function PanelLayout({
 
       <div className="flex flex-1 flex-col min-w-0">
         {/*
-          Mini App header.
-          paddingTop = высота Telegram overlay (JS значение из SDK).
+          Мобильный хедер — всегда рендерится на мобиле (lg:hidden).
+          Нет разделения на Mini App / обычный браузер — tgTop = 0 в браузере,
+          и тогда height = 56px как обычный хедер.
+          В Mini App tgTop приходит из SDK и добавляет нужный отступ.
         */}
-        {isMiniApp && (
-          <div
-            className="flex shrink-0 items-center justify-between border-b bg-background lg:hidden px-3"
-            style={{
-              paddingTop: tgTop,
-              height: 56 + tgTop,
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
-              <span className="font-semibold text-sm">Юридическая клиника</span>
-            </div>
-            <button
-              onClick={toggle}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
+        <div
+          className="flex shrink-0 items-center justify-between border-b bg-background lg:hidden px-3"
+          style={{
+            paddingTop: tgTop,
+            height: 56 + tgTop,
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
+            <span className="font-semibold text-sm truncate">
+              Юридическая клиника
+            </span>
           </div>
-        )}
-
-        {/* Обычный браузер */}
-        {!isMiniApp && (
-          <div
-            className="flex shrink-0 items-center justify-between border-b px-4 lg:hidden"
-            style={{ height: 56 }}
+          <button
+            onClick={toggle}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
-              <span className="font-semibold text-sm truncate">
-                Юридическая клиника
-              </span>
-            </div>
-            <button
-              onClick={toggle}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
-            >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-          </div>
-        )}
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </div>
 
         {/*
           Основной контент.
-          paddingBottom = высота BottomNav + отступ нативных кнопок телефона.
+          paddingBottom = высота BottomNav + отступ нативных кнопок телефона
+          + буфер чтобы последний элемент не упирался в нижний бар.
           На десктопе pb=0.
         */}
         <div
           className="flex-1 overflow-y-auto lg:pb-0"
-          style={{ paddingBottom: BOTTOM_NAV_H + tgBottom }}
+          style={{ paddingBottom: BOTTOM_NAV_H + tgBottom + BOTTOM_BUFFER }}
         >
           {children}
         </div>
