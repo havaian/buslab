@@ -21,6 +21,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDate, getUserDisplayName } from "@/lib/utils";
+import { BannedBadge } from "@/components/shared/banned-badge";
 
 const ACTION_LABELS: Record<string, string> = {
   took_request: "Взял обращение",
@@ -162,15 +163,7 @@ export default function StudentDetailPage() {
                 )}
                 <div className="flex justify-between gap-2">
                   <span className="text-muted-foreground shrink-0">Статус</span>
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      student.isBanned
-                        ? "bg-red-100 text-red-700"
-                        : "bg-green-100 text-green-700"
-                    }`}
-                  >
-                    {student.isBanned ? "Заблокирован" : "Активен"}
-                  </span>
+                  <BannedBadge isBanned={student.isBanned} />
                 </div>
               </CardContent>
             </Card>

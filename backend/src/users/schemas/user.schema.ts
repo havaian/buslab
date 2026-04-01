@@ -53,6 +53,10 @@ export class User {
 
   @Prop({ default: null, type: Number })
   course: number | null;
+
+  // UI theme preference. Defaults to light if not set.
+  @Prop({ enum: ["light", "dark"], default: "light" })
+  theme: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

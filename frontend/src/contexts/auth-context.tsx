@@ -26,6 +26,14 @@ const isPanelAuthExcluded = (pathname: string) =>
   pathname.startsWith("/user") ||
   pathname === "/auth/done";
 
+// Применяет тему из ответа сервера: обновляет localStorage + DOM.
+// Если theme не задана — принудительно ставим light.
+function applyServerTheme(theme?: string) {
+  const t = theme === "dark" ? "dark" : "light";
+  localStorage.setItem("theme", t);
+  document.documentElement.classList.toggle("dark", t === "dark");
+}
+
 function loadTelegramWebAppSdk(): Promise<void> {
   return new Promise((resolve) => {
     if ((window as any).Telegram?.WebApp?.initData !== undefined) {
@@ -100,6 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           localStorage.setItem("token", data.access_token);
 
+          // Применяем тему из ответа сервера
+          applyServerTheme(data.user.theme);
+
           // Вычисляем цель навигации
           const startParam = twa.initDataUnsafe?.start_param;
           let target: string | null = null;
@@ -141,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             try {
               const u = await authApi.me();
+              applyServerTheme(u.theme);
               setUser(u);
             } catch {
               localStorage.removeItem("token");
@@ -163,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const u = await authApi.me();
+        applyServerTheme(u.theme);
         setUser(u);
         if (pathname === "/login" || pathname === "/") {
           setPendingRedirect(redirectByRole(u.role));
@@ -183,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (idToken: string) => {
       const res = await authApi.telegramLogin(idToken);
       localStorage.setItem("token", res.access_token);
+      applyServerTheme(res.user.theme);
       setUser(res.user);
       router.push(redirectByRole(res.user.role));
     },

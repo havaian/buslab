@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import {
   statsApi,
   universitiesApi,
@@ -19,6 +25,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
@@ -32,13 +39,6 @@ const STATUS_OPTS = [
 type SortKey = "approved" | "submitted" | "approvalRate" | "avgTime";
 type SortDir = "desc" | "asc";
 
-const SORT_OPTS: { value: SortKey; label: string }[] = [
-  { value: "approved", label: "По одобренным" },
-  { value: "submitted", label: "По ответам" },
-  { value: "approvalRate", label: "По % одобрения" },
-  { value: "avgTime", label: "По среднему времени" },
-];
-
 const STATUS_LABELS: Record<string, string> = {
   free: "Свободен",
   overdue: "Просрочен",
@@ -46,14 +46,58 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  free: "bg-green-100 text-green-700",
-  overdue: "bg-red-100 text-red-700",
-  busy: "bg-blue-100 text-blue-700",
+  free: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
+  overdue: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+  busy: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
 };
 
 function truncate(str: string, max: number): string {
   if (!str) return "";
   return str.length > max ? str.slice(0, max) + "…" : str;
+}
+
+// Кликабельный заголовок колонки с индикатором сортировки
+function SortTh({
+  label,
+  sortKey: key,
+  currentKey,
+  currentDir,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey;
+  currentDir: SortDir;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}) {
+  const active = currentKey === key;
+  return (
+    <th
+      className={cn(
+        "px-4 py-2.5 text-right font-medium cursor-pointer select-none group",
+        className
+      )}
+      onClick={() => onSort(key)}
+    >
+      <span className="inline-flex items-center justify-end gap-1">
+        {label}
+        {active ? (
+          currentDir === "desc" ? (
+            <ArrowDown size={12} className="text-primary shrink-0" />
+          ) : (
+            <ArrowUp size={12} className="text-primary shrink-0" />
+          )
+        ) : (
+          <ArrowUpDown
+            size={12}
+            className="text-muted-foreground/40 group-hover:text-muted-foreground shrink-0"
+          />
+        )}
+      </span>
+    </th>
+  );
 }
 
 function StudentsContent() {
@@ -102,6 +146,16 @@ function StudentsContent() {
     setFaculty("_all");
   };
 
+  // Клик по заголовку: если уже активна — переключаем направление, иначе — меняем ключ с desc
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
   const filtered = useMemo(() => {
     let result = [...all];
 
@@ -128,8 +182,6 @@ function StudentsContent() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const toggleDir = () => setSortDir((d) => (d === "desc" ? "asc" : "desc"));
 
   return (
     <PageShell
@@ -198,27 +250,6 @@ function StudentsContent() {
             </SelectContent>
           </Select>
         )}
-
-        <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-          <SelectTrigger className="h-9 text-sm w-[190px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SORT_OPTS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <button
-          onClick={toggleDir}
-          className="flex items-center gap-1.5 h-9 px-3 rounded-md border text-sm text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
-        >
-          {sortDir === "desc" ? <ArrowDown size={15} /> : <ArrowUp size={15} />}
-          {sortDir === "desc" ? "По убыванию" : "По возрастанию"}
-        </button>
       </div>
 
       <Card>
@@ -228,17 +259,36 @@ function StudentsContent() {
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <th className="px-4 py-2.5 text-left font-medium">Студент</th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    Ответов
-                  </th>
-                  <th className="px-4 py-2.5 text-right font-medium">
-                    Одобрено
-                  </th>
+                  <SortTh
+                    label="Ответов"
+                    sortKey="submitted"
+                    currentKey={sortKey}
+                    currentDir={sortDir}
+                    onSort={handleSort}
+                  />
+                  <SortTh
+                    label="Одобрено"
+                    sortKey="approved"
+                    currentKey={sortKey}
+                    currentDir={sortDir}
+                    onSort={handleSort}
+                  />
                   <th className="px-4 py-2.5 text-right font-medium">Откл.</th>
-                  <th className="px-4 py-2.5 text-right font-medium">%</th>
-                  <th className="px-4 py-2.5 text-right font-medium hidden md:table-cell">
-                    Ср. время
-                  </th>
+                  <SortTh
+                    label="%"
+                    sortKey="approvalRate"
+                    currentKey={sortKey}
+                    currentDir={sortDir}
+                    onSort={handleSort}
+                  />
+                  <SortTh
+                    label="Ср. время"
+                    sortKey="avgTime"
+                    currentKey={sortKey}
+                    currentDir={sortDir}
+                    onSort={handleSort}
+                    className="hidden md:table-cell"
+                  />
                   <th className="px-4 py-2.5 text-left font-medium">Статус</th>
                 </tr>
               </thead>
@@ -258,43 +308,41 @@ function StudentsContent() {
                       colSpan={7}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      Нет данных
+                      Нет студентов
                     </td>
                   </tr>
                 ) : (
                   paginated.map((s) => {
-                    const fullName = [s.firstName, s.lastName]
-                      .filter(Boolean)
-                      .join(" ");
                     return (
                       <tr
                         key={s.id}
-                        className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"
+                        className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                         onClick={() => router.push(`/students/${s.id}`)}
                       >
                         <td className="px-4 py-2.5">
-                          <p className="font-medium text-sm" title={fullName}>
-                            {truncate(fullName, 12) || "—"}
+                          <p className="font-medium">
+                            {truncate(
+                              [s.firstName, s.lastName]
+                                .filter(Boolean)
+                                .join(" "),
+                              28
+                            )}
                           </p>
                           {s.username && (
                             <p className="text-xs text-muted-foreground">
-                              @{truncate(s.username, 12)}
+                              @{s.username}
                             </p>
                           )}
                         </td>
                         <td className="px-4 py-2.5 text-right">
                           {s.submitted}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-green-600">
-                          {s.approved}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-red-500">
-                          {s.rejected}
-                        </td>
+                        <td className="px-4 py-2.5 text-right">{s.approved}</td>
+                        <td className="px-4 py-2.5 text-right">{s.rejected}</td>
                         <td className="px-4 py-2.5 text-right">
-                          {s.approvalRate}%
+                          {s.submitted > 0 ? `${s.approvalRate}%` : "—"}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">
+                        <td className="px-4 py-2.5 text-right hidden md:table-cell">
                           {s.avgTime ? `${s.avgTime} мин` : "—"}
                         </td>
                         <td className="px-4 py-2.5">

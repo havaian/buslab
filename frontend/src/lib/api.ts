@@ -54,6 +54,8 @@ export const authApi = {
       id_token: idToken,
     }),
   me: () => get<PanelUser>("/auth/me"),
+  setPreferences: (theme: "light" | "dark") =>
+    patch<{ ok: boolean }>("/auth/preferences", { theme }),
 };
 
 // ── Requests ──────────────────────────────────────────────────────────────
@@ -285,6 +287,7 @@ export interface PanelUser {
   university?: string | null;
   faculty?: string | null;
   course?: number | null;
+  theme?: "light" | "dark";
 }
 
 export interface CitizenUser {

@@ -15,11 +15,10 @@ import {
   Legend,
 } from "recharts";
 import { FileText, Clock, CheckCircle, AlertCircle, Users } from "lucide-react";
-import { statsApi, type DashboardStats, type StudentSummary } from "@/lib/api";
+import { statsApi, type DashboardStats } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDate } from "@/lib/utils";
 
 const PIE_COLORS = [
   "#6366f1",
@@ -97,6 +96,18 @@ function PeriodCard({
   );
 }
 
+// Разделитель секций с заголовком
+function SectionLabel({ title }: { title: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
+        {title}
+      </p>
+      <div className="flex-1 border-t" />
+    </div>
+  );
+}
+
 function DashboardContent() {
   const { user } = useAuth();
   const router = useRouter();
@@ -144,8 +155,9 @@ function DashboardContent() {
 
   return (
     <PageShell title="Дашборд">
-      {/* Main stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+      {/* ── Обращения ───────────────────────────────────────────────────────── */}
+      <SectionLabel title="Обращения" />
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard
           label="Всего обращений"
           value={stats.totals.total}
@@ -176,8 +188,9 @@ function DashboardContent() {
         />
       </div>
 
-      {/* Period cards */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      {/* ── За период ───────────────────────────────────────────────────────── */}
+      <SectionLabel title="За период" />
+      <div className="grid grid-cols-3 gap-3 mb-6">
         <PeriodCard
           label="За сегодня"
           value={stats.periods.today}
@@ -206,8 +219,9 @@ function DashboardContent() {
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+      {/* ── Графики ─────────────────────────────────────────────────────────── */}
+      <SectionLabel title="Графики" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">
@@ -265,90 +279,97 @@ function DashboardContent() {
         </Card>
       </div>
 
-      {/* University/Faculty/Course breakdown */}
+      {/* ── Студенты ────────────────────────────────────────────────────────── */}
       {(stats.users.byUniversity.length > 0 ||
         stats.users.byFaculty.length > 0 ||
         stats.users.byCourse.length > 0) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">По университетам</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {stats.users.byUniversity.map((u) => (
-                  <button
-                    key={u._id}
-                    onClick={() => router.push(`/students?university=${u._id}`)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <span className="text-sm truncate">{u.name}</span>
-                    <span className="text-sm font-semibold shrink-0 ml-2">
-                      {u.count}
-                    </span>
-                  </button>
-                ))}
-                {stats.users.byUniversity.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-4 py-3">
-                    Нет данных
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        <>
+          <SectionLabel title="Студенты" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">По университетам</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {stats.users.byUniversity.map((u) => (
+                    <button
+                      key={u._id}
+                      onClick={() =>
+                        router.push(`/students?university=${u._id}`)
+                      }
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <span className="text-sm truncate">{u.name}</span>
+                      <span className="text-sm font-semibold shrink-0 ml-2">
+                        {u.count}
+                      </span>
+                    </button>
+                  ))}
+                  {stats.users.byUniversity.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-4 py-3">
+                      Нет данных
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">По факультетам</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {stats.users.byFaculty.map((f) => (
-                  <button
-                    key={f._id}
-                    onClick={() => router.push(`/students?faculty=${f._id}`)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <span className="text-sm truncate">{f.name}</span>
-                    <span className="text-sm font-semibold shrink-0 ml-2">
-                      {f.count}
-                    </span>
-                  </button>
-                ))}
-                {stats.users.byFaculty.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-4 py-3">
-                    Нет данных
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">По факультетам</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {stats.users.byFaculty.map((f) => (
+                    <button
+                      key={f._id}
+                      onClick={() => router.push(`/students?faculty=${f._id}`)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <span className="text-sm truncate">{f.name}</span>
+                      <span className="text-sm font-semibold shrink-0 ml-2">
+                        {f.count}
+                      </span>
+                    </button>
+                  ))}
+                  {stats.users.byFaculty.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-4 py-3">
+                      Нет данных
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">По курсам</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="divide-y">
-                {stats.users.byCourse.map((c) => (
-                  <button
-                    key={c.course}
-                    onClick={() => router.push(`/students?course=${c.course}`)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
-                  >
-                    <span className="text-sm">{c.course} курс</span>
-                    <span className="text-sm font-semibold">{c.count}</span>
-                  </button>
-                ))}
-                {stats.users.byCourse.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-4 py-3">
-                    Нет данных
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">По курсам</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {stats.users.byCourse.map((c) => (
+                    <button
+                      key={c.course}
+                      onClick={() =>
+                        router.push(`/students?course=${c.course}`)
+                      }
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <span className="text-sm">{c.course} курс</span>
+                      <span className="text-sm font-semibold">{c.count}</span>
+                    </button>
+                  ))}
+                  {stats.users.byCourse.length === 0 && (
+                    <p className="text-xs text-muted-foreground px-4 py-3">
+                      Нет данных
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
     </PageShell>
   );

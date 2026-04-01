@@ -14,8 +14,11 @@ import {
   BarChart2,
   LogOut,
   Settings,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 const adminNav = [
   { href: "/dashboard", label: "Дашборд", icon: LayoutDashboard },
@@ -42,6 +45,7 @@ interface SidebarProps {
 
 export function Sidebar({ role, firstName, lastName, logout }: SidebarProps) {
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
 
   // Citizen role has no sidebar - they use bottom nav only
   if (role === "user") return null;
@@ -78,7 +82,7 @@ export function Sidebar({ role, firstName, lastName, logout }: SidebarProps) {
         ))}
       </nav>
 
-      {/* User + logout */}
+      {/* User + logout + theme */}
       <div className="border-t p-4">
         <div className="mb-3">
           <p className="text-xs font-medium truncate">
@@ -88,13 +92,22 @@ export function Sidebar({ role, firstName, lastName, logout }: SidebarProps) {
             {role === "admin" ? "Администратор" : "Студент"}
           </p>
         </div>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <LogOut size={14} />
-          Выйти
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <LogOut size={14} />
+            Выйти
+          </button>
+          <button
+            onClick={toggle}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
+          >
+            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+        </div>
       </div>
     </aside>
   );

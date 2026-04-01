@@ -13,6 +13,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { BannedBadge } from "@/components/shared/banned-badge";
 import { useToast } from "@/components/ui/toast-provider";
 import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDate, getUserDisplayName } from "@/lib/utils";
@@ -167,15 +168,7 @@ export default function UserDetailPage() {
               )}
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground shrink-0">Статус</span>
-                <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    user.isBanned
-                      ? "bg-red-100 text-red-700"
-                      : "bg-green-100 text-green-700"
-                  }`}
-                >
-                  {user.isBanned ? "Заблокирован" : "Активен"}
-                </span>
+                <BannedBadge isBanned={user.isBanned} />
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground shrink-0">
@@ -216,10 +209,10 @@ export default function UserDetailPage() {
           </Button>
         </div>
 
-        {/* Right: history */}
-        <div className="lg:col-span-2">
+        {/* Right: request history */}
+        <div className="lg:col-span-2 space-y-3">
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2">
               <CardTitle className="text-sm">
                 История обращений ({history.length})
               </CardTitle>
@@ -227,22 +220,21 @@ export default function UserDetailPage() {
             <CardContent className="p-0">
               {history.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-4 py-4">
-                  Обращений нет
+                  Нет обращений
                 </p>
               ) : (
                 <div className="divide-y">
                   {history.map((r) => (
                     <div
                       key={r._id}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 cursor-pointer"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 cursor-pointer transition-colors"
                       onClick={() => router.push(`/requests/${r._id}`)}
                     >
-                      <span className="font-mono text-xs text-muted-foreground shrink-0">
-                        #{r._id.slice(-6)}
-                      </span>
                       <StatusBadge status={r.status} />
-                      <span className="flex-1 truncate text-sm">{r.text}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 hidden sm:inline">
+                      <span className="text-xs text-muted-foreground truncate flex-1">
+                        {r.text}
+                      </span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
                         {formatDate(r.createdAt)}
                       </span>
                     </div>

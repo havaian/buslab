@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Sun, Moon } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { Sidebar } from "@/components/layout/sidebar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { useTgSafeArea } from "@/hooks/use-tg-safe-area";
+import { useTheme } from "@/hooks/use-theme";
 
 // Высота BottomNav (h-16 = 4rem = 64px)
 const BOTTOM_NAV_H = 64;
@@ -18,6 +20,7 @@ export default function PanelLayout({
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const { top: tgTop, bottom: tgBottom } = useTgSafeArea();
+  const { theme, toggle } = useTheme();
 
   const isMiniApp = tgTop > 0 || tgBottom > 0;
 
@@ -38,8 +41,6 @@ export default function PanelLayout({
 
   if (!user) return null;
 
-  const isCitizen = user.role === "user";
-
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
@@ -57,27 +58,43 @@ export default function PanelLayout({
         */}
         {isMiniApp && (
           <div
-            className="flex shrink-0 items-center justify-center gap-2 border-b bg-background lg:hidden"
+            className="flex shrink-0 items-center justify-between border-b bg-background lg:hidden px-3"
             style={{
               paddingTop: tgTop,
               height: 56 + tgTop,
             }}
           >
-            <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
-            <span className="font-semibold text-sm">Юридическая клиника</span>
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
+              <span className="font-semibold text-sm">Юридическая клиника</span>
+            </div>
+            <button
+              onClick={toggle}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
         )}
 
         {/* Обычный браузер */}
         {!isMiniApp && (
           <div
-            className="flex shrink-0 items-center gap-3 border-b px-4 lg:hidden"
+            className="flex shrink-0 items-center justify-between border-b px-4 lg:hidden"
             style={{ height: 56 }}
           >
-            <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
-            <span className="font-semibold text-sm truncate">
-              Юридическая клиника
-            </span>
+            <div className="flex items-center gap-3 min-w-0">
+              <img src="/logo.svg" alt="" className="h-6 w-6 shrink-0" />
+              <span className="font-semibold text-sm truncate">
+                Юридическая клиника
+              </span>
+            </div>
+            <button
+              onClick={toggle}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
         )}
 

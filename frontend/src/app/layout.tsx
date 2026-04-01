@@ -27,13 +27,20 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+// Инлайн-скрипт применяет тему ДО первого рендера — устраняет flash
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ru">
+    // suppressHydrationWarning нужен т.к. инлайн-скрипт меняет className до гидратации
+    <html lang="ru" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={inter.className}>
         <AuthProvider>
           <ToastProvider>

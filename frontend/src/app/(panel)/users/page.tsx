@@ -15,6 +15,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { BannedBadge } from "@/components/shared/banned-badge";
 import { useToast } from "@/components/ui/toast-provider";
 import { useDialog } from "@/components/ui/dialog-provider";
 import { formatDateShort, getUserDisplayName } from "@/lib/utils";
@@ -156,11 +157,13 @@ export default function UsersPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[480px]">
+            <table className="w-full text-sm min-w-[560px]">
               <thead>
                 <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 text-left font-medium">Имя</th>
-                  <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">
+                  <th className="px-4 py-2.5 text-left font-medium">
+                    Пользователь
+                  </th>
+                  <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
                     Username
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
@@ -171,9 +174,9 @@ export default function UsersPage() {
                   </th>
                   <th className="px-4 py-2.5 text-left font-medium">Статус</th>
                   <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">
-                    Регистрация
+                    Дата
                   </th>
-                  <th className="px-4 py-2.5 text-left font-medium"></th>
+                  <th className="px-4 py-2.5" />
                 </tr>
               </thead>
               <tbody>
@@ -192,22 +195,20 @@ export default function UsersPage() {
                       colSpan={7}
                       className="px-4 py-8 text-center text-muted-foreground"
                     >
-                      Пользователей не найдено
+                      Нет пользователей
                     </td>
                   </tr>
                 ) : (
                   users.map((u) => (
                     <tr
                       key={u._id}
+                      className="border-b last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                       onClick={() => router.push(`/users/${u._id}`)}
-                      className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
                     >
                       <td className="px-4 py-2.5 font-medium">
-                        <span className="block truncate max-w-[140px]">
-                          {getUserDisplayName(u)}
-                        </span>
+                        {getUserDisplayName(u)}
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">
+                      <td className="px-4 py-2.5 text-muted-foreground hidden md:table-cell">
                         {u.username ? `@${u.username}` : "-"}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground hidden md:table-cell whitespace-nowrap">
@@ -217,15 +218,7 @@ export default function UsersPage() {
                         {u.language.toUpperCase()}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span
-                          className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                            u.isBanned
-                              ? "bg-red-100 text-red-700"
-                              : "bg-green-100 text-green-700"
-                          }`}
-                        >
-                          {u.isBanned ? "Заблок." : "Активен"}
-                        </span>
+                        <BannedBadge isBanned={u.isBanned} />
                       </td>
                       <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap hidden md:table-cell">
                         {formatDateShort(u.createdAt)}
@@ -240,8 +233,8 @@ export default function UsersPage() {
                           disabled={busy}
                           className={
                             u.isBanned
-                              ? "text-green-600 border-green-200 hover:bg-green-50 text-xs"
-                              : "text-red-600 border-red-200 hover:bg-red-50 text-xs"
+                              ? "text-green-600 border-green-200 hover:bg-green-50 dark:text-green-400 dark:border-green-900 dark:hover:bg-green-950/30 text-xs"
+                              : "text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-950/30 text-xs"
                           }
                           onClick={() => toggleBlock(u)}
                         >

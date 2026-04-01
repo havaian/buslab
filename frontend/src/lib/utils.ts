@@ -16,12 +16,16 @@ export const STATUS_LABELS: Record<RequestStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<RequestStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  approved: "bg-blue-100 text-blue-800",
-  declined: "bg-red-100 text-red-800",
-  assigned: "bg-purple-100 text-purple-800",
-  answered: "bg-orange-100 text-orange-800",
-  closed: "bg-green-100 text-green-800",
+  pending:
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300",
+  approved: "bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
+  declined: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300",
+  assigned:
+    "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300",
+  answered:
+    "bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
+  closed:
+    "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300",
 };
 
 export function formatDate(iso: string): string {

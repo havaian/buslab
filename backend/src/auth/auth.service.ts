@@ -98,6 +98,7 @@ export class AuthService {
         lastName: user.lastName,
         username: user.username,
         role: user.role,
+        theme: user.theme ?? "light",
       },
     };
   }
@@ -113,6 +114,12 @@ export class AuthService {
       lastName: user.lastName,
       username: user.username,
       role: user.role,
+      theme: (user as any).theme ?? "light",
     };
+  }
+
+  async setPreferences(userId: string, theme: "light" | "dark") {
+    await this.userModel.updateOne({ _id: userId }, { $set: { theme } });
+    return { ok: true };
   }
 }

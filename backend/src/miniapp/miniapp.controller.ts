@@ -137,6 +137,7 @@ export class MiniappController {
         lastName: user.lastName,
         username: user.username,
         role: user.role,
+        theme: (user as any).theme ?? "light",
       },
     };
   }
@@ -161,6 +162,7 @@ export class MiniappController {
           university: u.university ?? null,
           faculty: u.faculty ?? null,
           course: u.course ?? null,
+          theme: (u as any).theme ?? "light",
         };
       });
   }

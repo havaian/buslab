@@ -9,9 +9,11 @@ import { useToast } from "@/components/ui/toast-provider";
 
 function StatusBadge({ status }: { status: ScriptRun["status"] }) {
   const map = {
-    running: "bg-yellow-100 text-yellow-800",
-    success: "bg-green-100 text-green-800",
-    error: "bg-red-100 text-red-800",
+    running:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300",
+    success:
+      "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300",
+    error: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300",
   };
   const labels = {
     running: "Выполняется",
