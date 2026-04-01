@@ -60,8 +60,8 @@ export default function PanelLayout({
           <div
             className="flex shrink-0 items-center justify-between border-b bg-background lg:hidden px-3"
             style={{
-              paddingTop: tgTop,
-              height: 56 + tgTop,
+              paddingTop: Math.round(tgTop * 1.3),
+              height: 56 + Math.round(tgTop * 1.3),
             }}
           >
             <div className="flex items-center gap-2">
