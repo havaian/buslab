@@ -54,8 +54,8 @@ function RunDetail({ runId, onClose }: { runId: string; onClose: () => void }) {
   }, [run?.output]);
 
   return (
-    <div className="mt-4 border rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-muted border-b">
+    <div className="border-t">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/30">
         <div className="flex items-center gap-2 text-sm font-medium">
           {run && <StatusBadge status={run.status} />}
           <span className="text-muted-foreground text-xs">
@@ -102,8 +102,9 @@ export function ScriptsTab() {
     setRunning(true);
     try {
       const { runId } = await scriptsApi.run();
-      setActiveRunId(runId);
+      // Обновляем историю и открываем лог нового запуска внутри карточки истории
       await loadLogs();
+      setActiveRunId(runId);
     } catch (e: unknown) {
       toast((e as Error).message || "Ошибка запуска", "error");
       setRunning(false);
@@ -112,6 +113,7 @@ export function ScriptsTab() {
 
   return (
     <div className="space-y-4">
+      {/* Карточка запуска — только описание и кнопки, без вывода лога */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
@@ -134,57 +136,60 @@ export function ScriptsTab() {
               Обновить
             </Button>
           </div>
-          {activeRunId && (
-            <RunDetail
-              runId={activeRunId}
-              onClose={() => setActiveRunId(null)}
-            />
-          )}
         </CardContent>
       </Card>
 
+      {/* Карточка истории — лог раскрывается прямо под кликнутым элементом */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">История запусков</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Загрузка...</p>
+            <p className="text-sm text-muted-foreground px-4 pb-4">
+              Загрузка...
+            </p>
           ) : logs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground px-4 pb-4">
               Запусков ещё не было
             </p>
           ) : (
-            <div className="space-y-1">
+            <div>
               {logs.map((run) => (
-                <button
-                  key={run._id}
-                  onClick={() =>
-                    setActiveRunId(activeRunId === run._id ? null : run._id)
-                  }
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm border transition-colors hover:bg-muted ${
-                    activeRunId === run._id
-                      ? "bg-muted border-border"
-                      : "border-transparent"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={run.status} />
-                    <span className="text-muted-foreground text-xs">
-                      {new Date(run.createdAt).toLocaleString("ru-RU")}
-                    </span>
-                  </div>
-                  {run.finishedAt && (
-                    <span className="text-xs text-muted-foreground">
-                      {Math.round(
-                        (new Date(run.finishedAt).getTime() -
-                          new Date(run.createdAt).getTime()) /
-                          1000
-                      )}
-                      с
-                    </span>
+                <div key={run._id}>
+                  <button
+                    onClick={() =>
+                      setActiveRunId(activeRunId === run._id ? null : run._id)
+                    }
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm border-t first:border-t-0 transition-colors hover:bg-muted/30 ${
+                      activeRunId === run._id ? "bg-muted/40" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={run.status} />
+                      <span className="text-muted-foreground text-xs">
+                        {new Date(run.createdAt).toLocaleString("ru-RU")}
+                      </span>
+                    </div>
+                    {run.finishedAt && (
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(
+                          (new Date(run.finishedAt).getTime() -
+                            new Date(run.createdAt).getTime()) /
+                            1000
+                        )}
+                        с
+                      </span>
+                    )}
+                  </button>
+                  {/* Лог раскрывается прямо под этим элементом */}
+                  {activeRunId === run._id && (
+                    <RunDetail
+                      runId={run._id}
+                      onClose={() => setActiveRunId(null)}
+                    />
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}
