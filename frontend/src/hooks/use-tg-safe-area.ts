@@ -1,50 +1,45 @@
-import { useEffect, useState } from "react";
+// frontend/src/hooks/use-tg-safe-area.ts
 
-/**
- * Читает отступы из Telegram Mini App SDK напрямую через JS.
- *
- * top    - высота нативного overlay Telegram (кнопки Close, бургер)
- * bottom - высота нативных кнопок телефона (домой, назад, последние приложения)
- *
- * Если SDK вернул реальное значение — умножаем на TOP_MULTIPLIER.
- * Если 0 (старый клиент / баг) — используем FALLBACK_TOP_PX.
- */
+import { useEffect, useState } from "react";
 
 const TOP_MULTIPLIER = 1.5;
 const FALLBACK_TOP_PX = 48;
 
 export function useTgSafeArea() {
-  const [top, setTop] = useState(0);
+  const [top, setTop] = useState(FALLBACK_TOP_PX); // сразу fallback, не 0
   const [bottom, setBottom] = useState(0);
 
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
-    if (!tg) return;
-
     const update = () => {
-      // contentSafeAreaInset.top - высота Telegram overlay (Bot API 8.0+)
+      const tg = (window as any).Telegram?.WebApp;
+      if (!tg) return false;
+
       const contentTop = tg.contentSafeAreaInset?.top ?? 0;
-      // safeAreaInset.top - системный safe area (Bot API 7.10+), fallback
       const safeTop = tg.safeAreaInset?.top ?? 0;
       const rawTop = Math.max(contentTop, safeTop);
+
       setTop(
         rawTop > 0 ? Math.round(rawTop * TOP_MULTIPLIER) : FALLBACK_TOP_PX
       );
+      setBottom(tg.safeAreaInset?.bottom ?? 0);
 
-      // safeAreaInset.bottom - нативные кнопки телефона (Bot API 7.10+)
-      const safeBottom = tg.safeAreaInset?.bottom ?? 0;
-      setBottom(safeBottom);
+      tg.onEvent?.("contentSafeAreaChanged", update);
+      tg.onEvent?.("safeAreaChanged", update);
+
+      return true;
     };
 
-    update();
-
-    // Подписываемся на изменения (например при повороте экрана)
-    tg.onEvent?.("contentSafeAreaChanged", update);
-    tg.onEvent?.("safeAreaChanged", update);
+    // Первая попытка
+    if (!update()) {
+      // SDK ещё не готов — повторяем через 300ms
+      const t = setTimeout(update, 300);
+      return () => clearTimeout(t);
+    }
 
     return () => {
-      tg.offEvent?.("contentSafeAreaChanged", update);
-      tg.offEvent?.("safeAreaChanged", update);
+      const tg = (window as any).Telegram?.WebApp;
+      tg?.offEvent?.("contentSafeAreaChanged", update);
+      tg?.offEvent?.("safeAreaChanged", update);
     };
   }, []);
 
