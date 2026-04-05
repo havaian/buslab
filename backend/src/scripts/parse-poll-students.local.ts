@@ -169,7 +169,7 @@ async function main() {
   if (!API_ID || !API_HASH)
     throw new Error("TELEGRAM_API_ID / TELEGRAM_API_HASH не заданы");
 
-  console.log(`MongoDB: ${MONGO}`);
+  console.log(`MongoDB: ✅`);
   console.log("Подключаемся к Telegram...");
 
   const client = new TelegramClient(
