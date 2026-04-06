@@ -1,7 +1,7 @@
 {
   "commands": {
     "start": {
-      "welcome_user": "Huquqiy klinika botiga xush kelibsiz!\n\nBu yerda siz:\n- Huquqiy savol berishingiz\n- Tez-tez beriladigan savollarni ko'rishingiz (FAQ)\n- Murojaatlaringiz holatini kuzatishingiz mumkin\n\nQuyidagi menyudan amalni tanlang:\n\n📄 [Maxfiylik siyosati va foydalanish shartlari](https://huquqbot.uz/privacy)",
+      "welcome_user": "Huquqiy klinika botiga xush kelibsiz!\n\nBu yerda siz:\n- Huquqiy savol berishingiz\n- Tez-tez beriladigan savollarni ko'rishingiz (FAQ)\n- Murojaatlaringiz holatini kuzatishingiz mumkin\n\nQuyidagi menyudan amalni tanlang:\n\n",
       "welcome_student": "Xush kelibsiz!\n\nSiz yangi murojaatlar haqida bildirishnomalar olasiz. Ishlash uchun veb-paneldan foydalaning."
     }
   },

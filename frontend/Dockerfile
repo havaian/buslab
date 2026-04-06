@@ -9,6 +9,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Копируем воркер PDF.js в public/ чтобы он раздавался статически
+RUN cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdf.worker.min.mjs
+
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_TELEGRAM_BOT_NAME
 ARG NEXT_PUBLIC_TELEGRAM_BOT_CLIENT_ID

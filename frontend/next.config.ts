@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  webpack: (config) => {
+    // react-pdf/pdfjs-dist тянет canvas как опциональную зависимость,
+    // в браузере она не нужна — отключаем чтобы не падал билд
+    config.resolve.alias.canvas = false;
+    return config;
+  },
   async rewrites() {
     return [
       {
