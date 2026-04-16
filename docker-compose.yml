@@ -17,6 +17,11 @@ services:
       - ./backend/uploads:/app/uploads
     networks:
       - legal_net
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
 
   frontend:
     build:
@@ -36,6 +41,11 @@ services:
       - "127.0.0.1:${FRONTEND_EXPOSE}:${FRONTEND_PORT}"
     networks:
       - legal_net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
 
 networks:
   legal_net:
