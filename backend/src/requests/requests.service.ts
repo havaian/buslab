@@ -622,13 +622,21 @@ export class RequestsService {
     }
 
     const user = req.userId as any;
-    if (user?.telegramId)
-      await this.notifications.notifyUserAnswerReady(
+    if (user?.telegramId) {
+      const ratingMsgId = await this.notifications.notifyUserAnswerReady(
         String(user.telegramId),
         user.language || "ru",
         req.finalAnswerText,
-        req.answerFiles ?? []
+        req.answerFiles ?? [],
+        String(req._id)
       );
+      if (ratingMsgId) {
+        await this.requestModel.updateOne(
+          { _id: req._id },
+          { ratingMessageId: ratingMsgId }
+        );
+      }
+    }
 
     return req;
   }
@@ -1060,5 +1068,120 @@ export class RequestsService {
       .sort({ createdAt: -1 })
       .populate("categoryId", "name hashtag")
       .lean();
+  }
+
+  // ── CITIZEN RATING ────────────────────────────────────────────────────────
+
+  /**
+   * Гражданин выставляет оценку ответу.
+   * telegramId используется как доказательство собственности обращения —
+   * только автор обращения может ставить оценку.
+   *
+   * confirm=false → это предварительный выбор (переписываемый)
+   * confirm=true  → финализация. Требует, чтобы уже был выбран rating.
+   *
+   * Возвращает результат для бот-хендлера:
+   *  - owner=false        → юзер не автор обращения (callback не от него)
+   *  - alreadyConfirmed   → ratedAt уже установлен, дальнейшие клики игнорируются
+   *  - needPick           → попытка confirm без предварительного выбора
+   *  - updated            → предварительная оценка записана
+   *  - confirmed          → финальная оценка записана
+   */
+  async rateAnswer(
+    requestId: string,
+    telegramId: number | string,
+    star: number | null,
+    confirm: boolean
+  ): Promise<{
+    outcome:
+      | "owner_mismatch"
+      | "not_found"
+      | "already_confirmed"
+      | "need_pick"
+      | "updated"
+      | "confirmed"
+      | "bad_status";
+    rating?: number;
+    chatId?: string;
+    messageId?: number | null;
+    language?: string;
+  }> {
+    if (!Types.ObjectId.isValid(requestId)) return { outcome: "not_found" };
+
+    const req = await this.requestModel
+      .findById(requestId)
+      .populate("userId", "telegramId language");
+    if (!req) return { outcome: "not_found" };
+
+    const user = req.userId as any;
+    if (!user?.telegramId || String(user.telegramId) !== String(telegramId)) {
+      return { outcome: "owner_mismatch" };
+    }
+
+    // Разрешаем оценивать только закрытые обращения (ответ уже отправлен)
+    if (req.status !== "closed") {
+      return { outcome: "bad_status" };
+    }
+
+    const chatId = String(user.telegramId);
+    const language: string = user.language || "ru";
+    const messageId = req.ratingMessageId;
+
+    if (req.ratedAt) {
+      return {
+        outcome: "already_confirmed",
+        rating: req.rating ?? undefined,
+        chatId,
+        messageId,
+        language,
+      };
+    }
+
+    if (confirm) {
+      // Финализация: нужен предварительный выбор
+      const selected = req.rating;
+      if (!selected || selected < 1 || selected > 5) {
+        return { outcome: "need_pick", chatId, messageId, language };
+      }
+      req.ratedAt = new Date();
+      await req.save();
+
+      await this.log({
+        requestId: req._id as any,
+        action: RequestHistoryAction.ANSWER_RATED,
+        performedBy: null,
+        performedByRole: "citizen",
+        statusFrom: req.status,
+        statusTo: req.status,
+        comment: String(selected),
+      });
+
+      return {
+        outcome: "confirmed",
+        rating: selected,
+        chatId,
+        messageId,
+        language,
+      };
+    }
+
+    // Предварительный выбор
+    if (star === null || star < 1 || star > 5) {
+      return { outcome: "need_pick", chatId, messageId, language };
+    }
+
+    // Никаких лишних записей в БД если юзер тыкнул ту же звезду
+    if (req.rating !== star) {
+      req.rating = star;
+      await req.save();
+    }
+
+    return {
+      outcome: "updated",
+      rating: star,
+      chatId,
+      messageId,
+      language,
+    };
   }
 }

@@ -8,6 +8,7 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  Star,
 } from "lucide-react";
 import {
   adminUsersApi,
@@ -81,7 +82,9 @@ export default function StudentDetailPage() {
     facValue: string | null | undefined
   ) => {
     if (!uniValue || !facValue) return null;
-    const uni = unis.find((u) => String(u._id) === uniValue || u.code === uniValue);
+    const uni = unis.find(
+      (u) => String(u._id) === uniValue || u.code === uniValue
+    );
     return (
       uni?.faculties.find(
         (f) => String(f._id) === facValue || f.code === facValue
@@ -192,6 +195,46 @@ export default function StudentDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Средняя оценка от граждан */}
+          <Card className="border-yellow-400/40 bg-yellow-400/5">
+            <CardContent className="flex items-center gap-4 pt-5 pb-5">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-yellow-400/15">
+                {stats.avgRating !== null ? (
+                  <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {stats.avgRating.toFixed(1)}
+                  </span>
+                ) : (
+                  <Star className="h-6 w-6 text-yellow-500" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold flex items-center gap-1.5">
+                  Средняя оценка
+                  {stats.avgRating !== null && (
+                    <span className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          size={12}
+                          className={
+                            n <= Math.round(stats.avgRating!)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground/30"
+                          }
+                        />
+                      ))}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {stats.ratingCount > 0
+                    ? `Кол-во оценок: ${stats.ratingCount}`
+                    : "Оценок от граждан пока нет"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-2 gap-3">
             {(

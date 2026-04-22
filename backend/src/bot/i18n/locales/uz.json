@@ -77,5 +77,14 @@
   },
   "help": {
     "user": "📚 **Huquqiy klinika bot foydalanish qo'llanmasi**\n\n**Asosiy funksiyalar:**\n\n🔸 **Savol berish**\n   • Huquqiy savolingiz uchun mos kategoriyani tanlang\n   • Vaziyatingizni batafsil tasvirlab bering (kamida 150 belgi)\n   • Matnni tekshiring va yuborishni tasdiqlang\n\n🔸 **FAQ (Tez-tez beriladigan savollar)**\n   • Mashhur savollarga tayyor javoblarni ko'ring\n   • Kategoriyani tanlang va mos savolni toping\n\n🔸 **Mening murojaatlarim**\n   • Murojaatlaringiz holatini kuzating\n   • Olingan javoblarni ko'ring\n\n**📋 Murojaatlar holatlari:**\n• ⏳ Ko'rib chiqilmoqda\n• 👨‍💼 Ijrochi kutilmoqda\n• 🔄 Ishlanmoqda\n• ✅ Javob tekshirilmoqda\n• ✅ Yopildi\n• ❌ Rad etildi\n\n**📝 Savollarga talablar:**\n• Murojaat matnida kamida 150 belgi\n• Huquqiy vaziyatingizni aniq ifodalang\n\n**⏰ Ishlov berish vaqti:**\n• Admin ko'rib chiqishi: odatda 1-2 kun\n• Talaba javob tayyorlashi: 3-7 kun\n• Admin javobni tekshirishi: 1-2 kun"
+  },
+  "rating": {
+    "prompt": "⭐ <b>Olingan javob sifatini baholang</b>\n\n1 (yomon) dan 5 (a'lo) gacha. Yulduzlar sonini tanlang va «Tasdiqlash» tugmasini bosing. Tasdiqlashgacha bahoni o'zgartirish mumkin.",
+    "current": "Sizning bahoingiz: {{stars}}",
+    "confirm_btn": "✅ Tasdiqlash",
+    "change_btn": "✏️ O'zgartirish",
+    "thanks": "🙏 Baho uchun rahmat!\n\nSizning bahoingiz: {{stars}}",
+    "pick_first": "Avval yulduzlar sonini tanlang",
+    "already_rated": "Baho allaqachon tasdiqlangan"
   }
 }

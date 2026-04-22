@@ -14,7 +14,14 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { FileText, Clock, CheckCircle, AlertCircle, Users } from "lucide-react";
+import {
+  FileText,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Users,
+  Star,
+} from "lucide-react";
 import { statsApi, type DashboardStats } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { PageShell } from "@/components/layout/page-shell";
@@ -278,6 +285,152 @@ function DashboardContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Оценки граждан ──────────────────────────────────────────────── */}
+      {stats.ratings.count > 0 && (
+        <>
+          <SectionLabel title="Оценки от граждан" />
+
+          {/* Карточки */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <Card className="border-yellow-400/40 bg-yellow-400/5">
+              <CardContent className="flex items-center gap-3 pt-5 pb-5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-yellow-400/15">
+                  <Star size={16} className="fill-yellow-400 text-yellow-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold">
+                    {stats.ratings.avg !== null
+                      ? stats.ratings.avg.toFixed(1)
+                      : "-"}
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Средняя оценка
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 pt-5 pb-5">
+                <div className="rounded-lg p-2.5 shrink-0 bg-blue-500">
+                  <CheckCircle size={16} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold">{stats.ratings.count}</p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Всего оценок
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 pt-5 pb-5">
+                <div className="rounded-lg p-2.5 shrink-0 bg-green-500">
+                  <FileText size={16} className="text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-2xl font-bold">
+                    {stats.ratings.ratedShare}%
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Закрытых с оценкой
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Распределение + Топ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Распределение оценок</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart
+                    data={stats.ratings.distribution}
+                    margin={{ top: 0, right: 0, bottom: 0, left: -20 }}
+                  >
+                    <XAxis
+                      dataKey="star"
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(v) => `${v}⭐`}
+                    />
+                    <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                    <Tooltip
+                      labelFormatter={(l) => `${l} звёзд`}
+                      formatter={(v: number) => [v, "Оценок"]}
+                    />
+                    <Bar
+                      dataKey="count"
+                      fill="#f59e0b"
+                      radius={[2, 2, 0, 0]}
+                      name="Оценок"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">
+                  Топ студентов{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    (мин. 3 оценки)
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {stats.ratings.top.length === 0 ? (
+                  <p className="text-xs text-muted-foreground px-4 py-3">
+                    Пока недостаточно данных. Нужно не менее 3 оценок.
+                  </p>
+                ) : (
+                  <div className="divide-y">
+                    {stats.ratings.top.map((s, i) => (
+                      <button
+                        key={s._id}
+                        onClick={() => router.push(`/students/${s._id}`)}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                      >
+                        <span className="text-xs text-muted-foreground shrink-0 w-4">
+                          {i + 1}.
+                        </span>
+                        <span className="text-sm truncate flex-1">
+                          {`${s.firstName} ${s.lastName}`.trim() ||
+                            s.username ||
+                            s._id.slice(-6)}
+                        </span>
+                        <span className="flex items-center gap-0.5 shrink-0">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <Star
+                              key={n}
+                              size={10}
+                              className={
+                                n <= Math.round(s.avg)
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-muted-foreground/30"
+                              }
+                            />
+                          ))}
+                        </span>
+                        <span className="text-sm font-semibold shrink-0 w-10 text-right">
+                          {s.avg.toFixed(1)}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          ({s.count})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* ── Студенты ────────────────────────────────────────────────────────── */}
       {(stats.users.byUniversity.length > 0 ||

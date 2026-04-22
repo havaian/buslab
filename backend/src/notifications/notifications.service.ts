@@ -377,14 +377,18 @@ export class NotificationsService implements OnModuleInit {
    * Sends the final answer to the citizen.
    * Automatically splits messages longer than 4096 characters (§7).
    * Sends attached files (answerFiles) after the text.
+   * Sends an additional "rate this answer" message with a 1-5 star keyboard
+   * at the very end. Returns that rating message_id (or null on failure /
+   * if answerText is empty).
    */
   async notifyUserAnswerReady(
     telegramId: string,
     language: string,
     answerText: string | null,
-    answerFiles?: { ref: string; originalName: string; source: string }[]
-  ) {
-    if (!answerText) return;
+    answerFiles?: { ref: string; originalName: string; source: string }[],
+    requestId?: string
+  ): Promise<number | null> {
+    if (!answerText) return null;
 
     const headers: Record<string, string> = {
       ru: "✅ Ваш вопрос рассмотрен. Ответ юридической клиники:\n\n",
@@ -415,6 +419,136 @@ export class NotificationsService implements OnModuleInit {
         }
       }
     }
+
+    // Send rating prompt (отдельное сообщение, чтобы не засорять сам ответ)
+    if (requestId) {
+      await new Promise((r) => setTimeout(r, 300));
+      return this.sendRatingPrompt(telegramId, language, requestId);
+    }
+
+    return null;
+  }
+
+  // ── Citizen rating keyboard ────────────────────────────────────────────
+
+  private ratingTexts(language: string): {
+    prompt: string;
+    current: string;
+    confirm: string;
+    thanks: string;
+  } {
+    const table: Record<
+      string,
+      { prompt: string; current: string; confirm: string; thanks: string }
+    > = {
+      ru: {
+        prompt:
+          "⭐ <b>Оцените качество полученного ответа</b>\n\nОт 1 (плохо) до 5 (отлично). Выберите количество звёзд и нажмите «Подтвердить». До подтверждения оценку можно изменить.",
+        current: "Ваша оценка: ",
+        confirm: "✅ Подтвердить",
+        thanks: "🙏 Спасибо за оценку!\n\nВаша оценка: ",
+      },
+      uz: {
+        prompt:
+          "⭐ <b>Olingan javob sifatini baholang</b>\n\n1 (yomon) dan 5 (a'lo) gacha. Yulduzlar sonini tanlang va «Tasdiqlash» tugmasini bosing. Tasdiqlashgacha bahoni o'zgartirish mumkin.",
+        current: "Sizning bahoingiz: ",
+        confirm: "✅ Tasdiqlash",
+        thanks: "🙏 Baho uchun rahmat!\n\nSizning bahoingiz: ",
+      },
+      en: {
+        prompt:
+          "⭐ <b>Please rate the quality of the answer</b>\n\nFrom 1 (poor) to 5 (excellent). Select the number of stars and press «Confirm». You can change your rating until you confirm it.",
+        current: "Your rating: ",
+        confirm: "✅ Confirm",
+        thanks: "🙏 Thank you for your rating!\n\nYour rating: ",
+      },
+    };
+    return table[language] || table.ru;
+  }
+
+  private stars(n: number): string {
+    // n filled + (5-n) empty
+    return "⭐".repeat(n) + "☆".repeat(Math.max(0, 5 - n));
+  }
+
+  /**
+   * Inline keyboard: row of 5 star buttons (selected one marked),
+   * plus a Confirm button if a selection exists.
+   * selected=null → only stars, no confirm (initial state).
+   */
+  private buildRatingKeyboard(
+    requestId: string,
+    selected: number | null,
+    confirmLabel: string
+  ) {
+    const starsRow = [1, 2, 3, 4, 5].map((n) => ({
+      text: selected === n ? `⭐${n}` : `${n}`,
+      callback_data: `rate:${requestId}:${n}`,
+    }));
+    const rows: any[] = [starsRow];
+    if (selected) {
+      rows.push([
+        { text: confirmLabel, callback_data: `rate_confirm:${requestId}` },
+      ]);
+    }
+    return { inline_keyboard: rows };
+  }
+
+  /** Sends the initial rating prompt (no star selected yet). */
+  async sendRatingPrompt(
+    telegramId: string,
+    language: string,
+    requestId: string
+  ): Promise<number | null> {
+    const t = this.ratingTexts(language);
+    const kb = this.buildRatingKeyboard(requestId, null, t.confirm);
+    return this.sendWithResponse(telegramId, t.prompt, kb);
+  }
+
+  /** Edits an existing rating prompt to reflect the new selection. */
+  async updateRatingSelection(
+    chatId: string,
+    messageId: number,
+    language: string,
+    requestId: string,
+    selected: number
+  ): Promise<void> {
+    if (!this.token || !chatId || !messageId) return;
+    const t = this.ratingTexts(language);
+    const newText = `${t.prompt}\n\n${t.current}${this.stars(selected)}`;
+    const kb = this.buildRatingKeyboard(requestId, selected, t.confirm);
+    try {
+      const url = `${TELEGRAM_API}/bot${this.token}/editMessageText`;
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text: newText,
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+          reply_markup: kb,
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(
+        `Failed to update rating selection ${messageId} in ${chatId}: ${e.message}`
+      );
+    }
+  }
+
+  /** Finalizes the rating message - removes keyboard, shows thanks text. */
+  async finalizeRatingMessage(
+    chatId: string,
+    messageId: number,
+    language: string,
+    selected: number
+  ): Promise<void> {
+    if (!this.token || !chatId || !messageId) return;
+    const t = this.ratingTexts(language);
+    const newText = `${t.thanks}${this.stars(selected)}`;
+    await this.editMessage(chatId, messageId, newText);
   }
 
   /** Reads a file from disk and sends it to the user via Telegram sendDocument. */

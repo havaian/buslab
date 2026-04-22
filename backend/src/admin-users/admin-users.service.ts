@@ -253,6 +253,8 @@ export class AdminUsersService {
         avgTime: 0,
         approvalRate: 0,
         rating: null,
+        avgRating: null,
+        ratingCount: 0,
       };
 
     const sid = new Types.ObjectId(studentId);
@@ -286,6 +288,31 @@ export class AdminUsersService {
 
     const rating = submitted >= 3 ? approvalRate : null;
 
+    // ── Средняя оценка от граждан ────────────────────────────────────────
+    // Считаем только обращения, где оценка финально подтверждена (ratedAt != null).
+    // Учитываются все закрытые обращения этого студента — независимо от того,
+    // правил ли админ его ответ перед отправкой (см. обсуждение с Маликом).
+    const ratingAgg = await this.requestModel.aggregate([
+      {
+        $match: {
+          studentId: sid,
+          status: "closed",
+          ratedAt: { $ne: null },
+          rating: { $gte: 1, $lte: 5 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          avg: { $avg: "$rating" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const ratingCount: number = ratingAgg[0]?.count ?? 0;
+    const avgRating: number | null =
+      ratingCount > 0 ? Math.round(ratingAgg[0].avg * 10) / 10 : null;
+
     return {
       total,
       submitted,
@@ -297,6 +324,8 @@ export class AdminUsersService {
       avgTime,
       approvalRate,
       rating,
+      avgRating,
+      ratingCount,
     };
   }
 

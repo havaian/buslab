@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   TrendingUp,
   ChevronDown,
+  Star,
 } from "lucide-react";
 import {
   adminUsersApi,
@@ -144,6 +145,46 @@ export default function MyStatsPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Средняя оценка граждан */}
+          <Card className="border-yellow-400/40 bg-yellow-400/5">
+            <CardContent className="flex items-center gap-4 pt-5 pb-5">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-yellow-400/15">
+                {stats.avgRating !== null ? (
+                  <span className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                    {stats.avgRating.toFixed(1)}
+                  </span>
+                ) : (
+                  <Star className="h-7 w-7 text-yellow-500" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-lg flex items-center gap-1.5">
+                  Оценка граждан
+                  {stats.avgRating !== null && (
+                    <span className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          size={12}
+                          className={
+                            n <= Math.round(stats.avgRating!)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground/30"
+                          }
+                        />
+                      ))}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {stats.ratingCount > 0
+                    ? `Кол-во оценок: ${stats.ratingCount}`
+                    : "Оценок пока нет"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-3">

@@ -77,5 +77,14 @@
   },
   "help": {
     "user": "📚 **Legal Clinic Bot Usage Guide**\n\n**Main Functions:**\n\n🔸 **Ask a Question**\n   • Select the appropriate category for your legal question\n   • Describe your situation in detail (minimum 150 characters)\n   • Review the text and confirm submission\n\n🔸 **FAQ (Frequently Asked Questions)**\n   • Browse ready answers to popular questions\n   • Select a category and find a suitable question\n\n🔸 **My Requests**\n   • Track the status of your requests\n   • View received answers\n\n**📋 Request Statuses:**\n• ⏳ Under Review\n• 👨‍💼 Awaiting Executor\n• 🔄 In Progress\n• ✅ Answer Under Review\n• ✅ Closed\n• ❌ Declined\n\n**📝 Question Requirements:**\n• Minimum 150 characters in request text\n• Clearly formulate your legal situation\n\n**⏰ Processing Time:**\n• Admin review: usually within 1-2 days\n• Student answer preparation: 3-7 days\n• Admin answer review: 1-2 days"
+  },
+  "rating": {
+    "prompt": "⭐ <b>Please rate the quality of the answer</b>\n\nFrom 1 (poor) to 5 (excellent). Select the number of stars and press «Confirm». You can change your rating until you confirm it.",
+    "current": "Your rating: {{stars}}",
+    "confirm_btn": "✅ Confirm",
+    "change_btn": "✏️ Change",
+    "thanks": "🙏 Thank you for your rating!\n\nYour rating: {{stars}}",
+    "pick_first": "Please pick a number of stars first",
+    "already_rated": "Rating already confirmed"
   }
 }

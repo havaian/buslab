@@ -25,7 +25,10 @@ async function request<T>(
   if (res.status === 401) {
     localStorage.removeItem("token");
     // Защита от бесконечного редиректа если /login сама делает API-запрос
-    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    if (
+      typeof window !== "undefined" &&
+      !window.location.pathname.startsWith("/login")
+    ) {
       window.location.href = "/login";
     }
     throw new Error("Unauthorized");
@@ -85,7 +88,7 @@ export const requestsApi = {
     post<{ sent: boolean }>(`/requests/${id}/message`, { text }),
   getHistory: (id: string) =>
     get<RequestHistoryEntry[]>(`/requests/${id}/history`),
-    // Admin draft + file management
+  // Admin draft + file management
   saveAnswerDraft: (id: string, answerText: string, adminComment?: string) =>
     patch<Request>(`/requests/${id}/save-answer`, { answerText, adminComment }),
   addAnswerFiles: (id: string, files: FileList) => {
@@ -260,8 +263,8 @@ export const universitiesApi = {
 // ── Scripts runner ────────────────────────────────────────────────────────
 
 export const scriptsApi = {
-  run:     ()           => post<{ runId: string }>("/scripts/parse-poll/run"),
-  logs:    ()           => get<ScriptRun[]>("/scripts/parse-poll/logs"),
+  run: () => post<{ runId: string }>("/scripts/parse-poll/run"),
+  logs: () => get<ScriptRun[]>("/scripts/parse-poll/logs"),
   getById: (id: string) => get<ScriptRun>(`/scripts/runs/${id}`),
 };
 
@@ -380,6 +383,9 @@ export interface Request {
   timerDeadline: string | null;
   timerWarningSent: boolean;
   timerExpiredNotified: boolean;
+  // Оценка от гражданина (выставляется после получения ответа)
+  rating: number | null;
+  ratedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -465,6 +471,9 @@ export interface StudentStats {
   avgTime: number;
   approvalRate: number;
   rating: number | null;
+  // Средняя оценка от граждан (1-5), округлена до 1 знака. null если оценок нет.
+  avgRating: number | null;
+  ratingCount: number;
 }
 
 export interface StudentLogEntry {
@@ -511,6 +520,22 @@ export interface DashboardStats {
     byUniversity: { _id: string; name: string; count: number }[];
     byFaculty: { _id: string; name: string; count: number }[];
     byCourse: { course: number; count: number }[];
+  };
+  // Статистика по оценкам граждан. Все поля считаются только по обращениям
+  // status="closed" с подтверждённой оценкой (ratedAt != null).
+  ratings: {
+    avg: number | null; // средняя оценка 1..5 (округлена до 1 знака)
+    count: number; // всего оценок
+    ratedShare: number; // % закрытых обращений, получивших оценку
+    distribution: { star: number; count: number }[]; // 5 точек: 1..5
+    top: {
+      _id: string;
+      avg: number;
+      count: number;
+      firstName: string;
+      lastName: string;
+      username: string | null;
+    }[];
   };
 }
 

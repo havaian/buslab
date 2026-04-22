@@ -140,12 +140,108 @@ export class StatsService {
       count: c.count as number,
     }));
 
+    // ── Оценки граждан ───────────────────────────────────────────────────
+    // Три параллельных агрегата по Request с фильтром:
+    //   status: "closed", ratedAt != null, rating ∈ [1..5]
+    // Только финально подтверждённые оценки (черновики игнорируются).
+    const ratingMatch = {
+      status: "closed",
+      ratedAt: { $ne: null },
+      rating: { $gte: 1, $lte: 5 },
+    };
+
+    const [ratingOverallRaw, ratingDistRaw, ratingTopRaw] = await Promise.all([
+      // 1) Общая статистика по оценкам
+      this.requestModel.aggregate([
+        { $match: ratingMatch },
+        {
+          $group: {
+            _id: null,
+            avg: { $avg: "$rating" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      // 2) Распределение по звёздам (1..5)
+      this.requestModel.aggregate([
+        { $match: ratingMatch },
+        { $group: { _id: "$rating", count: { $sum: 1 } } },
+      ]),
+      // 3) Топ студентов по средней оценке. Порог count >= 3.
+      //    $lookup сразу подтягивает имя и username студента.
+      this.requestModel.aggregate([
+        { $match: ratingMatch },
+        {
+          $group: {
+            _id: "$studentId",
+            avg: { $avg: "$rating" },
+            count: { $sum: 1 },
+          },
+        },
+        { $match: { count: { $gte: 3 } } },
+        { $sort: { avg: -1, count: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "student",
+          },
+        },
+        { $unwind: { path: "$student", preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 1,
+            avg: 1,
+            count: 1,
+            firstName: "$student.firstName",
+            lastName: "$student.lastName",
+            username: "$student.username",
+          },
+        },
+      ]),
+    ]);
+
+    // Для "процент оценённых" нам нужно общее число закрытых — оно уже посчитано
+    // выше как `closed` через countDocuments({ status: "closed" }).
+    const ratingCount: number = ratingOverallRaw[0]?.count ?? 0;
+    const ratingAvg: number | null =
+      ratingCount > 0 ? Math.round(ratingOverallRaw[0].avg * 10) / 10 : null;
+    const ratedShare: number =
+      closed > 0 ? Math.round((ratingCount / closed) * 100) : 0;
+
+    // Нормализуем распределение — всегда 5 точек, даже если некоторые пустые
+    const distMap = new Map<number, number>(
+      ratingDistRaw.map((r: any) => [r._id as number, r.count as number])
+    );
+    const ratingDistribution = [1, 2, 3, 4, 5].map((star) => ({
+      star,
+      count: distMap.get(star) ?? 0,
+    }));
+
+    const ratingTop = ratingTopRaw.map((r: any) => ({
+      _id: String(r._id),
+      avg: Math.round(r.avg * 10) / 10,
+      count: r.count as number,
+      firstName: r.firstName ?? "",
+      lastName: r.lastName ?? "",
+      username: r.username ?? null,
+    }));
+
     return {
       totals: { total, pending, inProgress, closed },
       periods: { today, week, month },
       activeStudents: activeStudents.length,
       charts: { byDay, byCategory, byStatus },
       users: { byUniversity, byFaculty, byCourse },
+      ratings: {
+        avg: ratingAvg,
+        count: ratingCount,
+        ratedShare, // % закрытых обращений, получивших подтверждённую оценку
+        distribution: ratingDistribution,
+        top: ratingTop,
+      },
     };
   }
 

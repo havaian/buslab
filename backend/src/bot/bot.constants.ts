@@ -21,6 +21,10 @@ export const CB = {
   // Admin - answer moderation
   APPROVE_ANSWER: "approve_answer", // approve_answer:<requestId>
   DECLINE_ANSWER: "decline_answer", // decline_answer:<requestId>
+
+  // Citizen - rate answer
+  RATE_PICK: "rate", // rate:<requestId>:<stars 1-5>  - предварительный выбор
+  RATE_CONFIRM: "rate_confirm", // rate_confirm:<requestId> - финальное подтверждение
 } as const;
 
 // Regex builders - used in bot.update.ts bot.callbackQuery() calls
@@ -33,6 +37,8 @@ export const CBRegex = {
   DECLINE_REQUEST: /^decline_request:(.+)$/,
   APPROVE_ANSWER: /^approve_answer:(.+)$/,
   DECLINE_ANSWER: /^decline_answer:(.+)$/,
+  RATE_PICK: /^rate:([a-f\d]{24}):([1-5])$/,
+  RATE_CONFIRM: /^rate_confirm:([a-f\d]{24})$/,
 } as const;
 
 // ── Supported locales ──────────────────────────────────────────────────────

@@ -94,6 +94,12 @@ export class BotUpdate {
       this.handleDeclineAnswerInit(ctx)
     );
 
+    // Citizen rating callbacks
+    bot.callbackQuery(CBRegex.RATE_PICK, (ctx) => this.handleRatePick(ctx));
+    bot.callbackQuery(CBRegex.RATE_CONFIRM, (ctx) =>
+      this.handleRateConfirm(ctx)
+    );
+
     // All text messages
     bot.on("message:text", (ctx) => this.handleText(ctx));
 
@@ -570,6 +576,132 @@ export class BotUpdate {
       requestId,
       promptMessageId: prompt.message_id,
     });
+  }
+
+  // ── Citizen: rate answer ─────────────────────────────────────────────────
+
+  private async handleRatePick(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+    const requestId = ctx.match![1];
+    const star = parseInt(ctx.match![2], 10);
+
+    const result = await this.requestsService.rateAnswer(
+      requestId,
+      ctx.from.id,
+      star,
+      false
+    );
+
+    if (result.outcome === "owner_mismatch" || result.outcome === "not_found") {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    if (result.outcome === "already_confirmed") {
+      // Получаем язык через populate внутри rateAnswer
+      const locale = (result.language as Locale) || "ru";
+      await ctx.answerCallbackQuery(
+        this.i18n.t(locale, "rating.already_rated")
+      );
+      return;
+    }
+    if (result.outcome === "bad_status") {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    // updated: обновляем клавиатуру через Grammy — контекст уже содержит ссылку
+    // на это же сообщение, отдельный notifications-метод не нужен.
+    const locale = (result.language as Locale) || "ru";
+    const prompt = this.i18n.t(locale, "rating.prompt");
+    const current = this.i18n.t(locale, "rating.current", {
+      stars: this.starsText(result.rating!),
+    });
+    const confirmLabel = this.i18n.t(locale, "rating.confirm_btn");
+
+    try {
+      await ctx.editMessageText(`${prompt}\n\n${current}`, {
+        parse_mode: "HTML",
+        reply_markup: this.buildRatingKb(
+          requestId,
+          result.rating!,
+          confirmLabel
+        ),
+      });
+    } catch {
+      // редактирование может упасть если текст/клавиатура не изменились
+    }
+    await ctx.answerCallbackQuery();
+  }
+
+  private async handleRateConfirm(ctx: BotContext): Promise<void> {
+    if (!ctx.from) return;
+    const requestId = ctx.match![1];
+
+    const result = await this.requestsService.rateAnswer(
+      requestId,
+      ctx.from.id,
+      null,
+      true
+    );
+
+    const locale = (result.language as Locale) || "ru";
+
+    if (result.outcome === "owner_mismatch" || result.outcome === "not_found") {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+    if (result.outcome === "already_confirmed") {
+      await ctx.answerCallbackQuery(
+        this.i18n.t(locale, "rating.already_rated")
+      );
+      return;
+    }
+    if (result.outcome === "need_pick") {
+      await ctx.answerCallbackQuery(this.i18n.t(locale, "rating.pick_first"));
+      return;
+    }
+    if (result.outcome === "bad_status") {
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    // confirmed: финализируем сообщение
+    const thanks = this.i18n.t(locale, "rating.thanks", {
+      stars: this.starsText(result.rating!),
+    });
+    try {
+      await ctx.editMessageText(thanks, {
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: [] },
+      });
+    } catch {
+      // non-fatal
+    }
+    await ctx.answerCallbackQuery("✅");
+  }
+
+  /** Строит инлайн-клавиатуру для оценки — дублирует логику notifications.buildRatingKeyboard,
+   *  но работает через Grammy типы. */
+  private buildRatingKb(
+    requestId: string,
+    selected: number | null,
+    confirmLabel: string
+  ) {
+    const starsRow = [1, 2, 3, 4, 5].map((n) => ({
+      text: selected === n ? `⭐${n}` : `${n}`,
+      callback_data: `rate:${requestId}:${n}`,
+    }));
+    const rows: any[] = [starsRow];
+    if (selected) {
+      rows.push([
+        { text: confirmLabel, callback_data: `rate_confirm:${requestId}` },
+      ]);
+    }
+    return { inline_keyboard: rows };
+  }
+
+  private starsText(n: number): string {
+    return "⭐".repeat(n);
   }
 
   // ── Text message router ──────────────────────────────────────────────────

@@ -97,6 +97,20 @@ export class Request {
     ref: string;
     source: string;
   }[];
+
+  // ── Citizen rating of the final answer ─────────────────────────────────
+  // Оценка выставляется гражданином после получения ответа (1-5).
+  // До подтверждения значение может перезаписываться; после ratedAt - залочено.
+  @Prop({ default: null, type: Number, min: 1, max: 5 })
+  rating: number | null;
+
+  // Момент финального подтверждения оценки. Пока null - оценка меняется.
+  @Prop({ default: null })
+  ratedAt: Date | null;
+
+  // message_id сообщения с клавиатурой оценки (для редактирования)
+  @Prop({ default: null, type: Number })
+  ratingMessageId: number | null;
 }
 
 export const RequestSchema = SchemaFactory.createForClass(Request);
@@ -108,3 +122,6 @@ RequestSchema.index({ createdAt: -1 });
 RequestSchema.index({ status: 1 });
 RequestSchema.index({ studentId: 1, status: 1 });
 RequestSchema.index({ createdAt: -1 });
+// Для агрегаций по оценкам (рейтинг студента, топ, распределение)
+RequestSchema.index({ studentId: 1, rating: 1 });
+RequestSchema.index({ rating: 1 });

@@ -18,6 +18,7 @@ import {
   Upload,
   Trash2,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import {
   requestsApi,
@@ -321,6 +322,52 @@ export default function RequestDetailPage() {
                         </div>
                       )}
                   </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Citizen rating card - shown only for closed requests */}
+          {request.status === "closed" && (
+            <Card>
+              <CardHeader className="pb-1 pt-3 px-4">
+                <CardTitle className="text-sm flex items-center gap-1.5">
+                  <Star size={14} />
+                  Оценка пользователя
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-3 pt-1">
+                {request.ratedAt && request.rating ? (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          size={18}
+                          className={
+                            n <= request.rating!
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground/30"
+                          }
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm font-medium">
+                      {request.rating} / 5
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      · {formatDate(request.ratedAt)}
+                    </span>
+                  </div>
+                ) : request.rating ? (
+                  <p className="text-sm text-muted-foreground">
+                    Пользователь выбрал {request.rating} ⭐, но не подтвердил
+                    оценку.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Пользователь ещё не оценил ответ.
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -730,9 +777,18 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
     label: "Ответ изменён администратором",
     color: "bg-yellow-500",
   },
-  answer_draft_saved: { label: "Ответ на обращение изменён администратором", color: "bg-gray-400" },
-  answer_file_added: { label: "Файл добавлен администратором", color: "bg-blue-400" },
-  answer_file_removed: { label: "Файл удалён администратором", color: "bg-orange-400" },
+  answer_draft_saved: {
+    label: "Ответ на обращение изменён администратором",
+    color: "bg-gray-400",
+  },
+  answer_file_added: {
+    label: "Файл добавлен администратором",
+    color: "bg-blue-400",
+  },
+  answer_file_removed: {
+    label: "Файл удалён администратором",
+    color: "bg-orange-400",
+  },
 };
 
 const STATUS_LABELS: Record<string, string> = {

@@ -20,6 +20,7 @@ export enum RequestHistoryAction {
   ANSWER_FILE_ADDED = "answer_file_added", // admin added file to student's answer
   ANSWER_FILE_REMOVED = "answer_file_removed", // admin removed file from student's answer
   ANSWER_DRAFT_SAVED = "answer_draft_saved", // admin saved student's updated answer
+  ANSWER_RATED = "answer_rated", // citizen rated the final answer (1-5)
 }
 
 @Schema({ timestamps: true, collection: "request_history" })
